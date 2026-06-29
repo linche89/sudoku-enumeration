@@ -1,0 +1,953 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en-gb" xml:lang="en-gb">
+<head>
+<base href="http://forum.enjoysudoku.com/"/>
+<link rel="canonical" href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html" />
+<meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+<title>Su-Doku's maths : General</title>
+<meta http-equiv="content-style-type" content="text/css" />
+<meta http-equiv="content-language" content="en-gb" />
+<meta http-equiv="imagetoolbar" content="no" />
+<meta name="content-language" content="en" />
+<meta name="title" content="Su-Doku's maths : General" />
+<meta name="description" content="Whilst I love solving tough Su-Dokus I have a couple of niggling questions in the back of my head about the puzzle. 1. How many ..." />
+<meta name="keywords" content="second, grids, such, doku, maths, long, interesting, seems, start, following, elimination" />
+<meta name="category" content="general" />
+<meta name="robots" content="index,follow" />
+<meta name="distribution" content="global" />
+<meta name="resource-type" content="document" />
+<meta name="copyright" content="The New Sudoku Players Forum" />
+
+
+
+
+<!--
+	phpBB style name: prosilver
+	Based on style:   prosilver (this is the default phpBB3 style)
+	Original author:  Tom Beddard ( http://www.subBlue.com/ )
+	Modified by:
+-->
+
+<script type="text/javascript">
+// <![CDATA[
+	var jump_page = 'Enter the page number you wish to go to:';
+	var on_page = '1';
+	var per_page = '15';
+	var base_url = 'http://forum.enjoysudoku.com/su-doku-s-maths-t44.html';
+	var style_cookie = 'phpBBstyle';
+	var style_cookie_settings = '; path=/; domain=forum.enjoysudoku.com';
+	var onload_functions = new Array();
+	var onunload_functions = new Array();
+	// www.phpBB-SEO.com SEO TOOLKIT BEGIN
+	var seo_delim_start = '-';
+	var seo_static_pagination = 'page';
+	var seo_ext_pagination = '.html';
+	var seo_external = true;
+	var seo_external_sub = false;
+	var seo_ext_classes = false;
+	var seo_hashfix = false;
+	// www.phpBB-SEO.com SEO TOOLKIT END
+
+	
+
+	/**
+	* Find a member
+	*/
+	function find_username(url)
+	{
+		popup(url, 760, 570, '_usersearch');
+		return false;
+	}
+
+	/**
+	* New function for handling multiple calls to window.onload and window.unload by pentapenguin
+	*/
+	window.onload = function()
+	{
+		for (var i = 0; i < onload_functions.length; i++)
+		{
+			eval(onload_functions[i]);
+		}
+	};
+
+	window.onunload = function()
+	{
+		for (var i = 0; i < onunload_functions.length; i++)
+		{
+			eval(onunload_functions[i]);
+		}
+	};
+
+// ]]>
+</script>
+<script type="text/javascript" src="http://forum.enjoysudoku.com/styles/prosilver/template/styleswitcher.js"></script>
+<script type="text/javascript" src="http://forum.enjoysudoku.com/styles/prosilver/template/forum_fn.js"></script>
+
+<link href="http://forum.enjoysudoku.com/styles/prosilver/theme/print.css" rel="stylesheet" type="text/css" media="print" title="printonly" />
+<link href="http://forum.enjoysudoku.com/style.php?id=1&amp;lang=en&amp;sid=af9a382f252980a7fee51ee8c7822dad" rel="stylesheet" type="text/css" media="screen, projection" />
+
+<link href="http://forum.enjoysudoku.com/styles/prosilver/theme/normal.css" rel="stylesheet" type="text/css" title="A" />
+<link href="http://forum.enjoysudoku.com/styles/prosilver/theme/medium.css" rel="alternate stylesheet" type="text/css" title="A+" />
+<link href="http://forum.enjoysudoku.com/styles/prosilver/theme/large.css" rel="alternate stylesheet" type="text/css" title="A++" />
+
+
+
+</head>
+
+<body id="phpbb" class="section-viewtopic ltr">
+
+<div id="wrap">
+	<a id="top" name="top" accesskey="t"></a>
+	<div id="page-header">
+		<div class="headerbar">
+			<div class="inner"><span class="corners-top"><span></span></span>
+
+			<div id="site-description">
+				<a href="http://forum.enjoysudoku.com/" title="Board index" id="logo"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/site_logo.gif" width="52" height="52" alt="" title="" /></a>
+				<h1>The New Sudoku Players' Forum</h1>
+				<p>Sponsored by Enjoy Sudoku</p>
+				<p class="skiplink"><a href="#start_here">Skip to content</a></p>
+			</div>
+
+		
+			<div id="search-box">
+				<form action="./search.php?sid=af9a382f252980a7fee51ee8c7822dad" method="get" id="search">
+				<fieldset>
+					<input name="keywords" id="keywords" type="text" maxlength="128" title="Search for keywords" class="inputbox search" value="Search…" onclick="if(this.value=='Search…')this.value='';" onblur="if(this.value=='')this.value='Search…';" />
+					<input class="button2" value="Search" type="submit" /><br />
+					<a href="./search.php?sid=af9a382f252980a7fee51ee8c7822dad" title="View the advanced search options">Advanced search</a> <input type="hidden" name="sid" value="af9a382f252980a7fee51ee8c7822dad" />
+
+				</fieldset>
+				</form>
+			</div>
+		
+
+			<span class="corners-bottom"><span></span></span></div>
+		</div>
+
+		<div class="navbar">
+			<div class="inner"><span class="corners-top"><span></span></span>
+
+			<ul class="linklist navlinks">
+				<li class="icon-home"><a href="http://forum.enjoysudoku.com/" accesskey="h">Board index</a>  <strong>&#8249;</strong> <a href="http://forum.enjoysudoku.com/sudoku-the-puzzle-f5.html">Sudoku: the puzzle</a> <strong>&#8249;</strong> <a href="http://forum.enjoysudoku.com/general-f7.html">General</a></li>
+
+				<li class="rightside"><a href="#" onclick="fontsizeup(); return false;" onkeypress="return fontsizeup(event);" class="fontsize" title="Change font size">Change font size</a></li>
+
+				<li class="rightside"><a href="http://forum.enjoysudoku.com/viewtopic.php?f=7&amp;t=44&amp;start=0&amp;view=print&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Print view" accesskey="p" class="print">Print view</a></li>
+			</ul>
+
+			
+
+			<ul class="linklist rightside">
+				<li class="icon-faq"><a href="http://forum.enjoysudoku.com/faq.php?sid=af9a382f252980a7fee51ee8c7822dad" title="Frequently Asked Questions">FAQ</a></li>
+				<li class="icon-register"><a href="http://forum.enjoysudoku.com/ucp.php?mode=register&amp;sid=af9a382f252980a7fee51ee8c7822dad">Register</a></li>
+					<li class="icon-logout"><a href="http://forum.enjoysudoku.com/ucp.php?mode=login&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Login" accesskey="x">Login</a></li>
+				
+			</ul>
+
+			<span class="corners-bottom"><span></span></span></div>
+		</div>
+
+	</div>
+
+	<a name="start_here"></a>
+	<div id="page-body">
+		
+<h2><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html">Su-Doku's maths</a></h2>
+<!-- NOTE: remove the style="display: none" when you want to have the forum description on the topic body --><div style="display: none !important;">Everything about Sudoku that doesn't fit in one of the other sections<br /></div>
+
+<div class="topic-actions">
+
+	<div class="buttons">
+	
+		<div class="reply-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=reply&amp;f=7&amp;t=44&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Post a reply"><span></span>Post a reply</a></div>
+	
+	</div>
+
+	
+		<div class="search-box">
+			<form method="get" id="topic-search" action="./search.php?sid=af9a382f252980a7fee51ee8c7822dad">
+			<fieldset>
+				<input class="inputbox search tiny"  type="text" name="keywords" id="search_keywords" size="20" value="Search this topic…" onclick="if(this.value=='Search this topic…')this.value='';" onblur="if(this.value=='')this.value='Search this topic…';" />
+				<input class="button2" type="submit" value="Search" />
+				<input type="hidden" name="t" value="44" />
+<input type="hidden" name="sf" value="msgonly" />
+<input type="hidden" name="sid" value="af9a382f252980a7fee51ee8c7822dad" />
+
+			</fieldset>
+			</form>
+		</div>
+	
+		<div class="pagination">
+			615 posts
+			 &bull; <a href="#" onclick="jumpto(); return false;" title="Click to jump to page…">Page <strong>1</strong> of <strong>41</strong></a> &bull; <span><strong>1</strong><span class="page-sep">, </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-15.html">2</a><span class="page-sep">, </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-30.html">3</a><span class="page-sep">, </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-45.html">4</a><span class="page-sep">, </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-60.html">5</a><span class="page-dots"> ... </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-600.html">41</a></span>
+		</div>
+	
+
+</div>
+<div class="clear"></div>
+
+
+	<div id="p106" class="post bg2">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=106&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 class="first"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p106">Su-Doku's maths</a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post106.html#p106"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong><a href="http://forum.enjoysudoku.com/member72.html">steveb</a></strong> &raquo; Mon Mar 14, 2005 9:31 pm </p>
+
+			
+
+			<div class="content">Whilst I love solving tough Su-Dokus I have a couple of niggling questions in the back of my head about the puzzle.<br /><br />1. How many ways are there of populating an empty 9*9 grid such that it satisfies the Su-Doku rules?<br /><br />2. What is the minimum number of clues (cells) required to give a unique solution?<br /><br />If anyone has the answers (and reasons/calculations) - please let me know!<br /><br />Thanks<br />Steveb</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile106">
+			<dt>
+				<a href="http://forum.enjoysudoku.com/member72.html">steveb</a>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		<dd><strong>Posts:</strong> 2</dd><dd><strong>Joined:</strong> 14 March 2005</dd>
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p108" class="post bg1">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=108&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p108">Re: Su-Doku's Maths.</a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post108.html#p108"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong><a href="http://forum.enjoysudoku.com/member70.html">howshaw</a></strong> &raquo; Tue Mar 15, 2005 12:11 am </p>
+
+			
+
+			<div class="content">Steve. I'm working on the &quot;number of puzzles&quot; problem. I think I have the number of valid arrangements of the top three rows, and perhaps the left three columns as well (boxes 1, 2, 3, 4, 7) at around 9x10(19). My approach is to fill row 1 freely (9! = 9x8x7x6x5x4x3x2x1 permutations) and then divide rows two and three into 6 bands. Then work down columns 1 2 and 3 as stacks. I am relying heavily on the symmetry. I don't have the solution in a presentable form yet and I can't get my head around how boxes 5,6,8,9 releate to the others yet. I haven't done this sort of thing for 25 years!<br />By the way I've found one beautiful looking puzzle...<br /><br />1 2 3 . 4 5 6 . 7 8 9<br />4 5 6 . 7 <span style="font-weight: bold">8</span> 9 . 1 <span style="text-decoration: underline">2</span> 3<br />7 8 9 . 1 2 <span style="font-weight: bold">3</span> . 4 5 <span style="text-decoration: underline">6</span><br /><br /><span style="text-decoration: underline">2</span> 3 4 . 5 6 <span style="font-weight: bold"><span style="font-style: italic">7</span></span> . <span style="font-weight: bold">8</span> 9 1<br />5 <span style="text-decoration: underline">6</span> 7 . 8 <span style="font-weight: bold"><span style="font-style: italic">9</span></span> 1 . 2 <span style="font-weight: bold">3</span> 4<br />8 9 1 . 2 3 4 . 5 6 7<br /><br />3 4 5 . 6 7 8 . 9 1 2<br />6 <span style="font-weight: bold"><span style="font-style: italic">7</span></span> 8 . 9 1 2 . 3 4 5<br /><span style="font-weight: bold"><span style="font-style: italic">9</span></span> 1 2 . 3 4 5 . 6 7 8<br /><br />look at cooresponding cells in each box, top left for example. Follow a diagonal out of one box into another and see that two digits repeat. See the 83 in bold and the 79 in bold-italic and it even wraps at the grid boundary. See the 26 underlined!<br />The stacks of box 4 (for example) mirror cells 1, 2, 3 of boxes 4, 5, 6 and that reminds me of something about Gaussian-pivioting arrays and determinants. I know the digits are just symbols but I wonder if it might be worth calculating the determinants of puzzles?</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile108">
+			<dt>
+				<a href="http://forum.enjoysudoku.com/member70.html">howshaw</a>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		<dd><strong>Posts:</strong> 9</dd><dd><strong>Joined:</strong> 13 March 2005</dd>
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p117" class="post bg2">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=117&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p117">Minimal Number for Uniqueness</a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post117.html#p117"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong><a href="http://forum.enjoysudoku.com/member73.html">dfj</a></strong> &raquo; Wed Mar 16, 2005 4:15 pm </p>
+
+			
+
+			<div class="content">Does a Sudoku have to have only the minimal number of entries in order to guarentee a unique solution? I have been looking at number 89 from the Times (March 11) and whilst it is unique, if you remove the 9 from r6c7 it still<br />appears to be unique.<br /><br />In terms of the number of entries required to guarentee uniqueness, I am not sure if this is a constant figure as it may depend on which cells are chosen.</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile117">
+			<dt>
+				<a href="http://forum.enjoysudoku.com/member73.html">dfj</a>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		<dd><strong>Posts:</strong> 1</dd><dd><strong>Joined:</strong> 16 March 2005</dd>
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p138" class="post bg1">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=138&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p138">Permutations</a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post138.html#p138"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong>Guest</strong> &raquo; Thu Mar 17, 2005 8:23 pm </p>
+
+			
+
+			<div class="content">In reply to the first question, this puzzle was set as an Easter competition yesterday by my maths teacher. To cut a long story short (involving one very late night last night), I came up with a solution that has convinced not only me but (so far) my teacher. I won't post the method until it has been checked properly, but in the mean time the answer I came up with was something in the region of 6.47x10^17. I think howshaw is roughly on the same line of thought as I was.</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile138">
+			<dt>
+				<strong>Guest</strong>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p235" class="post bg2">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=235&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p235"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post235.html#p235"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong>Guest</strong> &raquo; Mon Mar 21, 2005 9:48 am </p>
+
+			
+
+			<div class="content">Josh - what did your probability grid look like? I followed the same idea, populating from left to right, line by line the number of possibilities for each cell - the first line looks like this (no disputing this):<br /><br />9 8 7 6 5 4 3 2 1<br /><br />But I think the next line though looks like this:<br /><br />6 5 4 6 5 4 3 2 1<br /><br />This is because the the 1st box all ready has three numbers on the first line. Following the same logic, line 3 looks like this:<br /><br />3 2 1 3 2 1 3 2 1<br /><br />This leads to a possibility grid looking like this:<br /><br />9 8 7 6 5 4 3 2 1<br />6 5 4 6 5 4 3 2 1<br />3 2 1 3 2 1 3 2 1<br />6 6 6 6 5 4 3 2 1<br />5 5 4 5 5 4 3 2 1<br />4 4 4 4 4 4 3 2 1<br />3 3 3 3 3 3 3 2 1<br />2 2 2 2 2 2 3 2 1<br />1 1 1 1 1 1 1 1 1<br /><br />Multiplying these out you get around 1.74 x 10 ^ 33</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile235">
+			<dt>
+				<strong>Guest</strong>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p244" class="post bg1">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=244&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p244"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post244.html#p244"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong><a href="http://forum.enjoysudoku.com/member1366.html">Guest</a></strong> &raquo; Mon Mar 21, 2005 7:02 pm </p>
+
+			
+
+			<div class="content">I disagree with the second line<br /><br />The grid starts 9 8 7 6 5 4 3 2 1, but the second line is not<br />6 5 4 6 5 4 3 2 1. The second 6 can't be right since there may not be 6 choices available (depending on the choices in the first 6 5 4 box it could be as little as 3)</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile244">
+			<dt>
+				<a href="http://forum.enjoysudoku.com/member1366.html">Guest</a>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		<dd><strong>Posts:</strong> 312</dd><dd><strong>Joined:</strong> 25 November 2005</dd>
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p249" class="post bg2">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=249&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p249"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post249.html#p249"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong>Guest</strong> &raquo; Mon Mar 21, 2005 9:15 pm </p>
+
+			
+
+			<div class="content">I wondered about that - it is one possibility, but it is also possible that the first three cells don't eliminate any possibilites from the second box.<br /><br />So, to catch <span style="font-style: italic">all</span> possibilities, it has to be a six. What would you have put on the second line?<br /><br />PS you didn't leave a name - is it Josh again?</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile249">
+			<dt>
+				<strong>Guest</strong>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p272" class="post bg1">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=272&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p272"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post272.html#p272"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong>Guest</strong> &raquo; Wed Mar 23, 2005 1:51 am </p>
+
+			
+
+			<div class="content">I agree that the second line is incorrect. It can be 654654 or it can be 654321 or indeed others. It is a nice try, but I suspect 10^33 is an overestimate.</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile272">
+			<dt>
+				<strong>Guest</strong>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p274" class="post bg2">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=274&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p274"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post274.html#p274"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong>Guest</strong> &raquo; Wed Mar 23, 2005 3:19 am </p>
+
+			
+
+			<div class="content">Well, it certainly can't be both, or others, it has to be something!<br /><br />Thinking a bit harder about it, the possibilities are that the first three cells on row 2 include 0,1,2 or 3 of the top 3 in box 2. This gives four possibilities for the matrix on the second line:<br /><br />a) 6 5 4 3 2 1<br />b) 5 4 3 4 3 2<br />c) 4 3 2 5 4 3<br />d) 3 2 1 6 5 4<br /><br />the middle two multiply out to 1440, and the other two to 720, so to get the highest number of prossibilities, I think the first three boxes looks like this<br /><br />9 8 7 6 5 4 3 2 1<br />5 4 3 4 3 2 3 2 1<br />3 2 1 3 2 1 3 2 1<br /><br />I still think I'm missing a trick though. I'm half wondering if you actually need to add together the possibilities from four boxes, each with the second line starting with one of the above options. This would also need to be done for the other points of conflict (e.g. where I put 6 6 6 on row 4).<br /><br />However you do it - it's a big number!</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile274">
+			<dt>
+				<strong>Guest</strong>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p293" class="post bg1">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=293&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p293"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post293.html#p293"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong><a href="http://forum.enjoysudoku.com/member1366.html">Guest</a></strong> &raquo; Thu Mar 24, 2005 1:31 am </p>
+
+			
+
+			<div class="content">Is it easier if you calculate the total number of 9x9 grids, and then subtract the number that DON'T satisfy the Sudoku property?!<br /><br />Since: Total No. of grids = Grids with Sudoku property + grids without.</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile293">
+			<dt>
+				<a href="http://forum.enjoysudoku.com/member1366.html">Guest</a>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		<dd><strong>Posts:</strong> 312</dd><dd><strong>Joined:</strong> 25 November 2005</dd>
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p296" class="post bg2">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=296&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p296"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post296.html#p296"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong>Guest</strong> &raquo; Thu Mar 24, 2005 9:13 am </p>
+
+			
+
+			<div class="content">Maybe, how do you calculate the number of grids that can't be puzzles - isn't this the same problem?</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile296">
+			<dt>
+				<strong>Guest</strong>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p302" class="post bg1">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=302&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p302"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post302.html#p302"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong><a href="http://forum.enjoysudoku.com/member1366.html">Guest</a></strong> &raquo; Thu Mar 24, 2005 8:56 pm </p>
+
+			
+
+			<div class="content">Any ideas for working out how many <span style="font-style: italic">unique</span> grids there could be?<br /><br />i.e. if you were to swap all the 6s for 3s you would have essentially the same grid</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile302">
+			<dt>
+				<a href="http://forum.enjoysudoku.com/member1366.html">Guest</a>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		<dd><strong>Posts:</strong> 312</dd><dd><strong>Joined:</strong> 25 November 2005</dd>
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p308" class="post bg2">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=308&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p308"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post308.html#p308"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong>Guest</strong> &raquo; Fri Mar 25, 2005 1:37 pm </p>
+
+			
+
+			<div class="content">Hi IJ,<br /><br />I have been thinking about this problem on and off for a couple of days now, and still don't have a definite answer.<br /><br />I think your idea of calculating branching probability is a workable one provided we use a computer, because you really need to keep track of the branches which have implications for later probabilities.<br /><br />I have also tried the elimination method: in total there are 9^81 possible grid layouts; the chance of 1st column satisfying sudoku rule is 9! / 9^9 and you can do this for all other columns and rows in total 18 times. This gives<br /><br />9^81 * (9!/9^9)^18=6x10^22<br /><br />which is clearly an upper bound as we still need to incorporate the box constraint. The trouble here is, (9!/9^9)^9 would be an overkill for the box constraints, leading to a the result that is less than 1! At this point, I don't know how to do the box constraints properly. Any ideas?</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile308">
+			<dt>
+				<strong>Guest</strong>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p322" class="post bg1">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=322&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p322"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post322.html#p322"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong>Guest</strong> &raquo; Sat Mar 26, 2005 12:32 pm </p>
+
+			
+
+			<div class="content">Interesting. How about this...<br /><br />All the rows in insolation give you 9 * 9! possibilities<br /><br />Now, considering columns can only reduce this number, so col 1 at the moment has 9^9 possibilities (column one will be 999999999), but only 9! are valid, so that gives you...<br /><br />(9* 9!) - (9^9-9!) which rationalises to<br /><br />(10*9!)- (9^9)<br /><br />Column two has 8^9 possibilities so we need to take off 8^9 - 9!...<br /><br />(11*9!) - (9^9) - (8^9)<br /><br />So, I think rows and columns alone would give you<br /><br />(18*9!)-(9^9)-(8^9)-(7^9)-(6^9)-(5^9)-(4^9)-(3^9)-(2^9)-9<br /><br />Oh bugger, that's negative too!<br /><br />OK, how about this, start with this grid:<br /><br />987654321<br />876543219<br />765432198<br />654321987<br />543219876<br />432198765<br />321987654<br />219876543<br />198765432<br /><br />This is consistent for rows and columns, so you only need to worry about boxes:<br /><br />So how many possibilities are there in the top box: at the moment 9*8^2*7^3*6^2*5, and how many can actually be valid? 9!, of course, which is true for all the boxes. So that doesn't go anywhere either.<br /><br />Actually, I don't see any sensible answer other than 9*9!. I'm beginning to think this is a self-cancelling problem. By that I mean that although two adjacent boxes, rows or columns with possibilities of 9! seems contradictory, in fact it may not be - consider the first three rows, that might look like this:<br /><br />987987987<br />543543543<br />321321321<br /><br />Although the first row is over egged (this is way over the actual 9! possibilities) the third line is under-egged. Maybe this balance achieves the right answer.<br /><br />What do you think?</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile322">
+			<dt>
+				<strong>Guest</strong>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<div id="p425" class="post bg2">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<div class="postbody">
+			
+				<ul class="profile-icons">
+					<li class="quote-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=quote&amp;f=7&amp;p=425&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Reply with quote"><span>Reply with quote</span></a></li>
+				</ul>
+			
+
+			<h3 ><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#p425"></a></h3>
+			<p class="author"><a href="http://forum.enjoysudoku.com/post425.html#p425"><img src="http://forum.enjoysudoku.com/styles/prosilver/imageset/icon_post_target.gif" width="11" height="9" alt="Post" title="Post" /></a>by <strong>Guest</strong> &raquo; Wed Mar 30, 2005 6:08 pm </p>
+
+			
+
+			<div class="content">A quick calculation suggests that the number of ways of filling the top 3 rows is 948019639680. Here's how I've got this (I hope it's right!):<br /><br />There are 9! = 362880 possible top rows. Choose one, 123456789, say, and then we'll need to multiply the answer by 9!.<br /><br />As has been remarked already, the number of options after this depends on what three numbers are beneath the 123. We'll get a different answer if the three numbers are 456 or 789 (in some order), than if they are mixed (e.g., 457 etc.).<br /><br />123 456 789<br />[456] xxx xxx<br />xxx xxx xxx<br /><br />can be fillied in as:<br /><br />123 456 789<br />[456][789][123]<br />[789][123][456]<br /><br />where [456] means &quot;write in 4, 5 and 6 in some order&quot;. There are 6 arrangements for each of the 6 [xyz], making 6^6 arrangements so far. If the block below 123 is [789], the answer is the same. There are therefore 2*6^6 = 93312 such possibilities.<br /><br />The other possibility occurs when the numbers below 123 are something like 457. (There are 18 choices of three numbers from 456 789, not including 456 and 789 already accounted for.) Let's choose [457] and multiply the final answer by 18. Then the grid is fillied in:<br /><br />123 456 789<br />[457][89a][6bc]<br />[689][7bc][45a]<br /><br />where a, b and c are 1, 2 and 3 in some order. Each of the [xyz] again<br />has 6 possible arrangements. We have to multiply by an additional factor of 3 to account for the choice of a being 1, 2 or 3. In total, we get 18*(6^6)*3 = 2519424 possibilities of this shape.<br /><br />All this gives a total of<br /><br />9! * (6^6) * (2 + 18*3) = 948019639680 possibilities,<br /><br />if I've got this right.<br /><br />Frazer</div>
+
+			
+
+		</div>
+
+		
+			<dl class="postprofile" id="profile425">
+			<dt>
+				<strong>Guest</strong>
+			</dt>
+
+			
+
+		<dd>&nbsp;</dd>
+
+		
+
+		</dl>
+	
+
+		<div class="back2top"><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html#wrap" class="top" title="Top">Top</a></div>
+
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<hr class="divider" />
+
+	<form id="viewtopic" method="post" action="http://forum.enjoysudoku.com/su-doku-s-maths-t44.html">
+
+	<fieldset class="display-options" style="margin-top: 0; ">
+		<a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-15.html" class="right-box right">Next</a>
+		<label>Display posts from previous: <select name="st" id="st"><option value="0" selected="selected">All posts</option><option value="1">1 day</option><option value="7">7 days</option><option value="14">2 weeks</option><option value="30">1 month</option><option value="90">3 months</option><option value="180">6 months</option><option value="365">1 year</option></select></label>
+		<label>Sort by <select name="sk" id="sk"><option value="a">Author</option><option value="t" selected="selected">Post time</option><option value="s">Subject</option></select></label> <label><select name="sd" id="sd"><option value="a" selected="selected">Ascending</option><option value="d">Descending</option></select> <input type="submit" name="sort" value="Go" class="button2" /></label>
+		
+	</fieldset>
+
+	</form>
+	<hr />
+
+
+<div class="topic-actions">
+	<div class="buttons">
+	
+		<div class="reply-icon"><a href="http://forum.enjoysudoku.com/posting.php?mode=reply&amp;f=7&amp;t=44&amp;sid=af9a382f252980a7fee51ee8c7822dad" title="Post a reply"><span></span>Post a reply</a></div>
+	
+	</div>
+
+	
+		<div class="pagination">
+			615 posts
+			 &bull; <a href="#" onclick="jumpto(); return false;" title="Click to jump to page…">Page <strong>1</strong> of <strong>41</strong></a> &bull; <span><strong>1</strong><span class="page-sep">, </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-15.html">2</a><span class="page-sep">, </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-30.html">3</a><span class="page-sep">, </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-45.html">4</a><span class="page-sep">, </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-60.html">5</a><span class="page-dots"> ... </span><a href="http://forum.enjoysudoku.com/su-doku-s-maths-t44-600.html">41</a></span>
+		</div>
+	
+</div>
+
+
+	<p></p><p><a href="http://forum.enjoysudoku.com/general-f7.html" class="left-box left" accesskey="r">Return to General</a></p>
+
+	<form method="post" id="jumpbox" action="http://forum.enjoysudoku.com/viewforum.php" onsubmit="if(this.f.value == -1){return false;}">
+
+	
+		<fieldset class="jumpbox">
+	
+			<label for="f" accesskey="j">Jump to:</label>
+			<select name="f" id="f" onchange="if(this.options[this.selectedIndex].value != -1){ document.forms['jumpbox'].submit() }">
+			
+				<option value="-1">Select a forum</option>
+			<option value="-1">------------------</option>
+				<option value="9">News and announcements</option>
+			
+				<option value="10">&nbsp; &nbsp;About the New Sudoku Players' Forum</option>
+			
+				<option value="5">Sudoku: the puzzle</option>
+			
+				<option value="7" selected="selected">&nbsp; &nbsp;General</option>
+			
+				<option value="33">&nbsp; &nbsp;Puzzles</option>
+			
+				<option value="4">&nbsp; &nbsp;Help with puzzles and solving techniques</option>
+			
+				<option value="6">&nbsp; &nbsp;Advanced solving techniques</option>
+			
+				<option value="8">&nbsp; &nbsp;Interactive games</option>
+			
+				<option value="18">&nbsp; &nbsp;Software</option>
+			
+				<option value="16">Resources</option>
+			
+				<option value="32">&nbsp; &nbsp;Published puzzles</option>
+			
+				<option value="31">&nbsp; &nbsp;Books</option>
+			
+				<option value="17">&nbsp; &nbsp;On the web</option>
+			
+				<option value="11">Related puzzles</option>
+			
+				<option value="12">&nbsp; &nbsp;Sudoku variants</option>
+			
+				<option value="13">&nbsp; &nbsp;Kakuro</option>
+			
+				<option value="14">&nbsp; &nbsp;Other logic puzzles</option>
+			
+				<option value="15">&nbsp; &nbsp;Inventors' studio</option>
+			
+				<option value="19">Off-topic</option>
+			
+				<option value="20">&nbsp; &nbsp;Coffee bar</option>
+			
+				<option value="29">&nbsp; &nbsp;Forum questions and feedback</option>
+			
+			</select>
+			<input type="submit" value="Go" class="button2" />
+		</fieldset>
+	</form>
+
+</div>
+
+<div id="page-footer">
+
+	<div class="navbar">
+		<div class="inner"><span class="corners-top"><span></span></span>
+
+		<ul class="linklist">
+			<li class="icon-home"><a href="http://forum.enjoysudoku.com/" accesskey="h">Board index</a></li>
+				
+			<li class="rightside"><a href="http://forum.enjoysudoku.com/the-team.html">The team</a> &bull; <a href="http://forum.enjoysudoku.com/ucp.php?mode=delete_cookies&amp;sid=af9a382f252980a7fee51ee8c7822dad">Delete all board cookies</a> &bull; All times are UTC </li>
+		</ul>
+		
+		<span class="corners-bottom"><span></span></span></div>
+	</div>
+
+	<div class="copyright">Powered by <a href="https://www.phpbb.com/">phpBB</a>&reg; Forum Software &copy; phpBB Group
+		<br /><br /><a href="http://www.phpbb-seo.com/" title="Search Engine Optimization"><img src="http://forum.enjoysudoku.com/images/phpbb-seo.png" alt="phpBB SEO"/></a>
+	</div>
+</div>
+
+</div>
+
+<div>
+	<a id="bottom" name="bottom" accesskey="z"></a>
+	
+</div>
+
+</body>
+</html>
