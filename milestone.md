@@ -50,10 +50,10 @@
       *闸门通过：* 结果仍 = N₀ 精确（44/44）；单线程 **~0.9 s**（核心组合求和仅 ~0.03 s，其余为一次性建表）——相对基线 344 s 约 **380×**。
 
 ### 阶段 三：收尾
-- [ ] **M7 — 文档与对比**
-      在 `FJ_sudoku.md` 增补"组合计数"章：方法推导、$B(\sigma)$、兼容求和、44 类、三法（枚举/模板/纯组合）性能对比表，并交叉验证。
-- [ ] **M8 — 合并回 master**
-      所有闸门通过后，把 `combinatorial-counting` 合并入 `master`，打 tag。
+- [x] **M7 — 文档与对比** ✅
+      `FJ_sudoku.md` 新增"第二部分：组合计数"（§15–19）：核心因子化、$B(\sigma)=\sum 2^{\text{环}}$、$|compat|=56$ 与 $C(\sigma)$、$C_i=72\,\text{solcount}_i$ 桥梁、280 形状稠密查表、性能曲线、三法对比表 + 交叉验证网。
+- [x] **M8 — 合并回 master** ✅
+      `combinatorial-counting` 合并入 `master`，打 tag。
 
 ---
 
@@ -68,8 +68,8 @@
 | M4 $B(\sigma)$ | ✅ | Σ=564,350,976×1680 | combinatorial |
 | M5 组合 C+N₀ | ✅ | 44/44 C_i + N₀ ✓ / ~60s | combinatorial2 |
 | M6 亚秒级 | ✅ | N₀ ✓ / ~0.9s (核心 0.03s) | combinatorial2 |
-| M7 文档 | ⬜ | 三法对账 | — |
-| M8 合并 | ⬜ | — | — |
+| M7 文档 | ✅ | 三法对账 (§15–19) | FJ_sudoku.md |
+| M8 合并 | ✅ | merged + tag | master |
 
 ---
 
