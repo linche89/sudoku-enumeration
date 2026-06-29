@@ -1,0 +1,5 @@
+fully self-contained combinatorial count (B(sigma) only):
+  sum_{b2,b3} B*C (= N0/1680) = 3970776042869686272
+  N0 = 1680 * that           = 6670903752021072936960
+  expected                    = 6670903752021072936960  [OK]
+  distinct C computed = 39340   time = 28.311 s
