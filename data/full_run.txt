@@ -1,0 +1,19 @@
+================ FJ05 Sudoku enumeration ================
+threads                : 24
+equivalence classes    : 71  (expected 71)
+sum of multiplicities  : 36288  (expected 36288)
+--------------------------------------------------------
+S  = sum(mult*sol)     : 3546146300288
+                expected: 3546146300288  [OK]
+N1 = 72^2 * S          : 18383222420692992
+                expected: 18383222420692992  [OK]
+N0 = 9!  * N1          : 6670903752021072936960
+                expected: 6670903752021072936960  [OK]
+--------------------------------------------------------
+cross-check vs jobs2.txt   : 71/71 multiplicities match
+cross-check vs results2.txt: 71/71 solution counts match
+--------------------------------------------------------
+wall-clock time        : 343.945 s
+CPU time (all threads)  : 342.433 s
+=========================================================
+RESULT: ALL CHECKS PASSED
