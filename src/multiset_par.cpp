@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <string>
 #include <chrono>
+#include <atomic>
 #include <random>
 
 static int C, M, FULLC;
@@ -350,13 +351,20 @@ int main(int argc,char**argv){
         std::vector<Key> raws; raws.reserve(rawW.size());
         for(auto& kv : rawW) raws.push_back(kv.first);
         const long long NR = (long long)raws.size();
+        { double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
+          std::fprintf(stderr,"  band %d phaseA done: distinctRaw=%lld  el=%.1fs (now parallel canon)\n",band,NR,el);
+          std::fflush(stderr); }
         std::vector<Key> cks(NR);
         std::vector<std::vector<int>> creps(keepRep?NR:0);
+        std::atomic<long long> doneCnt{0};
         #pragma omp parallel for schedule(dynamic,128)
         for(long long idx=0; idx<NR; ++idx){
             std::vector<int> rp;
             cks[idx] = canonMS(raws[idx].data(), keepRep?&rp:nullptr);
             if(keepRep) creps[idx] = std::move(rp);
+            long long d=++doneCnt;
+            if((d & 0xFFFFF)==0){ double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
+                std::fprintf(stderr,"    canon %lld/%lld  el=%.1fs\n",d,NR,el); std::fflush(stderr); }
         }
         // PHASE C (serial): reduce into nx + pick a representative per canonical state.
         for(long long idx=0; idx<NR; ++idx){
