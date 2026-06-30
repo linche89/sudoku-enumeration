@@ -107,7 +107,17 @@ static void enumV(SplitCtx& cx, const std::vector<int>& Us, int ui,
 static void distributeU(SplitCtx& cx, const std::vector<int>& Us, int ui,
                         u128 numerFact, u128 denomFact) {
     if (ui == (int)Us.size()) {
-        // all U processed: this split-vector b is complete
+        // all U processed: this split-vector b is complete.
+        // CONSTRAINT (ii): a(b) and a(^b) must be VALID sub-states, i.e. every
+        // row sees exactly C*M (resp. C*(L-M)) symbols.  Reject otherwise.
+        for (int x = 0; x < R; ++x) {
+            int sm = 0, sc = 0;
+            for (int t = 0; t < (int)cx.SM->masks.size(); ++t)
+                if (cx.SM->masks[t] & (1<<x)) sm += cx.mState[t];
+            for (int t = 0; t < (int)cx.SLM->masks.size(); ++t)
+                if (cx.SLM->masks[t] & (1<<x)) sc += cx.cState[t];
+            if (sm != Cg * cx.M || sc != Cg * (cx.L - cx.M)) return;   // invalid split
+        }
         u128 term = (numerFact / denomFact) * N(cx.M, cx.mState) * N(cx.L - cx.M, cx.cState);
         cx.total += term;
         return;
