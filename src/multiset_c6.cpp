@@ -383,6 +383,11 @@ int main(int argc,char**argv){
             std::map<Key,Big>& mynx=tnx[tid];
             std::map<Key,std::vector<int>>& mynr=tnr[tid];
             std::unordered_map<Key,uint64_t,KeyHash> local;     // reused per class, bounded
+            // bounded per-thread canon cache: catches raws that recur across classes without
+            // retaining all raws (capped -> memory stays bounded, the whole point for C=6).
+            std::unordered_map<Key,Key,KeyHash> ccache;
+            std::unordered_map<Key,std::vector<int>,KeyHash> crepc;
+            const size_t CCAP = 2'000'000;   // ~ tens of MB/thread cap
             #pragma omp for schedule(dynamic,1)
             for(long long wi=0; wi<NW; ++wi){
                 const Work& W=work[wi];
@@ -402,10 +407,18 @@ int main(int argc,char**argv){
                     }
                 }
                 for(auto& lp:local){
-                    std::vector<int> rp;
-                    Key ck=canonMS(lp.first.data(), keepRep?&rp:nullptr);
+                    Key ck;
+                    auto cit=ccache.find(lp.first);
+                    if(cit!=ccache.end()){
+                        ck=cit->second;
+                        if(keepRep && !mynr.count(ck)){ auto rit=crepc.find(lp.first); if(rit!=crepc.end()) mynr.emplace(ck,rit->second); }
+                    } else {
+                        std::vector<int> rp;
+                        ck=canonMS(lp.first.data(), keepRep?&rp:nullptr);
+                        if(ccache.size()<CCAP){ ccache.emplace(lp.first,ck); if(keepRep) crepc.emplace(lp.first,rp); }
+                        if(keepRep && !mynr.count(ck)) mynr.emplace(ck,std::move(rp));
+                    }
                     mynx[ck].addMul(w, lp.second*W.nclass);
-                    if(keepRep && !mynr.count(ck)) mynr.emplace(ck,std::move(rp));
                 }
                 long long d=++doneTasks;
                 if((d & 0x3FF)==0){ double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
