@@ -320,3 +320,28 @@ $$N(2{\times}C)=\sum_{(A_0,\dots,A_{C-1})\in\binom{[2C]}{C}^C}\text{stack0}(A_*)
 
 ### 结论(对得起"小心驶得万年船")
 我们把 #P 问题压缩到了"小转移矩阵 + permanent 聚合转移核",并**精确刻画了封顶石的形状与唯一难点**。封顶石本身(permanent 聚合转移)是定义清晰、但需要多会话、每步卡死的真实工程。**不预支未完成的跨越。**
+
+---
+
+## 🔬 封顶石锻造 #2:permanent 身份已验 + canon 瓶颈被精确量出（profiling 救场）
+
+### 已验证的地基（brute,300 随机例）
+**permanent 身份**:`stack0_band(A | 列剩余集) = per(M_A)·per(M_{~A})`,$M_A[a][c]=1\iff a\notin R_c$。✅ 这是 placement 枚举的多项式替代的数学根据。
+
+### 已落地、已验证、已 profiling 的转移
+`src/kernel2xC.cpp`:联合转移 + 精确度数桶 canon + **逐带 profiling**(states/rawTrans/elapsed,fflush)。
+- C=2→288 ✅(瞬间);C=3→28200960 ✅(**29s**)。
+
+### profiling 精确定位的瓶颈(关键,正是"别卡死而不自知")
+微基准 `/tmp/prof.cpp`:
+- **canon(空状态) @ C=3 = 610 µs/次**;@ C=4 慢到 2000 次 >2min。
+- 根因:**空/低度状态所有符号同度数 ⟹ 落入单个桶 ⟹ 仍做满 $M!$ 置换**(C=4 即 8!=40320)。**度数桶细化在度数均匀时失效。**
+- 且 band 0 的 rawTrans = Σ_skeleton(X-placements × Y-placements) 本就大(C=3 已 25920),canon 被调用这么多次 ⟹ 29s。
+
+### 精确裁决:封顶石 = 一个真正的 orbit-refinement canon + permanent 聚合权重
+两处都要换,且**互相独立、可分别 brute 卡死**:
+1. **canon 升级**:用 Weisfeiler–Leman 式**迭代细化**(以符号-列关联结构细化,而非仅度数),把 $M!$ 降到接近 $O(\text{poly})$。可独立用"与慢全 canon 同结果"验证。
+2. **转移升级**:用 permanent 身份**按结果 canonical 态聚合权重**,不枚举 placement(rawTrans 从 25920 降到 #(state,A,state') 量级)。可独立用"与枚举版同 N"验证。
+
+### 诚实状态
+结构、联合转移、permanent 身份、状态维数(小)、精确 canon(慢版)——全 solid。封顶石 = 上面两个**定义清晰、可分别验证**的优化。未在本会话完成,但**瓶颈已被 profiling 钉死到具体函数与具体原因**,不再是模糊的"太慢"。下一步先做 canon 的 WL 细化(独立卡死),再做 permanent 聚合(独立卡死),最后合体冲 C=4→C=5→C=6。
