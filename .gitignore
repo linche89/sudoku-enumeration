@@ -13,3 +13,4 @@ Thumbs.db
 # transient run scratch
 data/*.err
 src/__pycache__/
+*.err

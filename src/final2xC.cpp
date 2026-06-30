@@ -12,6 +12,7 @@
 #include <set>
 #include <algorithm>
 #include <string>
+#include <cstring>
 #include <chrono>
 
 static int C, M;
@@ -19,47 +20,46 @@ static std::vector<int> Askel;
 static std::vector<std::vector<int>> CP;            // perms of {0..C-1}
 
 static std::string canonT(const int T[8][8]) {
-    std::string best;
+    // Allocation-free hot loop: build each candidate into a stack buffer and keep the
+    // byte-min via memcmp.  Only the winner is turned into a std::string (one alloc).
+    // (A std::string temporary per (rp,cp) would exceed libstdc++'s 15-byte SSO at C>=4
+    //  -- C*C=16 -- and heap-allocate ~ (C!)^2 times per call, the real C=4 wall.)
+    unsigned char best[36]; bool have=false; const int n=C*C;
     for (auto& rp : CP) for (auto& cp : CP) {
-        std::string k; k.reserve(C*C);
-        for (int a=0;a<C;++a) for (int b=0;b<C;++b) k.push_back((char)T[rp[a]][cp[b]]);
-        if (best.empty()||k<best) best=k;
+        unsigned char cand[36]; int p=0;
+        for (int a=0;a<C;++a) for (int b=0;b<C;++b) cand[p++]=(unsigned char)T[rp[a]][cp[b]];
+        if(!have || std::memcmp(cand,best,n)<0){ std::memcpy(best,cand,n); have=true; }
     }
-    return best;
+    return std::string((const char*)best, n);
 }
 static std::string keyXY(const std::vector<int>& X,const std::vector<int>& Y){
     int T[8][8]; for(int a=0;a<C;++a)for(int b=0;b<C;++b)T[a][b]=__builtin_popcount(X[a]&Y[b]);
     return canonT(T);
 }
 
-// convolution side histogram (Delta with cross-terms), weights as uint64 counts (<= (C!)^2 small)
-static std::map<std::string,uint64_t> sideDist(const std::vector<int>& X,const std::vector<int>& Y,const std::vector<int>& side){
-    std::map<std::string,uint64_t> h;
+// convolution side histogram (Delta with cross-terms).  For each distinct Delta-key we
+// also keep ONE witness placement (addX/addY = the new symbols this side adds to each
+// X-/Y-column), so a concrete representative (X',Y') can be reconstructed as a byproduct.
+struct SideEntry { uint64_t cnt; std::vector<int> addX, addY; };
+static std::map<std::string,SideEntry> sideDist(const std::vector<int>& X,const std::vector<int>& Y,const std::vector<int>& side){
+    std::map<std::string,SideEntry> h;
     for(auto&pX:CP){ bool ok=true; for(int i=0;i<C;++i) if(X[pX[i]]&(1<<side[i])){ok=false;break;} if(!ok)continue;
         for(auto&pY:CP){ bool o2=true; for(int i=0;i<C;++i) if(Y[pY[i]]&(1<<side[i])){o2=false;break;} if(!o2)continue;
             int D[8][8]={{0}};
+            std::vector<int> addX(C,0),addY(C,0);
             for(int i=0;i<C;++i){ int s=side[i],ax=pX[i],ay=pY[i];
+                addX[ax]|=1<<s; addY[ay]|=1<<s;
                 D[ax][ay]++;
                 for(int b=0;b<C;++b) if(Y[b]&(1<<s)) D[ax][b]++;
                 for(int a=0;a<C;++a) if(X[a]&(1<<s)) D[a][ay]++;
             }
             std::string k; k.reserve(C*C); for(int a=0;a<C;++a)for(int b=0;b<C;++b)k.push_back((char)D[a][b]);
-            h[k]+=1;
+            auto it=h.find(k);
+            if(it==h.end()) h.emplace(std::move(k),SideEntry{1,std::move(addX),std::move(addY)});
+            else it->second.cnt++;
         }
     }
     return h;
-}
-
-// discover representatives for the NEXT band's states by applying placements to current reps,
-// stopping as soon as every weight-target canonical key has a representative.
-static std::vector<std::vector<int>> placementsOf(const std::vector<int>& cols,const std::vector<int>& Av,const std::vector<int>& Acv){
-    std::vector<std::vector<int>> out;
-    for(auto&pT:CP){ bool ok=true; for(int i=0;i<C;++i) if(cols[pT[i]]&(1<<Av[i])){ok=false;break;} if(!ok)continue;
-        for(auto&pB:CP){ bool o2=true; for(int i=0;i<C;++i) if(cols[pB[i]]&(1<<Acv[i])){o2=false;break;} if(!o2)continue;
-            std::vector<int> nc=cols; for(int i=0;i<C;++i){ nc[pT[i]]|=1<<Av[i]; nc[pB[i]]|=1<<Acv[i]; } out.push_back(std::move(nc));
-        }
-    }
-    return out;
 }
 
 int main(int argc,char**argv){
@@ -76,6 +76,10 @@ int main(int argc,char**argv){
 
     for(int band=0; band<C; ++band){
         std::map<std::string,Big> nx;
+        // representatives reconstructed as a byproduct of the weight pass: every target
+        // canonical state comes from some (da,db) placement pair, so we capture the first
+        // witness and rebuild a concrete (X',Y').  Guaranteed to cover every state in nx.
+        std::map<std::string,std::pair<std::vector<int>,std::vector<int>>> nr;
         for(auto&kv:states){
             const auto& XY=rep[kv.first]; const std::vector<int>& X=XY.first; const std::vector<int>& Y=XY.second; const Big& w=kv.second;
             int Tb[8][8]; for(int a=0;a<C;++a)for(int b=0;b<C;++b)Tb[a][b]=__builtin_popcount(X[a]&Y[b]);
@@ -87,29 +91,18 @@ int main(int argc,char**argv){
                     int T[8][8];
                     for(int a=0;a<C;++a)for(int b=0;b<C;++b)
                         T[a][b]=Tb[a][b]+(unsigned char)da.first[a*C+b]+(unsigned char)db.first[a*C+b];
-                    nx[canonT(T)].addMul(w, (uint64_t)da.second*(uint64_t)db.second);
+                    std::string ck=canonT(T);
+                    nx[ck].addMul(w, da.second.cnt*db.second.cnt);
+                    if(band+1<C && !nr.count(ck)){
+                        std::vector<int> Xn(C),Yn(C);
+                        for(int a=0;a<C;++a){
+                            Xn[a]=X[a]|da.second.addX[a]|db.second.addX[a];
+                            Yn[a]=Y[a]|da.second.addY[a]|db.second.addY[a];
+                        }
+                        nr.emplace(ck,std::make_pair(std::move(Xn),std::move(Yn)));
+                    }
                 }
             }
-        }
-        // representatives for the next band: apply placements to current reps, stop once every
-        // weight-target canonical key has a representative (bounded discovery).
-        std::map<std::string,std::pair<std::vector<int>,std::vector<int>>> nr;
-        if(band+1<C){
-            for(auto&kv:rep){
-                if(nr.size()==nx.size()) break;
-                const std::vector<int>& X=kv.second.first; const std::vector<int>& Y=kv.second.second;
-                for(int A:Askel){
-                    if(nr.size()==nx.size()) break;
-                    std::vector<int> Av,Acv; for(int s=0;s<M;++s){ if(A&(1<<s))Av.push_back(s); else Acv.push_back(s); }
-                    auto Xp=placementsOf(X,Av,Acv); if(Xp.empty())continue;
-                    auto Yp=placementsOf(Y,Av,Acv); if(Yp.empty())continue;
-                    std::sort(Xp.begin(),Xp.end()); Xp.erase(std::unique(Xp.begin(),Xp.end()),Xp.end());
-                    std::sort(Yp.begin(),Yp.end()); Yp.erase(std::unique(Yp.begin(),Yp.end()),Yp.end());
-                    for(auto&a:Xp){ for(auto&b:Yp){ std::string k=keyXY(a,b); if(nx.count(k)&&!nr.count(k)) nr[k]={a,b}; }
-                        if(nr.size()==nx.size())break; }
-                }
-            }
-            for(auto&kv:nx) if(!nr.count(kv.first)) std::fprintf(stderr,"WARN band %d: target has no rep\n",band);
         }
         states=std::move(nx); rep=std::move(nr);
         double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
