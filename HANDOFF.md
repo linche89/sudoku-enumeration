@@ -32,30 +32,50 @@
 
 ### A.2 当前引擎与验证闸门
 
-- **`src/multiset_fast.cpp`** ← **现在的主引擎(单线程)**。正确状态 + orbit-aggregated 卷积直方图
+- **`src/multiset_fast.cpp`** ← 单线程正确引擎。正确状态 + orbit-aggregated 卷积直方图
   (把每侧 $(C!)^2$ 的双射枚举换成按旧-pair 分组的组合计数;**11.6 万随机例差分测试与 brute 字节一致**)。
-- **`src/multiset_par.cpp`** ← **并行版(OpenMP)**。把 band 循环拆成 A(累加 raw)/B(并行 canon)/C(归约),
-  编译 `g++ -O3 -mpopcnt -fopenmp -std=c++20 -I src`。C=4 = 1.1s(24 线程)。
+- **`src/multiset_par.cpp`** ← **并行主引擎(OpenMP, lex-min canon)**。band 循环 = phase A(串行累加
+  全局去重 rawW)/ B(并行 canon)/ C(归约)。编译 `g++ -O3 -mpopcnt -fopenmp -std=c++20 -I src`。
+  C=4 = ~1s(24 线程)。⚠️ **内存**:phase A 的全局 rawW 在 C=5 会涨到 ~十几 GB(64G 可容);
+  **务必在内存看门狗下跑**(见 A.6)。
+- **`src/multiset_refine.cpp`** ← 同引擎但 canon 换成 refinement-key(见 A.3),C=3/C=4 已验证正确。
 - **验证(全部通过)**:C=2=288,C=3=28200960(逐带 3,3,1),C=4=29136487207403520(逐带 5,232,5,1)。
 - **独立 oracle**:`src/sudoku_rc.cpp`(转置法 $\sum_\sigma B(\sigma)^2$,与转移法完全独立)复现 C=3,C=4。
 - **金标准护栏**:见旧 §3 的 C=3 逐带权重表(改任何代码必须仍复现)。
 
-### A.3 唯一剩下的墙:**canonicalization 成本**(不是状态数,不是代表发现)
+### A.3 canon 的真相(2026-06-30 大量实验后)
 
-- **状态数很小**(C=4 峰值 232),不是墙。**墙是 canon 调用量 × 每次 canon 的成本**:
-  - 每个带,所有符号 popcount 都 = 深度 ⟹ 基于 popcount 的分支限界**永不生效** ⟹ canon 退化成全 $(C!)^2$。
-  - C=5: 14400 perm/次;C=6: 518400 perm/次。C=4 band-1 有 54277 个不同 raw → 232 状态。
-- **并行**(24 核)买到 ~12–24× = **够到 C=5,够不到 C=6**(常数因子,不改可行性)。
-- **C=6 的必要条件 = 结构性更快的精确 canon**(nauty 式 individualization-refinement)。
-  ⚠️ 已试两个简化快-canon(列签名排序),**都被差分测试当场否决**:签名顺序 ≠ packed lex-min 顺序。
-  正确版需要带回溯的规范标号,是真功夫,**务必先差分测试再用**。
+- **lex-min canon 本质上贵**:`canonMS` 的 popcount-LB 分支限界在"每符号 popcount 相同"(每带都如此)
+  时**永不剪枝**,退化成全 $(C!)^2$。增量 B&B(`src/canon_ir2.cpp`,差分测试 0 失配)也只快 2.2×(C=5)
+  /2.8×(C=6)——**lex-min 不是 C=6 的杠杆**。
+- **关键认知**:`nx[]` 只需要**一个一致的轨道不变键**,**不必是 lex-min**!
+  `src/canon_refine2.cpp` 用等价划分细化(exact 共现签名)给出这样的键。**已验证**:
+  ① 不变性(对随机重标号键不变,C=4/C=5 各 2 万例 0 违反);
+  ② 分离性(#refineKeys == #bruteKeys,0 过度合并,C=4/C=5)⟹ 与轨道一一对应,不多算。
+  速度:随机态 64µs(C=4)/752µs(C=5)/>5ms(C=6)——一般,因随机态残余对称大;
+  真实(列平衡)态可能细化得更好,待端到端测。
+- **负结果(已确证,别再试)**:细化离散后的列定序 **≠** brute lex-min(两个不同的合法规范形);
+  之前"100% mismatch"是拿两个不同规范形比,无意义。canon 的两种正确用法:lex-min(慢)或 refine-key(忠实)。
 
-### A.4 接力下一步(明确)
+### A.4 真正的 C=6 墙 = **distinct raw 数**,不是 canon 单价
 
-1. (进行中)并行跑 C=5,验证 = `1903816047972624930994913280000`,并记录 band-1 真实状态数。
-2. 写正确的 nauty 式 canon(独立差分测试 vs `canonMSbrute`,几千~几万例 0 失配才可用)。
-3. 用它替换 `multiset_fast`/`multiset_par` 的 `canonMS`,逐级卡死 C=3→4→5,再冲 C=6。
-4. **C=6 提交 OEIS 前**:用第二套独立方法或更高精度复算交叉验证(诚实:站在 Pettersen/kjellfp 肩上)。
+- C=4 band-1:54277 个 distinct raw → 232 状态。C=5:几百万~千万。**C=6:几十亿**(转移用 hTop×hBot 笛卡尔积)。
+- ⟹ 就算 canon 再快 10×,几十亿次仍是天文数字。**C=6 的真钥匙 = 状态级聚合转移**:
+  直接算"规范源状态 → 规范目标状态"的权重矩阵,中间**绝不 materialize** 单个 raw。
+  目标多重集 = topPart ⊎ botPart(多重集层无交叉项),难点 = canon(A⊎B) 不由 canon(A),canon(B) 决定
+  (并集的对称把两边混合)。这是 Pettersen 内核,多会话工程。
+- **接力下一步**:① 等 C=5 落地(跳板,验证引擎端到端,~1-2h);② 设计状态级聚合转移
+  (先 C=3/C=4 卡死金标准,再 C=5 交叉验证,最后 C=6);③ refine-key 作聚合里的快速状态命名。
+- **C=6 提交 OEIS 前**:第二套独立方法或更高精度复算交叉验证(诚实:站在 Pettersen/kjellfp 肩上,
+  我们的贡献 = 独立推导/实现 + 可能的新数值项)。
+
+### A.6 内存安全(血泪教训,2026-06-30)
+
+- **64G 曾被撑爆、系统无响应**:并行版给 24 线程各开一个近乎全量的 thread-local rawW 表 ⟹ ~24× 膨胀。
+- **铁律**:并行只复制**小**结构(规范状态表,几百项),**绝不**复制大 raw 表。全局 rawW 只留一份。
+- **跑大 C 必须带内存看门狗**:`/tmp/memwatch.sh <exe> <C>` 实时采样 RSS,超 58G 自动 kill。
+- 流式版(`multiset_par.cpp` 的 commit 3d9f4b8 历史版)内存有界(~MB)但丢全局去重 ⟹ **太慢**(C=5 band1 ~小时级)。
+  现用版 = 全局去重单 rawW + 并行 canon = 快且 64G 可容。
 
 ### A.5 已死的路(别重试)
 
