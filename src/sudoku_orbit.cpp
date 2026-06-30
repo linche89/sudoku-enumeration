@@ -120,7 +120,15 @@ int main(int argc, char** argv) {
     unsigned __int128 N=0;
     int colset[20]; colset[0]=(1<<C)-1; colset[1]=FULL^colset[0];   // box 0
     int64_t pairs=0;
-    for (int i=0;i<(int)vecs.size();++i) {
+    const int total = (int)vecs.size();
+    for (int i=0;i<total;++i) {
+        if ((i & 0xF) == 0 && i > 0) {                    // progress every 256 vecs
+            double el = std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
+            double rate = i/el, eta = (total-i)/rate;
+            std::fprintf(stderr,"progress %d/%d (%.1f%%)  pairs=%lld  %.0fs  ETA %.0fs  B-memo=%zu\n",
+                         i,total,100.0*i/total,(long long)pairs,el,eta,Bmemo.size());
+            std::fflush(stderr);
+        }
         // required mu~T marginal: per box C - tb[b]; encode (same base traversal order)
         int64_t need = fullMarg - vecs[i].marg;            // since marg packs each box linearly, C-tb per box
         auto it = byMarg.find(need); if (it==byMarg.end()) continue;
