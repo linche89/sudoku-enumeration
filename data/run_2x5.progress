@@ -1,0 +1,5 @@
+C=5  M=10  patterns P=16  count-vectors=15504
+progress 16/15504 (0.1%)  pairs=25  14s  ETA 14008s  B-memo=21
+progress 32/15504 (0.2%)  pairs=58  30s  ETA 14379s  B-memo=48
+progress 48/15504 (0.3%)  pairs=93  41s  ETA 13199s  B-memo=75
+progress 64/15504 (0.4%)  pairs=126  81s  ETA 19516s  B-memo=90

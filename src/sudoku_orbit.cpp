@@ -27,33 +27,43 @@
 #include <functional>
 
 static int C, M, FULL;
-static int rem_[16];
 
-// ---- B(sigma): C-row band fill = sum over first C-2 rows of 2^(residual cycles)
-static int residual_cycles() {
+// ---- B(sigma): C-row band fill = #proper C-edge-colourings of the C-regular
+// bipartite graph (symbols x columns).  Recurse B(G) = sum over perfect
+// matchings m of B(G - m); base: 1-regular -> 1, 2-regular -> 2^(#cycles).
+// GLOBAL memoisation by the sorted column-subsets (column-permutation invariant,
+// so safe) collapses the shared residual subgraphs across the whole run.
+#include <unordered_map>
+struct U128Hash { size_t operator()(unsigned __int128 x) const {
+    return std::hash<unsigned long long>()((unsigned long long)x ^ (unsigned long long)(x>>64)); } };
+static std::unordered_map<unsigned __int128, int64_t, U128Hash> Gmemo;
+
+static int cycles_of(const int* cs) {
     int par[40]; for (int i = 0; i < 2*M; ++i) par[i] = i;
-    auto find = [&](int x){ while (par[x] != x){ par[x]=par[par[x]]; x=par[x]; } return x; };
+    auto find = [&](int x){ while (par[x]!=x){ par[x]=par[par[x]]; x=par[x]; } return x; };
     int comps = 2*M;
     for (int col = 0; col < M; ++col)
-        for (int s = rem_[col]; s; s &= s-1) {
-            int sym = __builtin_ctz(s), a = find(col), b = find(M+sym);
-            if (a != b) { par[a]=b; --comps; }
-        }
+        for (int s = cs[col]; s; s &= s-1) { int sym=__builtin_ctz(s),a=find(col),b=find(M+sym); if(a!=b){par[a]=b;--comps;} }
     return comps;
 }
-static int64_t enum_row(int rowsLeft, int col, int usedRow);
-static int64_t Bfill(int rowsLeft) {
-    if (rowsLeft == 2) return (int64_t)1 << residual_cycles();
-    if (rowsLeft == 1) return 1;
-    return enum_row(rowsLeft, 0, 0);
+static int64_t Bgraph(const int* cs, int k);
+static void enumPM(const int* cs, int col, int used, int* newcs, int k, int64_t& total) {
+    if (col == M) { total += Bgraph(newcs, k-1); return; }
+    int a = cs[col] & ~used;
+    while (a) { int bit = a&-a; a-=bit; newcs[col] = cs[col]^bit; enumPM(cs, col+1, used|bit, newcs, k, total); }
 }
-static int64_t enum_row(int rowsLeft, int col, int usedRow) {
-    if (col == M) return Bfill(rowsLeft-1);
-    int64_t s = 0; int avail = rem_[col] & ~usedRow;
-    while (avail) { int bit = avail&-avail; avail-=bit; rem_[col]^=bit; s+=enum_row(rowsLeft,col+1,usedRow|bit); rem_[col]^=bit; }
-    return s;
+static int64_t Bgraph(const int* cs, int k) {
+    if (k == 1) return 1;
+    if (k == 2) return (int64_t)1 << cycles_of(cs);
+    int s[16]; for (int j=0;j<M;++j) s[j]=cs[j]; std::sort(s, s+M);
+    unsigned __int128 key = 0; for (int j=0;j<M;++j) key = (key<<M) | (unsigned)s[j];
+    auto it = Gmemo.find(key); if (it != Gmemo.end()) return it->second;
+    int64_t total = 0; int newcs[16];
+    enumPM(cs, 0, 0, newcs, k, total);
+    Gmemo.emplace(key, total);
+    return total;
 }
-static int64_t Bcount(const int* colset) { for (int j=0;j<M;++j) rem_[j]=colset[j]; return Bfill(C); }
+static int64_t Bcount(const int* colset) { return Bgraph(colset, C); }
 
 // relabel-canonical memo for B (anchor each box -> {0..C-1}|{C..2C-1}, sort, min)
 static std::map<unsigned __int128,int64_t> Bmemo;
