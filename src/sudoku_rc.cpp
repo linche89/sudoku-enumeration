@@ -122,33 +122,41 @@ int main(int argc, char** argv) {
     // weight by the number of orderings (C! / prod run-length!).
     auto fact = [](int n){ int64_t f = 1; for (int i = 2; i <= n; ++i) f *= i; return f; };
     const int ns = (int)subs.size();
-    // total multisets = combinations with repetition C(ns+C-1, C)
-    int64_t total = 1; for (int i = 0; i < C; ++i) total = total * (ns + i) / (i + 1);
+    // Relabel reduction: fix box 0 to {0..C-1}|{C..2C-1} and multiply by the
+    // number of C-subsets C(2C,C); then iterate only the OTHER C-1 boxes as a
+    // multiset.  N = C(2C,C) * sum_{multiset of C-1 boxes} mult * B^2.
+    const int K = C - 1;                                   // boxes left to iterate
+    int64_t box0factor = ns;                               // C(2C,C) = #C-subsets
+    int low = (1 << C) - 1;                                // {0..C-1}
+    // total multisets of K boxes from ns subsets
+    int64_t total = 1; for (int i = 0; i < K; ++i) total = total * (ns + i) / (i + 1);
     auto t0 = std::chrono::steady_clock::now();
-    std::vector<int> idx(C, 0);
+    std::vector<int> idx(K, 0);
     unsigned __int128 N = 0;
     int colset[16];
     int64_t multisets = 0;
+    colset[0] = low; colset[1] = FULL ^ low;               // box 0 fixed
     for (;;) {
-        for (int b = 0; b < C; ++b) { int S = subs[idx[b]]; colset[2*b] = S; colset[2*b+1] = FULL ^ S; }
+        for (int b = 0; b < K; ++b) { int S = subs[idx[b]]; colset[2*(b+1)] = S; colset[2*(b+1)+1] = FULL ^ S; }
         int64_t b1 = Bget(colset);
         if (b1) {
-            int64_t mult = fact(C);
-            for (int r = 0; r < C; ) { int s = r; while (s + 1 < C && idx[s+1] == idx[r]) ++s; mult /= fact(s - r + 1); r = s + 1; }
+            int64_t mult = fact(K);
+            for (int r = 0; r < K; ) { int s = r; while (s + 1 < K && idx[s+1] == idx[r]) ++s; mult /= fact(s - r + 1); r = s + 1; }
             N += (unsigned __int128)(uint64_t)(mult * b1) * (uint64_t)b1;   // mult * B^2
         }
         ++multisets;
-        if ((multisets & 0xFFF) == 0) {                  // every 4096 multisets
+        if ((multisets & 0x3FFFF) == 0) {                  // every ~1M multisets
             double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             double rate = multisets / el, eta = (total - multisets) / rate;
-            std::fprintf(stderr, "progress %lld/%lld (%.1f%%)  %.0fs elapsed  rate %.0f/s  ETA %.0fs\n",
+            std::fprintf(stderr, "progress %lld/%lld (%.1f%%)  %.0fs  rate %.0f/s  ETA %.0fs\n",
                          (long long)multisets, (long long)total, 100.0*multisets/total, el, rate, eta);
             std::fflush(stderr);
         }
-        int p = C - 1; while (p >= 0 && idx[p] == ns - 1) --p;
+        int p = K - 1; while (p >= 0 && idx[p] == ns - 1) --p;
         if (p < 0) break;
-        ++idx[p]; for (int q = p + 1; q < C; ++q) idx[q] = idx[p];
+        ++idx[p]; for (int q = p + 1; q < K; ++q) idx[q] = idx[p];
     }
+    N *= (unsigned __int128)(uint64_t)box0factor;           // restore box-0 relabel orbit
 
     auto u128 = [](unsigned __int128 x){ std::string s; if(!x)s="0"; while(x){ s=char('0'+(int)(x%10))+s; x/=10;} return s; };
     std::printf("2x%d (grid %dx%d): N = %s\n", C, M, M, u128(N).c_str());
