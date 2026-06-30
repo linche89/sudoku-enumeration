@@ -34,8 +34,6 @@
 #include <algorithm>
 #include <string>
 #include <chrono>
-#include <atomic>
-#include <omp.h>
 #include <random>
 
 static int C, M, FULLC;
@@ -314,86 +312,58 @@ int main(int argc,char**argv){
             std::vector<std::pair<PartKey,uint64_t>> flat(hm.begin(),hm.end());
             return sideMemo.emplace(std::move(sk),std::move(flat)).first->second;
         };
-        // ----- MEMORY-BOUNDED STREAMING TRANSITION -----
-        // The previous design materialised EVERY distinct raw merged multiset in one map
-        // before canonicalising -> at C=5 that is tens of millions of entries (many GB) and
-        // a per-thread copy of it OOM-killed a 64GB box.  Instead we STREAM by skeleton class:
-        // each class's local histogram (hTop x hBot, a few MB) is built, canonicalised, and
-        // folded IMMEDIATELY into the tiny canonical-state table, then freed.  We only ever
-        // keep canonical STATES (hundreds), never the raw multisets.  Peak memory =
-        //   (one class local ~few MB) x threads  +  (#states x threads) -- bounded, indep of C.
-        struct Work { int src; Key topK, botK; uint64_t nclass; };
-        std::vector<Work> work;
-        std::vector<const std::vector<int>*> srcP;
-        std::vector<const Big*> srcW;
-        {
-            int si=0;
-            for(auto&kv:states){
-                srcP.push_back(&rep[kv.first]); srcW.push_back(&kv.second);
-                const std::vector<int>& P=*srcP.back();
-                std::map<std::pair<std::vector<int>,std::vector<int>>,uint64_t> classes;
-                for(int A:Askel){
-                    std::vector<int> topMS,botMS;
-                    for(int s=0;s<M;++s){ if(A&(1<<s))topMS.push_back(P[s]); else botMS.push_back(P[s]); }
-                    std::sort(topMS.begin(),topMS.end()); std::sort(botMS.begin(),botMS.end());
-                    classes[{std::move(topMS),std::move(botMS)}]++;
-                }
-                for(auto& cl:classes){
-                    getSide(cl.first.first); getSide(cl.first.second);   // pre-populate (serial)
-                    Key tk{},bk{}; for(int i=0;i<C;++i){ tk[i]=(uint16_t)cl.first.first[i]; bk[i]=(uint16_t)cl.first.second[i]; }
-                    work.push_back(Work{si,tk,bk,cl.second});
-                }
-                ++si;
+        // PHASE A (serial, cheap vs canon): accumulate each DISTINCT raw merged multiset
+        // -> Big weight = sum over (source state, skeleton class, hTop x hBot) of
+        //   w_src * topcnt * botcnt * nclass.  Canon deferred to phase B (parallel).
+        std::unordered_map<Key,Big,KeyHash> rawW;
+        for(auto&kv:states){
+            const std::vector<int>& P = rep[kv.first];
+            const Big& w = kv.second;
+            std::map<std::pair<std::vector<int>,std::vector<int>>,uint64_t> classes;
+            for(int A:Askel){
+                std::vector<int> topMS, botMS;
+                for(int s=0;s<M;++s){ if(A&(1<<s))topMS.push_back(P[s]); else botMS.push_back(P[s]); }
+                std::sort(topMS.begin(),topMS.end()); std::sort(botMS.begin(),botMS.end());
+                classes[{std::move(topMS),std::move(botMS)}]++;
             }
-        }
-        const long long NW=(long long)work.size();
-        { double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
-          std::fprintf(stderr,"  band %d: %lld class-tasks (streaming canon)  el=%.1fs\n",band,NW,el); std::fflush(stderr); }
-        // thread-local canonical-state accumulators (tiny: bounded by #states).
-        std::vector<std::map<Key,Big>> tnx;
-        std::vector<std::map<Key,std::vector<int>>> tnr;
-        std::atomic<long long> doneTasks{0};
-        #pragma omp parallel
-        {
-            int nth=omp_get_num_threads(), tid=omp_get_thread_num();
-            #pragma omp single
-            { tnx.resize(nth); tnr.resize(nth); }
-            #pragma omp barrier
-            std::map<Key,Big>& mynx=tnx[tid];
-            std::map<Key,std::vector<int>>& mynr=tnr[tid];
-            std::unordered_map<Key,uint64_t,KeyHash> local;     // reused per class, bounded
-            #pragma omp for schedule(dynamic,1)
-            for(long long wi=0; wi<NW; ++wi){
-                const Work& W=work[wi];
-                const auto& hTop=sideMemo.find(W.topK)->second;
-                const auto& hBot=sideMemo.find(W.botK)->second;
-                if(hTop.empty()||hBot.empty()) continue;
-                const Big& w=*srcW[W.src];
-                local.clear();
-                local.reserve(hTop.size()*hBot.size()/2+16);
-                for(const auto&tp:hTop){ const uint16_t* a=tp.first.data(); uint64_t wt=tp.second;
-                    for(const auto&bp:hBot){ const uint16_t* b=bp.first.data();
+            for(auto& cl : classes){
+                const auto& hTop = getSide(cl.first.first); if(hTop.empty())continue;
+                const auto& hBot = getSide(cl.first.second); if(hBot.empty())continue;
+                uint64_t nclass = cl.second;
+                std::unordered_map<Key,uint64_t,KeyHash> local;
+                local.reserve(hTop.size()*hBot.size()/2 + 16);
+                for(const auto&tp:hTop){
+                    const uint16_t* a=tp.first.data(); uint64_t wt=tp.second;
+                    for(const auto&bp:hBot){
+                        const uint16_t* b=bp.first.data();
                         Key raw{}; int i=0,j=0,k=0;
                         while(i<C&&j<C){ if(a[i]<=b[j]) raw[k++]=a[i++]; else raw[k++]=b[j++]; }
                         while(i<C) raw[k++]=a[i++];
                         while(j<C) raw[k++]=b[j++];
-                        local[raw]+=wt*bp.second;
+                        local[raw] += wt*bp.second;
                     }
                 }
-                for(auto& lp:local){
-                    std::vector<int> rp;
-                    Key ck=canonMS(lp.first.data(), keepRep?&rp:nullptr);
-                    mynx[ck].addMul(w, lp.second*W.nclass);
-                    if(keepRep && !mynr.count(ck)) mynr.emplace(ck,std::move(rp));
-                }
-                long long d=++doneTasks;
-                if((d & 0x3FF)==0){ double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
-                    std::fprintf(stderr,"    class %lld/%lld  el=%.1fs\n",d,NW,el); std::fflush(stderr); }
+                for(auto& lp : local) rawW[lp.first].addMul(w, lp.second * nclass);
             }
         }
-        // merge thread-local canonical-state tables (serial; small).
-        for(auto& tm:tnx) for(auto& kv:tm) nx[kv.first]+=kv.second;
-        if(keepRep) for(auto& tm:tnr) for(auto& kv:tm) if(!nr.count(kv.first)) nr.emplace(kv.first,kv.second);
+        // PHASE B (parallel): canonicalise each distinct raw independently.
+        std::vector<Key> raws; raws.reserve(rawW.size());
+        for(auto& kv : rawW) raws.push_back(kv.first);
+        const long long NR = (long long)raws.size();
+        std::vector<Key> cks(NR);
+        std::vector<std::vector<int>> creps(keepRep?NR:0);
+        #pragma omp parallel for schedule(dynamic,128)
+        for(long long idx=0; idx<NR; ++idx){
+            std::vector<int> rp;
+            cks[idx] = canonMS(raws[idx].data(), keepRep?&rp:nullptr);
+            if(keepRep) creps[idx] = std::move(rp);
+        }
+        // PHASE C (serial): reduce into nx + pick a representative per canonical state.
+        for(long long idx=0; idx<NR; ++idx){
+            const Key& ck = cks[idx];
+            nx[ck] += rawW[raws[idx]];
+            if(keepRep && !nr.count(ck)) nr.emplace(ck, creps[idx]);
+        }
         states=std::move(nx); rep=std::move(nr);
         double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
         std::fprintf(stderr,"band %d: states=%zu elapsed=%.1fs\n",band,states.size(),el); std::fflush(stderr);
