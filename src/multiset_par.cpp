@@ -18,7 +18,7 @@
 //     (3) within each group, all bijections pairing its X-cols to its Y-cols.
 //   Weight = prod_k n_k!  (labeled symbols -> distinct slots).  Bin by output
 //   multiset.  Validated byte-identical to brute over thousands of random states
-//   at C=2,3,4 (see proto/fast_hist.py and the built-in --difftest).
+//   at C=2,3,4 (see experiments/proto/fast_hist.py and the built-in --difftest).
 //
 // Verify: 288 (C=2), 28200960 (C=3), 29136487207403520 (C=4),
 //   1903816047972624930994913280000 (C=5); C=6 is the new value.
@@ -35,6 +35,7 @@
 #include <string>
 #include <chrono>
 #include <random>
+#include <atomic>
 
 static int C, M, FULLC;
 static std::vector<int> Askel;                 // all C-subsets of [2C]
@@ -316,7 +317,17 @@ int main(int argc,char**argv){
         // -> Big weight = sum over (source state, skeleton class, hTop x hBot) of
         //   w_src * topcnt * botcnt * nclass.  Canon deferred to phase B (parallel).
         std::unordered_map<Key,Big,KeyHash> rawW;
+        size_t srcDone=0, srcTotal=states.size(), classDone=0;
+        auto lastPhaseLog = std::chrono::steady_clock::now();
+        auto logPhaseA = [&](const char* tag, size_t src, size_t classes, size_t raw, size_t ht, size_t hb){
+            double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
+            std::fprintf(stderr,"  band %d phaseA %s: src=%zu/%zu classes=%zu raw=%zu hTop=%zu hBot=%zu el=%.1fs\n",
+                         band,tag,src,srcTotal,classes,raw,ht,hb,el);
+            std::fflush(stderr);
+            lastPhaseLog = std::chrono::steady_clock::now();
+        };
         for(auto&kv:states){
+            ++srcDone;
             const std::vector<int>& P = rep[kv.first];
             const Big& w = kv.second;
             std::map<std::pair<std::vector<int>,std::vector<int>>,uint64_t> classes;
@@ -327,8 +338,15 @@ int main(int argc,char**argv){
                 classes[{std::move(topMS),std::move(botMS)}]++;
             }
             for(auto& cl : classes){
+                ++classDone;
                 const auto& hTop = getSide(cl.first.first); if(hTop.empty())continue;
                 const auto& hBot = getSide(cl.first.second); if(hBot.empty())continue;
+                auto now = std::chrono::steady_clock::now();
+                uint64_t crossSize = (uint64_t)hTop.size() * (uint64_t)hBot.size();
+                if(crossSize >= 1000000 ||
+                   std::chrono::duration<double>(now-lastPhaseLog).count() >= 10.0){
+                    logPhaseA("class",srcDone,classDone,rawW.size(),hTop.size(),hBot.size());
+                }
                 uint64_t nclass = cl.second;
                 std::unordered_map<Key,uint64_t,KeyHash> local;
                 local.reserve(hTop.size()*hBot.size()/2 + 16);
@@ -344,19 +362,34 @@ int main(int argc,char**argv){
                     }
                 }
                 for(auto& lp : local) rawW[lp.first].addMul(w, lp.second * nclass);
+                now = std::chrono::steady_clock::now();
+                if((classDone & 0x3FF)==0 ||
+                   std::chrono::duration<double>(now-lastPhaseLog).count() >= 10.0){
+                    logPhaseA("done",srcDone,classDone,rawW.size(),hTop.size(),hBot.size());
+                }
             }
         }
         // PHASE B (parallel): canonicalise each distinct raw independently.
         std::vector<Key> raws; raws.reserve(rawW.size());
         for(auto& kv : rawW) raws.push_back(kv.first);
         const long long NR = (long long)raws.size();
+        { double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
+          std::fprintf(stderr,"  band %d phaseA done: raw=%lld sideMemo=%zu el=%.1fs\n",
+                       band,NR,sideMemo.size(),el); std::fflush(stderr); }
         std::vector<Key> cks(NR);
         std::vector<std::vector<int>> creps(keepRep?NR:0);
+        std::atomic<long long> canonDone{0};
         #pragma omp parallel for schedule(dynamic,128)
         for(long long idx=0; idx<NR; ++idx){
             std::vector<int> rp;
             cks[idx] = canonMS(raws[idx].data(), keepRep?&rp:nullptr);
             if(keepRep) creps[idx] = std::move(rp);
+            long long d=++canonDone;
+            if((d & 0x3FFFF)==0){
+                double el=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
+                std::fprintf(stderr,"  band %d phaseB: canon=%lld/%lld el=%.1fs\n",band,d,NR,el);
+                std::fflush(stderr);
+            }
         }
         // PHASE C (serial): reduce into nx + pick a representative per canonical state.
         for(long long idx=0; idx<NR; ++idx){

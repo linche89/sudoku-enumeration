@@ -18,7 +18,7 @@
 //     (3) within each group, all bijections pairing its X-cols to its Y-cols.
 //   Weight = prod_k n_k!  (labeled symbols -> distinct slots).  Bin by output
 //   multiset.  Validated byte-identical to brute over thousands of random states
-//   at C=2,3,4 (see experiments/proto/fast_hist.py and the built-in --difftest).
+//   at C=2,3,4 (see proto/fast_hist.py and the built-in --difftest).
 //
 // Verify: 288 (C=2), 28200960 (C=3), 29136487207403520 (C=4),
 //   1903816047972624930994913280000 (C=5); C=6 is the new value.
@@ -34,7 +34,6 @@
 #include <algorithm>
 #include <string>
 #include <chrono>
-#include <random>
 
 static int C, M, FULLC;
 static std::vector<int> Askel;                 // all C-subsets of [2C]
@@ -70,61 +69,30 @@ static inline void isort(uint16_t* a, int n){
     for(int i=1;i<n;++i){ uint16_t v=a[i]; int j=i-1; while(j>=0 && a[j]>v){ a[j+1]=a[j]; --j; } a[j+1]=v; }
 }
 
-// Reference brute canon (no pruning), used by `canontest` to validate the pruned canonMS.
-static Key canonMSbrute(const uint16_t* pairs){
-    const int m=M; uint16_t bestArr[MAXM]; bool have=false; uint16_t cand[MAXM];
-    for(size_t rp=0; rp<CP.size(); ++rp){ const int* pmX=permMask[rp].data();
-        for(size_t cp=0; cp<CP.size(); ++cp){ const int* pmY=permMask[cp].data();
-            for(int i=0;i<m;++i){ int t=pairs[i]; cand[i]=(uint16_t)(pmX[t&FULLC]|(pmY[(t>>C)&FULLC]<<C)); }
-            isort(cand,m);
-            if(!have){ std::memcpy(bestArr,cand,m*sizeof(uint16_t)); have=true; continue; }
-            int cmp=0; for(int i=0;i<m;++i){ if(cand[i]!=bestArr[i]){ cmp=cand[i]<bestArr[i]?-1:1; break; } }
-            if(cmp<0) std::memcpy(bestArr,cand,m*sizeof(uint16_t));
-        }
-    }
-    Key best{}; for(int i=0;i<M;++i)best[i]=bestArr[i]; return best;
-}
-
 // Canonicalise a multiset of M pairs under S_C x S_C.
-// Hot kernel: for each (X-perm, Y-perm) relabel all M pairs (table-driven), sort, keep min.
-// NOTE: a Y-restriction shortcut (only perms achieving the lex-min ymask-multiset) was tried
-// and REJECTED by differential test (764/4000 mismatch at C=3): xmask is packed BELOW ymask,
-// so a worse ymask arrangement can pair with a better xmask for a smaller packed sorted seq.
-// Canonicalisation stays exact over all (C!)^2 perm pairs.
-//
-// SPEED: exact branch-and-bound over the X-permutation.  For each X-perm we form a valid
-// LOWER BOUND on any reachable sorted sequence by pairing each X-relabeled xmask with the
-// independent-minimum relabeled ymask of that pair = (1<<popcount(ymask))-1 (a column-perm
-// can always push a ymask's bits to the lowest positions).  If sorted(LB) >= current best,
-// the whole inner Y-perm loop is skipped.  This is EXACT (same optimum as full (C!)^2);
-// verified by the `canontest` mode against the brute canon over many random multisets.
+// Hot kernel: for each (X-perm, Y-perm) relabel all M pairs (table-driven), sort, keep byte-min.
 static Key canonMS(const uint16_t* pairs, std::vector<int>* repOut=nullptr){
-    const int m=M;
+#ifdef CANON_STUB
+    // STUB: skip the (C!)^2 relabel; just return the sorted raw multiset.
+    Key best{}; uint16_t cand[MAXM]; for(int i=0;i<M;++i)cand[i]=pairs[i]; isort(cand,M);
+    for(int i=0;i<M;++i)best[i]=cand[i];
+    if(repOut){ repOut->assign(M,0); for(int i=0;i<M;++i)(*repOut)[i]=cand[i]; }
+    return best;
+#else
     uint16_t bestArr[MAXM]; bool have=false;
     uint16_t cand[MAXM];
-    // Precompute, per source pair, its xmask, ymask, and the independent-min relabeled ymask
-    // = (1<<popcount(ymask))-1 (smallest mask with that many bits; any column-perm can reach it).
-    uint16_t xms[MAXM], yms[MAXM]; uint16_t ymin[MAXM];
-    for(int i=0;i<m;++i){ int t=pairs[i]; xms[i]=(uint16_t)(t&FULLC); yms[i]=(uint16_t)((t>>C)&FULLC);
-        ymin[i]=(uint16_t)((1<<__builtin_popcount(yms[i]))-1); }
-    uint16_t lb[MAXM];
+    const int m=M;
     for(size_t rp=0; rp<CP.size(); ++rp){
         const int* pmX = permMask[rp].data();
-        uint16_t xrel[MAXM];
-        for(int i=0;i<m;++i) xrel[i]=(uint16_t)pmX[xms[i]];
-        if(have){
-            // Lower bound for this X-perm: pair each xrel_i with its independent-min ymask.
-            // If sorted(lb) >= best, no Y-perm under this X-perm can beat best -> skip.
-            for(int i=0;i<m;++i) lb[i]=(uint16_t)(xrel[i] | (ymin[i]<<C));
-            isort(lb,m);
-            int cmp=0; for(int i=0;i<m;++i){ if(lb[i]!=bestArr[i]){ cmp = lb[i]<bestArr[i]?-1:1; break; } }
-            if(cmp>=0) continue;   // lb >= best -> prune entire X-perm
-        }
         for(size_t cp=0; cp<CP.size(); ++cp){
             const int* pmY = permMask[cp].data();
-            for(int i=0;i<m;++i){ int t=pairs[i]; cand[i]=(uint16_t)(xrel[i] | (pmY[(t>>C)&FULLC]<<C)); }
+            for(int i=0;i<m;++i){ int t=pairs[i]; cand[i]=(uint16_t)(pmX[t&FULLC] | (pmY[(t>>C)&FULLC]<<C)); }
             isort(cand,m);
             if(!have){ std::memcpy(bestArr,cand,m*sizeof(uint16_t)); have=true; continue; }
+            // compare cand vs bestArr lexicographically; replace if smaller
+            int c=std::memcmp(cand,bestArr,m*sizeof(uint16_t)); // uint16 little-endian on x86: memcmp != lex order!
+            // memcmp on little-endian compares bytes; for correctness compare element-wise.
+            (void)c;
             int cmp=0; for(int i=0;i<m;++i){ if(cand[i]!=bestArr[i]){ cmp = cand[i]<bestArr[i]?-1:1; break; } }
             if(cmp<0){ std::memcpy(bestArr,cand,m*sizeof(uint16_t)); }
         }
@@ -133,6 +101,7 @@ static Key canonMS(const uint16_t* pairs, std::vector<int>* repOut=nullptr){
     for(int i=0;i<M;++i) best[i]=bestArr[i];
     if(repOut){ repOut->assign(M,0); for(int i=0;i<M;++i)(*repOut)[i]=bestArr[i]; }
     return best;
+#endif
 }
 
 // ---- FAST aggregated within-side histogram ----
@@ -272,20 +241,6 @@ int main(int argc,char**argv){
         unsigned seed=(argc>4)?(unsigned)atoi(argv[4]):12345u;
         return difftest(n,seed);
     }
-    if(mode=="canontest"){
-        int n=(argc>3)?atoi(argv[3]):20000;
-        unsigned seed=(argc>4)?(unsigned)atoi(argv[4]):777u;
-        std::mt19937 rng(seed); int mm=0;
-        uint16_t pr[MAXM];
-        for(int t=0;t<n;++t){
-            // bias toward realistic multisets: random masks with some repeats
-            for(int i=0;i<M;++i){ int xm=rng()&FULLC, ym=rng()&FULLC; pr[i]=(uint16_t)(xm|(ym<<C)); }
-            Key a=canonMS(pr); Key b=canonMSbrute(pr);
-            if(a!=b){ mm++; if(mm<=5){ std::fprintf(stderr,"CANON MISMATCH t=%d\n",t);} }
-        }
-        std::printf("canontest C=%d: tests=%d mismatches=%d [%s]\n",C,n,mm,mm==0?"OK":"FAIL");
-        return mm==0?0:1;
-    }
 
     bool dump=(mode=="dump");
     for(int m=0;m<(1<<M);++m) if(__builtin_popcount(m)==C) Askel.push_back(m);
@@ -304,56 +259,32 @@ int main(int argc,char**argv){
         std::unordered_map<Key,Key,KeyHash> canonMemo;
         std::unordered_map<Key,std::vector<int>,KeyHash> repMemo;
         bool keepRep = (band+1<C);
-        // side-histogram memo: old-pair multiset (sorted) -> flat sorted histogram.
-        // The within-side histogram depends ONLY on the multiset of old (xmask,ymask) pairs
-        // of that side's symbols, so it is shared across skeletons and source states.
-        std::unordered_map<Key,std::vector<std::pair<PartKey,uint64_t>>,KeyHash> sideMemo;
-        auto getSide = [&](const std::vector<int>& pairMS)->const std::vector<std::pair<PartKey,uint64_t>>&{
-            Key sk{}; for(int i=0;i<C;++i)sk[i]=(uint16_t)pairMS[i];   // already sorted by caller
-            auto it=sideMemo.find(sk);
-            if(it!=sideMemo.end()) return it->second;
-            // build: syms 0..C-1 with xm/ym taken from pairMS
-            std::vector<int> xm(C),ym(C); int syms[8];
-            for(int i=0;i<C;++i){ syms[i]=i; xm[i]=pX(pairMS[i]); ym[i]=pY(pairMS[i]); }
-            std::map<PartKey,uint64_t> hm; buildHistFast(syms,xm,ym,hm);
-            std::vector<std::pair<PartKey,uint64_t>> flat(hm.begin(),hm.end());
-            return sideMemo.emplace(std::move(sk),std::move(flat)).first->second;
-        };
+        size_t stateIdx=0, nstates=states.size();
         for(auto&kv:states){
+            ++stateIdx;
+            std::fprintf(stderr,"  band%d state %zu/%zu  canonMemo=%zu nx=%zu el=%.1fs\n",
+                band,stateIdx,nstates,canonMemo.size(),nx.size(),
+                std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count());
+            std::fflush(stderr);
             const std::vector<int>& P = rep[kv.first];
             const Big& w = kv.second;
-            // Group the C(2C,C) skeletons by the sorted multiset of top old-pairs (bot is the
-            // complement multiset).  Skeletons in a class give identical hTop and hBot, so each
-            // class is processed once and weighted by its size.
-            std::map<std::pair<std::vector<int>,std::vector<int>>,uint64_t> classes;
+            std::vector<int> xm(M),ym(M);
+            for(int s=0;s<M;++s){ xm[s]=pX(P[s]); ym[s]=pY(P[s]); }
             for(int A:Askel){
-                std::vector<int> topMS, botMS;
-                for(int s=0;s<M;++s){ if(A&(1<<s))topMS.push_back(P[s]); else botMS.push_back(P[s]); }
-                std::sort(topMS.begin(),topMS.end()); std::sort(botMS.begin(),botMS.end());
-                classes[{std::move(topMS),std::move(botMS)}]++;
-            }
-            for(auto& cl : classes){
-                const std::vector<int>& topMS = cl.first.first;
-                const std::vector<int>& botMS = cl.first.second;
-                uint64_t nclass = cl.second;
-                const auto& hTop = getSide(topMS); if(hTop.empty())continue;
-                const auto& hBot = getSide(botMS); if(hBot.empty())continue;
+                int top[8],bot[8],nt=0,nb=0;
+                for(int s=0;s<M;++s){ if(A&(1<<s))top[nt++]=s; else bot[nb++]=s; }
+                std::map<PartKey,uint64_t> hTop, hBot;
+                buildHistFast(top,xm,ym,hTop); if(hTop.empty())continue;
+                buildHistFast(bot,xm,ym,hBot); if(hBot.empty())continue;
                 // Local dedup: accumulate raw merged multisets (sorted) -> summed weight, so
-                // each DISTINCT raw multiset is canonicalised at most once per class.
-                // raw = sorted merge of the two already-sorted C-length parts (linear).
+                // each DISTINCT raw multiset is canonicalised at most once per (state,skel).
                 std::unordered_map<Key,uint64_t,KeyHash> local;
-                local.reserve(hTop.size()*hBot.size()/2 + 16);
-                for(const auto&tp:hTop){
-                    const uint16_t* a=tp.first.data(); uint64_t wt=tp.second;
-                    for(const auto&bp:hBot){
-                        const uint16_t* b=bp.first.data();
-                        Key raw{};
-                        int i=0,j=0,k=0;
-                        while(i<C&&j<C){ if(a[i]<=b[j]) raw[k++]=a[i++]; else raw[k++]=b[j++]; }
-                        while(i<C) raw[k++]=a[i++];
-                        while(j<C) raw[k++]=b[j++];
-                        local[raw] += wt*bp.second;
-                    }
+                local.reserve(hTop.size()*hBot.size()/4 + 8);
+                for(auto&tp:hTop) for(auto&bp:hBot){
+                    Key raw{};
+                    for(int i=0;i<C;++i){ raw[i]=tp.first[i]; raw[C+i]=bp.first[i]; }
+                    isort(raw.data(), M);                 // sort to make raw multiset canonical-as-multiset
+                    local[raw] += tp.second*bp.second;
                 }
                 for(auto& lp : local){
                     const Key& raw = lp.first;
@@ -365,7 +296,7 @@ int main(int argc,char**argv){
                         canonMemo.emplace(raw, ck);
                         if(keepRep) repMemo.emplace(ck, std::move(repPairs));
                     } else ck = it->second;
-                    nx[ck].addMul(w, lp.second * nclass);
+                    nx[ck].addMul(w, lp.second);
                 }
             }
         }
@@ -385,6 +316,7 @@ int main(int argc,char**argv){
 }
 
 // ---------- differential test ----------
+#include <random>
 static int difftest(int ntests, unsigned seed){
     std::mt19937 rng(seed);
     int mismatches=0, empties=0;

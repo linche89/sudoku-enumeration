@@ -1,0 +1,4 @@
+band 0: states=5 elapsed=2.4s  mergeCands=40320 distinctRawMerged=282
+band 1: states=232 elapsed=81.0s  mergeCands=1010992 distinctRawMerged=54277
+band 2: states=5 elapsed=95.0s  mergeCands=188524 distinctRawMerged=273
+band 3: states=1 elapsed=95.0s  mergeCands=34 distinctRawMerged=1

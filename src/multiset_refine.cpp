@@ -18,7 +18,7 @@
 //     (3) within each group, all bijections pairing its X-cols to its Y-cols.
 //   Weight = prod_k n_k!  (labeled symbols -> distinct slots).  Bin by output
 //   multiset.  Validated byte-identical to brute over thousands of random states
-//   at C=2,3,4 (see proto/fast_hist.py and the built-in --difftest).
+//   at C=2,3,4 (see experiments/proto/fast_hist.py and the built-in --difftest).
 //
 // Verify: 288 (C=2), 28200960 (C=3), 29136487207403520 (C=4),
 //   1903816047972624930994913280000 (C=5); C=6 is the new value.

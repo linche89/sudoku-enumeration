@@ -18,7 +18,7 @@
 //     (3) within each group, all bijections pairing its X-cols to its Y-cols.
 //   Weight = prod_k n_k!  (labeled symbols -> distinct slots).  Bin by output
 //   multiset.  Validated byte-identical to brute over thousands of random states
-//   at C=2,3,4 (see experiments/proto/fast_hist.py and the built-in --difftest).
+//   at C=2,3,4 (see proto/fast_hist.py and the built-in --difftest).
 //
 // Verify: 288 (C=2), 28200960 (C=3), 29136487207403520 (C=4),
 //   1903816047972624930994913280000 (C=5); C=6 is the new value.
@@ -338,6 +338,8 @@ int main(int argc,char**argv){
                 uint64_t nclass = cl.second;
                 const auto& hTop = getSide(topMS); if(hTop.empty())continue;
                 const auto& hBot = getSide(botMS); if(hBot.empty())continue;
+                double _clt0 = std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
+                static unsigned long long gc=0; ++gc;
                 // Local dedup: accumulate raw merged multisets (sorted) -> summed weight, so
                 // each DISTINCT raw multiset is canonicalised at most once per class.
                 // raw = sorted merge of the two already-sorted C-length parts (linear).
@@ -367,6 +369,9 @@ int main(int argc,char**argv){
                     } else ck = it->second;
                     nx[ck].addMul(w, lp.second * nclass);
                 }
+                if(band>=1 && gc<=80){ double _clt1=std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count();
+                    std::fprintf(stderr,"   [b%d] class#%llu hTop=%zu hBot=%zu localRaws=%zu canonMemo=%zu classDt=%.2fs el=%.1f\n",
+                        band,gc,hTop.size(),hBot.size(),local.size(),canonMemo.size(),_clt1-_clt0,_clt1); std::fflush(stderr); }
             }
         }
         // commit representatives for surviving states

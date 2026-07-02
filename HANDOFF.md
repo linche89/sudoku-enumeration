@@ -49,7 +49,7 @@
   时**永不剪枝**,退化成全 $(C!)^2$。增量 B&B(`src/canon_ir2.cpp`,差分测试 0 失配)也只快 2.2×(C=5)
   /2.8×(C=6)——**lex-min 不是 C=6 的杠杆**。
 - **refine-canon 忠实但对真实态无用(决定性负结果)**:`src/canon_refine2.cpp` 用等价划分细化,
-  **已验证忠实**(不变性 + 与 brute 精确分离,#keys 相等 0 过度合并)。**但** `proto/refprof.cpp` 实测:
+  **已验证忠实**(不变性 + 与 brute 精确分离,#keys 相等 0 过度合并)。**但** `experiments/proto/refprof.cpp` 实测:
   **真实 DP 状态是列正则的**(depth d 时每列恰好 2d 个符号)⟹ 极度对称 ⟹ 细化**零离散化**,
   残余搜索 = 满 $(C!)^2$,**100% 的真实态都如此**(C=4 576/576,C=5 14400/14400,C=6 518400/518400)。
   之前随机态能离散化 55% 是**误导**——真实态是最坏情况。
@@ -60,7 +60,7 @@
 
 - profiling(`src/profile_c6.cpp`):C=5 band-1 = 1147 classes × 平均 1364² ≈ **20 亿** rawPair,
   坍缩成几百状态(C=4 是 671748 raw → 232 state,2900:1)。但坍缩**只能通过 canon 实现**,无法提前预测。
-- **所有"绕过 canon"的聚合捷径都已差分测试排除**(`proto/aggtest.cpp`, `proto/aggderive.cpp`):
+- **所有"绕过 canon"的聚合捷径都已差分测试排除**(`experiments/proto/aggtest.cpp`, `experiments/proto/aggderive.cpp`):
   - 单边形状聚合(固定 top 代表 + 全 bot):**错**(丢相对对齐)。
   - 联合轨道(对角 G)聚合:**正确但 ~0 坍缩**(899/900 对各自独立轨道)——无加速。
   - GPU:**不适用**(瓶颈是组合去重 + 图同构 canon,不是稠密数值吞吐)。
@@ -100,7 +100,7 @@
 - 商转移矩阵跨带摊销:**不成立**——每带状态 popcount 不同,状态在带间不复用。
 - WL-canon / 列签名排序快-canon:**差分测试否决**(签名顺序 ≠ packed lex-min 顺序)。
 - refine-canon 加速真实态:**0 离散化**(列正则态最坏情况),忠实但无速度收益。
-- 单边形状聚合 / 联合轨道聚合:前者错(丢对齐),后者对但 0 坍缩(`proto/aggderive.cpp`)。
+- 单边形状聚合 / 联合轨道聚合:前者错(丢对齐),后者对但 0 坍缩(`experiments/proto/aggderive.cpp`)。
 - GPU offload:不适用(组合去重 + 图 canon,非稠密数值)。
 
 ### A.7 引擎文件速查(接力直接用哪个)

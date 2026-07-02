@@ -18,7 +18,7 @@
 //     (3) within each group, all bijections pairing its X-cols to its Y-cols.
 //   Weight = prod_k n_k!  (labeled symbols -> distinct slots).  Bin by output
 //   multiset.  Validated byte-identical to brute over thousands of random states
-//   at C=2,3,4 (see proto/fast_hist.py and the built-in --difftest).
+//   at C=2,3,4 (see experiments/proto/fast_hist.py and the built-in --difftest).
 //
 // Verify: 288 (C=2), 28200960 (C=3), 29136487207403520 (C=4),
 //   1903816047972624930994913280000 (C=5); C=6 is the new value.
@@ -87,19 +87,6 @@ static Key canonMSbrute(const uint16_t* pairs){
     Key best{}; for(int i=0;i<M;++i)best[i]=bestArr[i]; return best;
 }
 
-// Canonicalise a multiset of M pairs under S_C x S_C.
-// Hot kernel: for each (X-perm, Y-perm) relabel all M pairs (table-driven), sort, keep min.
-// NOTE: a Y-restriction shortcut (only perms achieving the lex-min ymask-multiset) was tried
-// and REJECTED by differential test (764/4000 mismatch at C=3): xmask is packed BELOW ymask,
-// so a worse ymask arrangement can pair with a better xmask for a smaller packed sorted seq.
-// Canonicalisation stays exact over all (C!)^2 perm pairs.
-//
-// SPEED: exact branch-and-bound over the X-permutation.  For each X-perm we form a valid
-// LOWER BOUND on any reachable sorted sequence by pairing each X-relabeled xmask with the
-// independent-minimum relabeled ymask of that pair = (1<<popcount(ymask))-1 (a column-perm
-// can always push a ymask's bits to the lowest positions).  If sorted(LB) >= current best,
-// the whole inner Y-perm loop is skipped.  This is EXACT (same optimum as full (C!)^2);
-// verified by the `canontest` mode against the brute canon over many random multisets.
 // ---- refinement-based canonical KEY (faithful orbit invariant; NOT lex-min) ----
 // Validated in canon_refine2.cpp: invariant under relabeling + separates orbits exactly
 // like brute (#keys equal, 0 over-merge).  Equitable-partition refinement on exact
@@ -156,6 +143,81 @@ static Key canonMS(const uint16_t* pairs, std::vector<int>* repOut=nullptr){
     Key best{}; for(int i=0;i<M;++i) best[i]=bestArr[i];
     if(repOut){ repOut->assign(M,0); for(int i=0;i<M;++i)(*repOut)[i]=bestArr[i]; }
     return best;
+}
+
+static void relabelPairs(const uint16_t* in, const int* sx, const int* sy, uint16_t* out){
+    for(int i=0;i<M;++i){
+        int xm=in[i]&FULLC, ym=(in[i]>>C)&FULLC, nx=0, ny=0;
+        for(int b=xm;b;b&=b-1) nx |= 1<<sx[__builtin_ctz(b)];
+        for(int b=ym;b;b&=b-1) ny |= 1<<sy[__builtin_ctz(b)];
+        out[i]=(uint16_t)(nx|(ny<<C));
+    }
+}
+
+static void randomPairs(std::mt19937& rng, uint16_t* out){
+    for(int i=0;i<M;++i){
+        int xm=(int)(rng()&FULLC);
+        int ym=(int)(rng()&FULLC);
+        out[i]=(uint16_t)(xm|(ym<<C));
+    }
+}
+
+static int canonSelfTest(int ntests, unsigned seed){
+    std::mt19937 rng(seed);
+    int invariantBad=0;
+    uint16_t pr[MAXM], pr2[MAXM];
+    for(int t=0;t<ntests;++t){
+        randomPairs(rng, pr);
+        Key k0=canonMS(pr);
+        for(int r=0;r<3;++r){
+            int sx[8], sy[8];
+            for(int i=0;i<C;++i){ sx[i]=i; sy[i]=i; }
+            std::shuffle(sx, sx+C, rng);
+            std::shuffle(sy, sy+C, rng);
+            relabelPairs(pr, sx, sy, pr2);
+            Key k1=canonMS(pr2);
+            if(k0!=k1){
+                ++invariantBad;
+                if(invariantBad<=5) std::fprintf(stderr,"CANON INVARIANCE MISMATCH t=%d\n",t);
+                break;
+            }
+        }
+    }
+
+    int separationConflicts=0;
+    size_t refineKeys=0, bruteKeys=0;
+    bool didSeparation=false;
+    if(C<=4){
+        didSeparation=true;
+        std::map<Key,Key> refineToBrute;
+        std::map<Key,int> rk, bk;
+        for(int t=0;t<ntests;++t){
+            randomPairs(rng, pr);
+            Key kr=canonMS(pr);
+            Key kb=canonMSbrute(pr);
+            auto it=refineToBrute.find(kr);
+            if(it==refineToBrute.end()) refineToBrute.emplace(kr,kb);
+            else if(!(it->second==kb)){
+                ++separationConflicts;
+                if(separationConflicts<=5) std::fprintf(stderr,"CANON SEPARATION CONFLICT t=%d\n",t);
+            }
+            rk[kr]=1;
+            bk[kb]=1;
+        }
+        refineKeys=rk.size();
+        bruteKeys=bk.size();
+    }
+
+    bool ok = invariantBad==0 && (!didSeparation || (separationConflicts==0 && refineKeys==bruteKeys));
+    std::printf("canontest C=%d: invarianceTests=%d violations=%d", C, ntests, invariantBad);
+    if(didSeparation){
+        std::printf("  separationKeys refine=%zu brute=%zu conflicts=%d",
+                    refineKeys, bruteKeys, separationConflicts);
+    } else {
+        std::printf("  separation=SKIP(C>4)");
+    }
+    std::printf("  [%s]\n", ok?"OK":"FAIL");
+    return ok?0:1;
 }
 
 // ---- FAST aggregated within-side histogram ----
@@ -298,16 +360,7 @@ int main(int argc,char**argv){
     if(mode=="canontest"){
         int n=(argc>3)?atoi(argv[3]):20000;
         unsigned seed=(argc>4)?(unsigned)atoi(argv[4]):777u;
-        std::mt19937 rng(seed); int mm=0;
-        uint16_t pr[MAXM];
-        for(int t=0;t<n;++t){
-            // bias toward realistic multisets: random masks with some repeats
-            for(int i=0;i<M;++i){ int xm=rng()&FULLC, ym=rng()&FULLC; pr[i]=(uint16_t)(xm|(ym<<C)); }
-            Key a=canonMS(pr); Key b=canonMSbrute(pr);
-            if(a!=b){ mm++; if(mm<=5){ std::fprintf(stderr,"CANON MISMATCH t=%d\n",t);} }
-        }
-        std::printf("canontest C=%d: tests=%d mismatches=%d [%s]\n",C,n,mm,mm==0?"OK":"FAIL");
-        return mm==0?0:1;
+        return canonSelfTest(n,seed);
     }
 
     bool dump=(mode=="dump");
