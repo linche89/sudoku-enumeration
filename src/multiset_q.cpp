@@ -82,6 +82,46 @@ struct KeyPairHash {
     }
 };
 
+struct PartKeyHash {
+    size_t operator()(const PartKey& k) const {
+        size_t h=1469598103934665603ull;
+        for(uint16_t v:k){ h^=v; h*=1099511628211ull; }
+        return h;
+    }
+};
+
+static uint64_t partPairHash64(const PartKey& a, const PartKey& b){
+    uint64_t h=1469598103934665603ull;
+    for(uint16_t v:a){ h^=v; h*=1099511628211ull; }
+    h^=0x9e3779b97f4a7c15ull; h*=1099511628211ull;
+    for(uint16_t v:b){ h^=v; h*=1099511628211ull; }
+    return h;
+}
+
+static PartKey canonPartBrute(const PartKey& p){
+    uint16_t src[2][6]{};
+    for(int i=0;i<C;++i){
+        src[0][i]=p[i];
+        uint16_t t=p[i];
+        src[1][i]=(uint16_t)(((t>>C)&FULLC) | ((t&FULLC)<<C));
+    }
+    PartKey best{}; bool have=false;
+    for(int br=0;br<2;++br){
+        for(size_t xp=0; xp<CP.size(); ++xp){ const int* pmX=permMask[xp].data();
+            for(size_t yp=0; yp<CP.size(); ++yp){ const int* pmY=permMask[yp].data();
+                PartKey cand{};
+                for(int i=0;i<C;++i){
+                    int t=src[br][i];
+                    cand[i]=(uint16_t)(pmX[t&FULLC] | (pmY[(t>>C)&FULLC]<<C));
+                }
+                std::sort(cand.begin(),cand.begin()+C);
+                if(!have || cand<best){ best=cand; have=true; }
+            }
+        }
+    }
+    return best;
+}
+
 static void initPerms(){
     std::vector<int> p(C); for(int i=0;i<C;++i)p[i]=i;
     do { std::array<int,8> a{}; for(int i=0;i<C;++i)a[i]=p[i]; CP.push_back(a); } while(std::next_permutation(p.begin(),p.end()));
@@ -399,6 +439,8 @@ struct TaggedCanon {
 // collisions cannot alias), and on any probe failure/full table we simply recompute the
 // canon — degradation is performance-only.
 static bool gProfile=false;
+static bool gPartOrbitAudit=false;
+static long long gPartOrbitMax=0;
 
 struct CacheStatsSnapshot {
     unsigned long long hits=0, misses=0, inserts=0, probeFail=0;
@@ -633,6 +675,89 @@ static void auditEssentialBand(const std::vector<std::pair<Key,const Big*>>& ess
         "    uniqueHist=%zu uniqueHistPair=%zu avgTopHist=%.2f avgBotHist=%.2f avgCross=%.2f maxTop=%llu maxBot=%llu maxCross=%llu\n",
         limit,ess.size(),topSides.size(),botSides.size(),sideToHist.size(),sidePairs.size(),
         histIds.size(),histPairs.size(),topEntries/den,botEntries/den,crossPairs/den,maxTop,maxBot,maxCross);
+    std::fflush(stderr);
+}
+
+static void targetAuditEssentialBand(const std::vector<std::pair<Key,const Big*>>& ess, long long auditMax){
+    long long limit=(auditMax>0 && auditMax<(long long)ess.size())?auditMax:(long long)ess.size();
+    std::unordered_map<Key,std::vector<std::pair<PartKey,uint64_t>>,KeyHash> sideMemo;
+    std::unordered_map<Key,int,KeyHash> globalTargets;
+    std::unordered_map<PartKey,int,PartKeyHash> globalTopParts, globalBotParts;
+    std::unordered_map<uint64_t,int> globalPartPairs;
+    std::unordered_map<Key,uint64_t,KeyHash> wtSum;
+    unsigned long long crossPairs=0, targetRefs=0, maxTargets=0;
+    unsigned long long maxTop=0, maxBot=0, sideHits=0, sideMisses=0;
+    bool oldProfile=gProfile;
+    gProfile=true;
+    gCache.resetStats();
+    auto getSide=[&](const uint16_t* ms)->const std::vector<std::pair<PartKey,uint64_t>>&{
+        Key sk=makeSideKey(ms);
+        auto it=sideMemo.find(sk);
+        if(it!=sideMemo.end()){ ++sideHits; return it->second; }
+        ++sideMisses;
+        std::vector<std::pair<PartKey,uint64_t>> flat=buildSideHistFromKey(sk);
+        return sideMemo.emplace(std::move(sk),std::move(flat)).first->second;
+    };
+    for(long long ei=0; ei<limit; ++ei){
+        const Key& tk=ess[(size_t)ei].first;
+        uint16_t topMS[8], botMS[8]; int nt=0, nb=0;
+        for(int i=0;i<M;++i){ if(tk[i]&TAG) topMS[nt++]=(uint16_t)(tk[i]&VALMASK); else botMS[nb++]=tk[i]; }
+        isort(topMS,C); isort(botMS,C);
+        const auto& hTop=getSide(topMS);
+        const auto& hBot=getSide(botMS);
+        maxTop=std::max(maxTop,(unsigned long long)hTop.size());
+        maxBot=std::max(maxBot,(unsigned long long)hBot.size());
+        wtSum.clear();
+        for(const auto& tp:hTop){ const uint16_t* a=tp.first.data(); uint64_t wt=tp.second;
+            globalTopParts.emplace(tp.first,0);
+            for(const auto& bp:hBot){ const uint16_t* b=bp.first.data();
+                globalBotParts.emplace(bp.first,0);
+                globalPartPairs.emplace(partPairHash64(tp.first,bp.first),0);
+                Key raw{}; int i=0,j=0,k=0;
+                while(i<C&&j<C){ if(a[i]<=b[j]) raw[k++]=a[i++]; else raw[k++]=b[j++]; }
+                while(i<C) raw[k++]=a[i++];
+                while(j<C) raw[k++]=b[j++];
+                wtSum[gCache.get(raw)] += wt*bp.second;
+            }
+        }
+        unsigned long long cr=(unsigned long long)hTop.size()*(unsigned long long)hBot.size();
+        crossPairs+=cr;
+        targetRefs+=(unsigned long long)wtSum.size();
+        maxTargets=std::max(maxTargets,(unsigned long long)wtSum.size());
+        for(const auto& kv:wtSum) globalTargets.emplace(kv.first,0);
+    }
+    CacheStatsSnapshot cs=gCache.stats();
+    gProfile=oldProfile;
+    size_t orbitSample=0, partOrbits=0;
+    if(gPartOrbitAudit){
+        std::vector<PartKey> parts;
+        parts.reserve(globalTopParts.size()+globalBotParts.size());
+        for(const auto& kv:globalTopParts) parts.push_back(kv.first);
+        for(const auto& kv:globalBotParts) parts.push_back(kv.first);
+        long long limitParts=(gPartOrbitMax>0 && gPartOrbitMax<(long long)parts.size())?gPartOrbitMax:(long long)parts.size();
+        std::unordered_map<PartKey,int,PartKeyHash> orbs;
+        for(long long i=0;i<limitParts;++i) orbs.emplace(canonPartBrute(parts[(size_t)i]),0);
+        orbitSample=(size_t)limitParts;
+        partOrbits=orbs.size();
+    }
+    double den=limit?double(limit):1.0;
+    double cacheDen=(cs.hits+cs.misses)?double(cs.hits+cs.misses):1.0;
+    std::fprintf(stderr,
+        "  targetaudit: inspected=%lld/%zu sideMemo=%zu sideHit=%llu sideMiss=%llu\n"
+        "    cross=%llu avgCross=%.2f maxTop=%llu maxBot=%llu\n"
+        "    partTop=%zu partBot=%zu partPairHash=%zu partPairCompression=%.2f\n"
+        "    globalTargets=%zu avgTargetsPerTask=%.2f maxTargetsPerTask=%llu targetCompression=%.2f\n"
+        "    rawCache hit=%llu miss=%llu hitRate=%.2f%% insert=%llu probeFail=%llu\n",
+        limit,ess.size(),sideMemo.size(),sideHits,sideMisses,
+        crossPairs,crossPairs/den,maxTop,maxBot,
+        globalTopParts.size(),globalBotParts.size(),globalPartPairs.size(),crossPairs/(double)std::max<size_t>(globalPartPairs.size(),1),
+        globalTargets.size(),targetRefs/den,maxTargets,crossPairs/(double)std::max<size_t>(globalTargets.size(),1),
+        cs.hits,cs.misses,100.0*cs.hits/cacheDen,cs.inserts,cs.probeFail);
+    if(gPartOrbitAudit){
+        std::fprintf(stderr,
+            "    partOrbit sample=%zu orbits=%zu compression=%.2f\n",
+            orbitSample,partOrbits,orbitSample/(double)std::max<size_t>(partOrbits,1));
+    }
     std::fflush(stderr);
 }
 
@@ -975,6 +1100,8 @@ int main(int argc,char**argv){
     size_t sideGlobalCap=1000000;
     int auditBand=-1;
     long long auditMax=0;
+    int targetAuditBand=-1;
+    long long targetAuditMax=0;
     int cacheLog2=0;
     for(int ai=2; ai<argc; ++ai){
         std::string a=argv[ai];
@@ -988,6 +1115,10 @@ int main(int argc,char**argv){
         else if(a.rfind("sideglobal=",0)==0){ sideGlobal=true; sideGlobalCap=(size_t)std::strtoull(a.c_str()+11,nullptr,10); }
         else if(a.rfind("auditband=",0)==0) auditBand=atoi(a.c_str()+10);
         else if(a.rfind("auditmax=",0)==0) auditMax=(long long)std::strtoll(a.c_str()+9,nullptr,10);
+        else if(a.rfind("targetauditband=",0)==0) targetAuditBand=atoi(a.c_str()+16);
+        else if(a.rfind("targetauditmax=",0)==0) targetAuditMax=(long long)std::strtoll(a.c_str()+15,nullptr,10);
+        else if(a=="partorbit") gPartOrbitAudit=true;
+        else if(a.rfind("partorbitmax=",0)==0){ gPartOrbitAudit=true; gPartOrbitMax=(long long)std::strtoll(a.c_str()+13,nullptr,10); }
         else if(a.rfind("ckpt=",0)==0) checkpointPrefix=a.substr(5);
         else if(isPositiveIntArg(a)) cacheLog2=atoi(a.c_str());
         else std::fprintf(stderr,"warning: ignoring unknown argument '%s'\n",a.c_str());
@@ -1005,6 +1136,8 @@ int main(int argc,char**argv){
     if(phiAuditMode) std::fprintf(stderr,"phiaudit: target shallow bands=%d\n",targetBands);
     if(sideGlobal) std::fprintf(stderr,"sideglobal: cap=%zu unique side keys\n",sideGlobalCap);
     if(auditBand>=0) std::fprintf(stderr,"audit: band=%d max=%lld\n",auditBand,auditMax);
+    if(targetAuditBand>=0) std::fprintf(stderr,"targetaudit: band=%d max=%lld\n",targetAuditBand,targetAuditMax);
+    if(gPartOrbitAudit) std::fprintf(stderr,"partorbit audit: max=%lld\n",gPartOrbitMax);
     for(int m=0;m<(1<<M);++m) if(__builtin_popcount(m)==C) Askel.push_back(m);
     auto t0=std::chrono::steady_clock::now();
     auto el=[&]{ return std::chrono::duration<double>(std::chrono::steady_clock::now()-t0).count(); };
@@ -1068,6 +1201,11 @@ int main(int argc,char**argv){
         if(auditBand==band){
             auditEssentialBand(ess,auditMax);
             std::printf("C=%d audit band %d complete (no final N computed)\n",C,band);
+            return 0;
+        }
+        if(targetAuditBand==band){
+            targetAuditEssentialBand(ess,targetAuditMax);
+            std::printf("C=%d targetaudit band %d complete (no final N computed)\n",C,band);
             return 0;
         }
 
