@@ -31,6 +31,7 @@ function Invoke-Compile {
 Invoke-Compile "src/multiset_fast.cpp" "build/ms_fast.exe"
 Invoke-Compile "src/multiset_par.cpp" "build/mp_fast.exe" $omp
 Invoke-Compile "src/multiset_c6.cpp" "build/mp_c6.exe" $omp
+Invoke-Compile "src/multiset_q.cpp" "build/mp_q.exe" $omp
 Invoke-Compile "src/canon_refine2.cpp" "build/canon_refine2.exe"
 
 Write-Host "built OG-2 tools in build/"
