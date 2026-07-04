@@ -129,7 +129,12 @@
 5. **交叉积成本地板的进一步压缩(未实装)**:下一条有希望的精确路线是 group/orbit kernel:
    把 hist pair 压到 `S_C×S_C×swap` 下的 orbit representative + relative double-coset 数据;
    或把单侧 restricted-permutation hist 改写成 rook-polynomial / permanent 生成函数。
-6. **换状态空间(kjellfp a-向量,§A.4b 原建议)**:仍开放,工程量大,C=6 才值得。
+6. **B-route permanent DP 原型(已实装旁路,见 `data/b_route_permdp_20260704.md`)**:
+   `buildHistPermDP` 把单侧 side histogram 写成彩色 restricted permanent 的 column-subset DP。
+   C=3/4/5 随机差分全部 OK,但作为 `buildHistFast` 的 drop-in 替换慢 3.5–4.1×;
+   因此不要接主路径。它的价值是作为 fused direct kernel 的地基:
+   `top side DP × bot side DP -> target-count vector / dual scalar`,目标是绕过 `hTop×hBot`。
+7. **换状态空间(kjellfp a-向量,§A.4b 原建议)**:仍开放,工程量大,C=6 才值得。
 
 ### B.7 接力检查清单
 

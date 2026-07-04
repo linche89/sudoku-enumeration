@@ -603,6 +603,77 @@ static void buildHistFast(const int* syms, const std::vector<int>& xm, const std
     }
 }
 
+struct HistDPKey {
+    uint16_t ymask=0, code=0;
+    PartKey part{};
+    bool operator==(const HistDPKey& o) const { return ymask==o.ymask && code==o.code && part==o.part; }
+};
+struct HistDPKeyHash {
+    size_t operator()(const HistDPKey& k) const {
+        size_t h=1469598103934665603ull;
+        h^=k.ymask; h*=1099511628211ull;
+        h^=k.code; h*=1099511628211ull;
+        for(uint16_t v:k.part){ h^=v; h*=1099511628211ull; }
+        return h;
+    }
+};
+
+// Side histogram as a coloured restricted permanent over X columns and Y columns.
+// This is a prototype foundation for the direct middle-band kernel: it avoids the
+// xAssignments*yAssignments materialisation in buildHistFast, while producing the
+// exact same PartKey histogram.
+static void buildHistPermDP(const int* syms, const std::vector<int>& xm, const std::vector<int>& ym,
+                            std::map<PartKey,uint64_t>& out){
+    int gx[8], gy[8], gn[8], G=0;
+    int sx[8], sy[8];
+    for(int i=0;i<C;++i){ sx[i]=xm[syms[i]]; sy[i]=ym[syms[i]]; }
+    for(int i=0;i<C;++i){
+        int k=-1; for(int j=0;j<G;++j) if(gx[j]==sx[i]&&gy[j]==sy[i]){ k=j; break; }
+        if(k<0){ k=G++; gx[k]=sx[i]; gy[k]=sy[i]; gn[k]=0; }
+        gn[k]++;
+    }
+    uint64_t gfact=1; for(int k=0;k<G;++k) gfact*=factU(gn[k]);
+    uint16_t mult[8]; mult[0]=1;
+    for(int k=1;k<G;++k) mult[k]=(uint16_t)(mult[k-1]*(gn[k-1]+1));
+    uint16_t targetCode=0; for(int k=0;k<G;++k) targetCode += (uint16_t)(gn[k]*mult[k]);
+    int legal[8][8][8]; int ln[8][8]={};
+    for(int a=0;a<C;++a) for(int b=0;b<C;++b)
+        for(int g=0; g<G; ++g)
+            if(!(gx[g]&(1<<a)) && !(gy[g]&(1<<b)))
+                legal[a][b][ln[a][b]++]=g;
+
+    std::unordered_map<HistDPKey,uint64_t,HistDPKeyHash> cur,nx;
+    cur.reserve(128);
+    cur[HistDPKey{}]=1;
+    for(int a=0;a<C;++a){
+        nx.clear();
+        nx.reserve(cur.size()*C);
+        for(const auto& kv:cur){
+            const HistDPKey& st=kv.first;
+            uint64_t ways=kv.second;
+            for(int b=0;b<C;++b){
+                if(st.ymask&(1<<b)) continue;
+                for(int ii=0; ii<ln[a][b]; ++ii){
+                    int g=legal[a][b][ii];
+                    int used=(st.code/mult[g])%(gn[g]+1);
+                    if(used>=gn[g]) continue;
+                    HistDPKey ns=st;
+                    ns.ymask |= (uint16_t)(1<<b);
+                    ns.code += mult[g];
+                    ns.part[a]=(uint16_t)((gx[g]|(1<<a)) | ((gy[g]|(1<<b))<<C));
+                    std::sort(ns.part.begin(), ns.part.begin()+a+1);
+                    nx[ns]+=ways;
+                }
+            }
+        }
+        cur.swap(nx);
+    }
+    for(const auto& kv:cur){
+        if(kv.first.ymask==(uint16_t)FULLC && kv.first.code==targetCode)
+            out[kv.first.part] += kv.second * gfact;
+    }
+}
+
 static Key makeSideKey(const uint16_t* ms){
     Key sk{};
     for(int i=0;i<C;++i) sk[i]=ms[i];
@@ -894,6 +965,86 @@ static int difftest(int ntests, unsigned seed){
     return mismatches==0?0:1;
 }
 
+static uint64_t histSum(const std::map<PartKey,uint64_t>& h){
+    uint64_t s=0; for(const auto& kv:h) s+=kv.second; return s;
+}
+
+static int permDptest(int ntests, unsigned seed){
+    std::mt19937 rng(seed);
+    int mismatches=0, sumBad=0, empties=0;
+    std::vector<int> xm(M,0), ym(M,0);
+    for(int t=0;t<ntests;++t){
+        int syms[8]; for(int i=0;i<C;++i)syms[i]=i;
+        std::vector<std::array<int,8>> ax, ay;
+        for(;;){
+            for(int i=0;i<C;++i){ xm[i]=rng()&FULLC; ym[i]=rng()&FULLC; }
+            ax=validBijections(syms,xm);
+            ay=validBijections(syms,ym);
+            if(!ax.empty() && !ay.empty()) break;
+        }
+        std::map<PartKey,uint64_t> hb,hf,hp;
+        buildHistBrute(syms,xm,ym,hb);
+        buildHistFast(syms,xm,ym,hf);
+        buildHistPermDP(syms,xm,ym,hp);
+        if(hb!=hf || hb!=hp){
+            ++mismatches;
+            if(mismatches<=5)
+                std::fprintf(stderr,"PERMDP HIST MISMATCH C=%d t=%d brute=%zu fast=%zu perm=%zu\n",
+                             C,t,hb.size(),hf.size(),hp.size());
+        }
+        uint64_t expect=(uint64_t)ax.size()*(uint64_t)ay.size();
+        if(histSum(hp)!=expect){
+            ++sumBad;
+            if(sumBad<=5)
+                std::fprintf(stderr,"PERMDP SUM BAD C=%d t=%d got=%llu expect=%llu\n",
+                             C,t,(unsigned long long)histSum(hp),(unsigned long long)expect);
+        }
+        if(hp.empty()) ++empties;
+    }
+    bool ok=mismatches==0 && sumBad==0;
+    std::printf("permdptest C=%d: tests=%d mismatches=%d sumBad=%d empties=%d  [%s]\n",
+                C,ntests,mismatches,sumBad,empties,ok?"OK":"FAIL");
+    return ok?0:1;
+}
+
+static int histBench(int ntests, unsigned seed){
+    std::mt19937 rng(seed);
+    std::vector<int> xm(M,0), ym(M,0);
+    std::vector<std::vector<int>> xs, ys;
+    xs.reserve(ntests); ys.reserve(ntests);
+    for(int t=0;t<ntests;++t){
+        int syms[8]; for(int i=0;i<C;++i)syms[i]=i;
+        for(;;){
+            for(int i=0;i<C;++i){ xm[i]=rng()&FULLC; ym[i]=rng()&FULLC; }
+            if(!validBijections(syms,xm).empty() && !validBijections(syms,ym).empty()) break;
+        }
+        xs.push_back(xm); ys.push_back(ym);
+    }
+    int syms[8]; for(int i=0;i<C;++i)syms[i]=i;
+    auto now=[]{ return std::chrono::steady_clock::now(); };
+    size_t fastKeys=0, permKeys=0; uint64_t fastMass=0, permMass=0;
+    auto t1=now();
+    for(int t=0;t<ntests;++t){
+        std::map<PartKey,uint64_t> h;
+        buildHistFast(syms,xs[t],ys[t],h);
+        fastKeys+=h.size(); fastMass+=histSum(h);
+    }
+    auto t2=now();
+    for(int t=0;t<ntests;++t){
+        std::map<PartKey,uint64_t> h;
+        buildHistPermDP(syms,xs[t],ys[t],h);
+        permKeys+=h.size(); permMass+=histSum(h);
+    }
+    auto t3=now();
+    double fastSec=std::chrono::duration<double>(t2-t1).count();
+    double permSec=std::chrono::duration<double>(t3-t2).count();
+    std::printf("histbench C=%d tests=%d fast=%.6fs permDP=%.6fs ratio=%.2f avgKeys fast=%.2f perm=%.2f mass %llu/%llu\n",
+                C,ntests,fastSec,permSec,permSec/(fastSec>0?fastSec:1e-9),
+                fastKeys/(double)ntests,permKeys/(double)ntests,
+                (unsigned long long)fastMass,(unsigned long long)permMass);
+    return 0;
+}
+
 // ---------- checkpoint and dual combine ----------
 static bool isPositiveIntArg(const std::string& s){
     if(s.empty()) return false;
@@ -1088,6 +1239,16 @@ int main(int argc,char**argv){
         int n=(argc>3)?atoi(argv[3]):2000;
         unsigned seed=(argc>4)?(unsigned)atoi(argv[4]):12345u;
         return difftest(n,seed);
+    }
+    if(mode=="permdptest"){
+        int n=(argc>3)?atoi(argv[3]):2000;
+        unsigned seed=(argc>4)?(unsigned)atoi(argv[4]):24680u;
+        return permDptest(n,seed);
+    }
+    if(mode=="histbench"){
+        int n=(argc>3)?atoi(argv[3]):20000;
+        unsigned seed=(argc>4)?(unsigned)atoi(argv[4]):13579u;
+        return histBench(n,seed);
     }
     if(mode=="canontest"){
         int n=(argc>3)?atoi(argv[3]):20000;
