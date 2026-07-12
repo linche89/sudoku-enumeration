@@ -1,0 +1,48 @@
+Exact validation results
+========================
+
+C=4
+---
+boundary color orbits=1890 exact states=44730
+cuts=35
+Sym^2(W) columns=630
+U nonzeros=626220 density=0.5259
+half_norm=1821030450462720
+N4=29136487207403520
+rank_F_mod_1000003=630
+
+C=5
+---
+half types=3+10
+full histograms=589392
+full cube orbits=355
+weighted skeletons=1016255020032 = binom(10,5)^5
+classes=355
+maxF=26011238400
+N5=1903816047972624930994913280000
+
+C=5 channel-rank certificate
+----------------------------
+D2=Sym^2(W_10), dim 8001
+D3=Sym^3(W_10), dim 341376
+End_{S_10}(D2) has dimension 154.
+For A=M M^* (with exact divided-power weights on D3), the matrix of
+left multiplication by A in the 154-dimensional orbital algebra has
+rank 154 modulo 1000003. Therefore every D2 isotypic block is invertible
+and rank(M)=8001 over Q.
+
+centralizer_left_multiplication_rank_mod_1000003=154 of 154
+therefore_cross_channel_rank=8001 of 8001
+
+C=6 representation data
+-----------------------
+D=Sym^3(W_12), dim 16542064
+67 nonzero S_12 types
+sum multiplicities=6206
+max multiplicity=344
+sum multiplicity squares=1081862
+sum multiplicity cubes=242094680
+symmetric block entries=544034
+17 half-skeleton orbit types
+H=(Q[X])^{S_6}, dim 5171942314
+Every D multiplicity is <= the corresponding H multiplicity.
