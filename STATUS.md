@@ -1,6 +1,6 @@
 # Current Project Status
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.
@@ -23,8 +23,28 @@ The exact 2xC counts are verified by multiple engines:
 | 4 | 29136487207403520 |
 | 5 | 1903816047972624930994913280000 |
 
-The primary exact engine is `src/factorization_orbit.cpp`. Its current C=5
-full gate takes about 9.2 seconds with `pivot rooted4`.
+The primary exact engine is `src/factorization_orbit.cpp`. Five fresh C=5
+full gates averaged about 8.66 seconds with `pivot rooted4` on the reference
+machine.  A same-binary controlled ablation measured factor-stage times of
+53.35 seconds for the plain recurrence, 36.93 seconds with only the rooted
+edge pivot, 11.48 seconds with only the degree-four split, and 8.58 seconds
+with both.  See `docs/reports/og2/c5-paper-ablation-20260712.md`.
+
+## Historical C=6 target
+
+The C=6 decimal value is not an unpublished target.  Kjell Fredrik Pettersen
+announced the following count on the New Sudoku Players' Forum on 2006-11-14:
+
+```text
+N(6) = 38296278920738107863746324732012492486187417600000
+```
+
+The same thread reports 63,199 outer band-configuration classes and describes
+the weighted square sum used to obtain the result.  No buildable historical
+source or independent executable verification has been located in the current
+literature audit.  This project's C=6 objective is therefore an independent,
+open verification of that historical claim, not discovery of a new integer.
+See `docs/reports/og2/literature-audit-20260712.md`.
 
 ## C=6 frontier
 
@@ -47,21 +67,43 @@ pivot                     31920               19850
 Its first 50 new F5 values are closed. A straight hard run remains a multi-hour
 operation, so no full C=6 count is currently in progress.
 
-## Current mathematical question
+## Audited route decision
 
-The rooted color-block identities have removed the cubic canonicalization
-layer. The unsolved problem is now global aggregation: either compress the
-roughly 20,000 strong F5 residuals of a low-symmetry outer graph, or evaluate
-the exact one-shot coefficient
+The single-graph aggregation question now has a concrete exact candidate.  A
+future-twin recurrence processes the 12 left vertices directly and identifies
+right columns by their remaining neighborhood and used-color set
+`(tau, K)`.  It never enumerates a top perfect matching, constructs a residual
+`Q-M`, or calls `F5` separately.  The recurrence and its labelled transition
+multiplicities have been independently audited and spot-checked against a
+separate perfect-matching recurrence on random C=2..4 graphs.  It has not yet
+been integrated into the repository or passed the complete C=2..5 gate, so it
+is not yet a verified engine or a C=6 timing result.
 
-```text
-[Omega_x Omega_y] Phi(x,y)^12
-```
+The proposed natural 3+3 low-rank route did not pass its required small-C
+decision gate.  The exact symmetry-block endpoint exists, but reproduced
+certificates give full rank 630/630 at C=4 and full row rank 8001/8001 at C=5.
+At C=6 every domain multiplicity fits inside the midpoint module, so symmetry
+forces no channel loss.  This rules out ordinary irreducible-channel
+truncation as a justified C=6 implementation route; it does not rule out a
+different fast implicit contraction for a full-rank operator.
 
-without expanding its enormous midpoint state space. The proposed
-symmetry-adapted 3+3 low-rank contraction is a research program, not yet an
-algorithm; explicit bases, contraction maps, and measured C=4/5 channel ranks
-are still missing.
+The external derivations, supplied code, local reproduction commands, hashes,
+and limitations are recorded in
+`docs/reports/og2/c6-expert-routes-audit-20260713.md`.
+
+## Immediate objective
+
+Implement the future-twin recurrence as an optional exact backend while
+leaving the current factorization engine and checkpoint format unchanged.  Its
+mandatory decision gates are, in order:
+
+1. canonical-key and grouped-transition differential tests;
+2. per-outer-class agreement with the current engine for complete C=2..5;
+3. a cold reproduction of `F6(G1) = 6986348258918400`;
+4. a bounded two-order evaluation of the low-symmetry second outer graph;
+5. only if those pass, a spread-out bounded sample for a full-run projection.
+
+No full 63,199-class C=6 run is authorized by this objective.
 
 ## Current checkpoint
 

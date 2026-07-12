@@ -14,10 +14,14 @@
 ## Current mathematics
 
 - `math/c6-current-bottleneck.md` — audited C=6 mathematical frontier.
-- `math/og2-band-kernel-lowrank.md` — formalized transfer-kernel question.
+- `math/og2-band-kernel-lowrank.md` — separate formalized transfer-kernel
+  question; it is not the immediate implementation objective.
 
 ## Dated evidence
 
+- `reports/og2/c6-expert-routes-audit-20260713.md`
+- `reports/og2/literature-audit-20260712.md`
+- `reports/og2/c5-paper-ablation-20260712.md`
 - `reports/og2/factorization-c5-20260712.md`
 - `reports/og2/factorization-c6-20260712.md`
 - `reports/og2/mpq-c5-calibration-20260704.md`
@@ -35,3 +39,9 @@ They may contain conjectures or proposals that have not been implemented.
 
 Files under `history/` explain how the project arrived here. Their statements,
 commands, and source paths may be obsolete and must not override `STATUS.md`.
+
+## Manuscript
+
+- `../paper/c5-orbit-factorization/` — LaTeX paper on the fast, reproducible
+  C=5 orbit/factorization computation.  Its author block and archival DOI are
+  intentionally left for the user to finalize before submission.
