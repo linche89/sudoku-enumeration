@@ -425,3 +425,65 @@ Thus the first outer class falls from an early estimate near 80 hours to about
 six hours if later degree-5 values resemble the first.  The next decision gate
 is the exact rooted 2-factor count for these degree-5 representatives; only a
 small output count justifies implementing the two-color block enumerator.
+
+## Follow-up: rooted two-factor split
+
+The ternary right-degree DP was implemented first as a counting-only gate.  For
+the first three degree-5 representatives, the exact minimum over the ten root
+edge pairs was:
+
+```text
+F5 representative   minimum rooted 2-factors   all root-pair counts summed
+1                                      1635237                       17439798
+2                                      1626321                       17341639
+3                                      1618911                       17299931
+```
+
+These stable 1.6-million-object minima rule out formula (10) as the immediate
+replacement: it would create at least that many cubic complements per degree-5
+graph.  The same gate on three degree-4 residuals gave minima 15,553, 15,382,
+and 15,536, so formula (8) is on the right scale.
+
+The optional `rooted4` evaluator now computes
+
+```text
+F4(G) = 6 * sum_H 2^(c(H) + c(G-H))
+```
+
+directly.  It fixes two edges at row zero, builds the reachable ternary
+right-degree states layer by layer, and enumerates valid factors backward from
+the all-two state.  A stamped dense table gives O(1) predecessor tests.  Two
+rollback disjoint-set structures maintain `c(H)` and `c(G-H)` without creating
+cubic residual graphs.  Only complete `F4` values enter the existing strong-key
+memo, so the checkpoint format and old entries remain compatible.
+
+All exact gates passed with the final implementation:
+
+```text
+C=2  N=288                                [OK]
+C=3  N=28200960                           [OK]
+C=4  N=29136487207403520                  [OK]  countTime=0.007569s
+C=5  N=1903816047972624930994913280000    [OK]  countTime=9.225454s
+      flags: pivot rooted4
+```
+
+On C=6, `pivotinner parallelparents rooted4` reproduced the first ten `F5`
+values from a clean memo.  The first three were the independently established
+values 37,186,844,160; 36,718,141,440; and 35,733,365,760.  Their ten timings
+were:
+
+```text
+0.934  0.961  0.864  0.847  0.909  0.762  0.811  0.809  0.737  0.799 seconds
+mean = 0.843 seconds
+```
+
+The first exact gate therefore fell from 13.474 seconds to 0.934 seconds
+(14.4x).  A straight-line extrapolation of the 1,622-class first degree-5
+frontier is now roughly 20--30 minutes rather than six hours, but this is not a
+completed outer-class measurement and does not address the 63,199 outer-class
+frontier.
+
+Finally, the compatible checkpoint was resumed atomically after every closed
+degree-5 value.  A fresh reload skipped the stored prefix and reproduced the
+next previously observed value, 35,892,157,440.  It now contains 242,937 exact
+states (9,960,437 bytes), with the first 14 degree-5 values closed.

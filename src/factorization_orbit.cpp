@@ -742,7 +742,12 @@ std::unordered_map<GraphKey, GraphKey, GraphKeyHash> degree3DiscreteCanonMap;
 bool useDegree3IsoBatch = false;
 bool useDegree3PairIso = false;
 bool parallelDegree4ParentEnumeration = false;
+bool useDegree4RootedSplit = false;
 int colorPivotMaxDegree = 0;
+std::array<int, MAX_C + 1> rootedTwoFactorProbes{};
+uint64_t degree4RootedCalls = 0;
+uint64_t degree4RootedLeaves = 0;
+uint64_t degree4RootedNodes = 0;
 uint64_t degree3IsoNodeBudget = 1000;
 uint64_t degree3IsoChecks = 0;
 uint64_t degree3IsoHits = 0;
@@ -1758,6 +1763,320 @@ uint64_t residualMultiplicitySum(const std::vector<Residual>& residuals) {
     return total;
 }
 
+struct RootedTwoFactorPairCount {
+    uint16_t edgePair = 0;
+    uint64_t count = 0;
+};
+
+struct RootedTwoFactorCounts {
+    std::array<RootedTwoFactorPairCount, MAX_C * (MAX_C - 1) / 2> pairs{};
+    int pairCount = 0;
+    uint64_t minimum = std::numeric_limits<uint64_t>::max();
+    uint64_t maximum = 0;
+    uint64_t total = 0;
+};
+
+uint64_t countRootedTwoFactors(const std::array<uint16_t, MAX_M>& graph,
+                               uint16_t rootPair) {
+    std::array<int, MAX_M> powerOfThree{};
+    powerOfThree[0] = 1;
+    for (int col = 1; col < M; ++col) powerOfThree[col] = 3 * powerOfThree[col - 1];
+    const int stateCount = 3 * powerOfThree[M - 1];
+    const int target = stateCount - 1;
+    std::vector<uint64_t> current((size_t)stateCount, 0);
+    std::vector<uint64_t> next((size_t)stateCount, 0);
+    std::vector<int> active;
+    std::vector<int> nextActive;
+    active.reserve(80000);
+    nextActive.reserve(80000);
+
+    int rootState = 0;
+    uint16_t rootBits = rootPair;
+    while (rootBits) {
+        const int col = std::countr_zero(rootBits);
+        rootBits &= (uint16_t)(rootBits - 1);
+        rootState += powerOfThree[col];
+    }
+    current[rootState] = 1;
+    active.push_back(rootState);
+
+    for (int row = 1; row < M; ++row) {
+        for (int state : active) {
+            const uint64_t ways = current[state];
+            uint16_t firstChoices = graph[row];
+            while (firstChoices) {
+                const uint16_t firstBit = firstChoices & (uint16_t)(-firstChoices);
+                firstChoices ^= firstBit;
+                const int firstCol = std::countr_zero(firstBit);
+                if ((state / powerOfThree[firstCol]) % 3 >= 2) continue;
+                uint16_t secondChoices = firstChoices;
+                while (secondChoices) {
+                    const uint16_t secondBit = secondChoices & (uint16_t)(-secondChoices);
+                    secondChoices ^= secondBit;
+                    const int secondCol = std::countr_zero(secondBit);
+                    if ((state / powerOfThree[secondCol]) % 3 >= 2) continue;
+                    const int child = state + powerOfThree[firstCol] + powerOfThree[secondCol];
+                    if (next[child] == 0) nextActive.push_back(child);
+                    next[child] += ways;
+                }
+            }
+        }
+        for (int state : active) current[state] = 0;
+        current.swap(next);
+        active.swap(nextActive);
+        nextActive.clear();
+    }
+    return current[target];
+}
+
+RootedTwoFactorCounts countRootedTwoFactorPairs(
+    const std::array<uint16_t, MAX_M>& graph) {
+    RootedTwoFactorCounts result;
+    uint16_t firstChoices = graph[0];
+    while (firstChoices) {
+        const uint16_t firstBit = firstChoices & (uint16_t)(-firstChoices);
+        firstChoices ^= firstBit;
+        uint16_t secondChoices = firstChoices;
+        while (secondChoices) {
+            const uint16_t secondBit = secondChoices & (uint16_t)(-secondChoices);
+            secondChoices ^= secondBit;
+            const uint16_t pair = firstBit | secondBit;
+            const uint64_t count = countRootedTwoFactors(graph, pair);
+            result.pairs[result.pairCount++] = {pair, count};
+            result.minimum = std::min(result.minimum, count);
+            result.maximum = std::max(result.maximum, count);
+            result.total += count;
+        }
+    }
+    return result;
+}
+
+void probeRootedTwoFactors(const std::array<uint16_t, MAX_M>& graph,
+                           int degree) {
+    if (rootedTwoFactorProbes[degree] <= 0) return;
+    const auto start = std::chrono::steady_clock::now();
+    const RootedTwoFactorCounts counts = countRootedTwoFactorPairs(graph);
+    const double seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - start).count();
+    std::fprintf(stderr,
+                 "rooted2 probe degree=%d pairs=%d min=%llu max=%llu "
+                 "total=%llu time=%.6fs values=",
+                 degree, counts.pairCount,
+                 (unsigned long long)counts.minimum,
+                 (unsigned long long)counts.maximum,
+                 (unsigned long long)counts.total, seconds);
+    for (int i = 0; i < counts.pairCount; ++i) {
+        const uint16_t pair = counts.pairs[i].edgePair;
+        const int first = std::countr_zero(pair);
+        const int second = std::countr_zero((uint16_t)(pair & (pair - 1)));
+        std::fprintf(stderr, "%s%d-%d:%llu", i == 0 ? "" : ",",
+                     first, second,
+                     (unsigned long long)counts.pairs[i].count);
+    }
+    std::fprintf(stderr, "\n");
+    std::fflush(stderr);
+    --rootedTwoFactorProbes[degree];
+}
+
+struct RollbackDsu {
+    struct Change {
+        uint8_t child;
+        uint8_t root;
+        uint8_t rootSize;
+    };
+
+    std::array<uint8_t, 2 * MAX_M> parent{};
+    std::array<uint8_t, 2 * MAX_M> size{};
+    std::array<Change, 2 * MAX_M> history{};
+    int historySize = 0;
+    int components = 0;
+
+    explicit RollbackDsu(int vertices) : components(vertices) {
+        for (int vertex = 0; vertex < vertices; ++vertex) {
+            parent[vertex] = (uint8_t)vertex;
+            size[vertex] = 1;
+        }
+    }
+
+    int root(int vertex) const {
+        while (parent[vertex] != vertex) vertex = parent[vertex];
+        return vertex;
+    }
+
+    void addEdge(int left, int right) {
+        int a = root(left);
+        int b = root(right);
+        if (a == b) return;
+        if (size[a] < size[b]) std::swap(a, b);
+        history[historySize++] = {(uint8_t)b, (uint8_t)a, size[a]};
+        parent[b] = (uint8_t)a;
+        size[a] = (uint8_t)(size[a] + size[b]);
+        --components;
+    }
+
+    void rollback(int snapshot) {
+        while (historySize > snapshot) {
+            const Change change = history[--historySize];
+            parent[change.child] = change.child;
+            size[change.root] = change.rootSize;
+            ++components;
+        }
+    }
+};
+
+struct Degree4RootedResult {
+    FactorCount value = 0;
+    uint64_t leaves = 0;
+    uint64_t nodes = 0;
+};
+
+void addFactorEdges(RollbackDsu& dsu, int left, uint16_t rightBits) {
+    while (rightBits) {
+        const int right = std::countr_zero(rightBits);
+        rightBits &= (uint16_t)(rightBits - 1);
+        dsu.addEdge(left, M + right);
+    }
+}
+
+struct RootedSplitWorkspace {
+    std::vector<uint32_t> marks;
+    std::array<std::vector<int>, MAX_M> layers;
+    uint32_t marker = 0;
+
+    uint32_t nextMarker() {
+        if (++marker == 0) {
+            std::fill(marks.begin(), marks.end(), 0);
+            marker = 1;
+        }
+        return marker;
+    }
+};
+
+thread_local RootedSplitWorkspace rootedSplitWorkspace;
+
+void enumerateRootedDegree4Split(
+    const std::array<uint16_t, MAX_M>& graph,
+    const std::array<int, MAX_M>& powerOfThree,
+    const std::vector<uint32_t>& reachable,
+    uint32_t marker,
+    int row,
+    int state,
+    RollbackDsu& selected,
+    RollbackDsu& complement,
+    Degree4RootedResult& result) {
+    ++result.nodes;
+    if (row == 0) {
+        result.value += (FactorCount)1 << (selected.components + complement.components);
+        ++result.leaves;
+        return;
+    }
+
+    uint16_t firstChoices = graph[row];
+    while (firstChoices) {
+        const uint16_t first = firstChoices & (uint16_t)(-firstChoices);
+        firstChoices ^= first;
+        const int firstCol = std::countr_zero(first);
+        if ((state / powerOfThree[firstCol]) % 3 == 0) continue;
+        uint16_t secondChoices = firstChoices;
+        while (secondChoices) {
+            const uint16_t second = secondChoices & (uint16_t)(-secondChoices);
+            secondChoices ^= second;
+            const int secondCol = std::countr_zero(second);
+            if ((state / powerOfThree[secondCol]) % 3 == 0) continue;
+            const uint16_t pair = first | second;
+            const int predecessor = state - powerOfThree[firstCol]
+                                          - powerOfThree[secondCol];
+            if (reachable[predecessor] != marker) continue;
+            const int selectedSnapshot = selected.historySize;
+            const int complementSnapshot = complement.historySize;
+            addFactorEdges(selected, row, pair);
+            addFactorEdges(complement, row, graph[row] ^ pair);
+            enumerateRootedDegree4Split(graph, powerOfThree, reachable, marker,
+                                        row - 1, predecessor,
+                                        selected, complement, result);
+            selected.rollback(selectedSnapshot);
+            complement.rollback(complementSnapshot);
+        }
+    }
+}
+
+Degree4RootedResult computeDegree4RootedSplit(
+    const std::array<uint16_t, MAX_M>& graph) {
+    // F_4(G) = 6 * sum_H 2^(c(H) + c(G-H)), with H containing rootPair.
+    const uint16_t first = graph[0] & (uint16_t)(-graph[0]);
+    const uint16_t rest = graph[0] ^ first;
+    const uint16_t second = rest & (uint16_t)(-rest);
+    const uint16_t rootPair = first | second;
+    if (std::popcount((unsigned)graph[0]) != 4 || second == 0) {
+        throw std::runtime_error("rooted degree-4 split requires a 4-regular graph");
+    }
+
+    std::array<int, MAX_M> powerOfThree{};
+    powerOfThree[0] = 1;
+    for (int col = 1; col < M; ++col) {
+        powerOfThree[col] = 3 * powerOfThree[col - 1];
+    }
+    const int stateCount = 3 * powerOfThree[M - 1];
+    if ((int)rootedSplitWorkspace.marks.size() != stateCount) {
+        rootedSplitWorkspace.marks.assign((size_t)stateCount, 0);
+        rootedSplitWorkspace.marker = 0;
+    }
+    for (int row = 0; row < M; ++row) rootedSplitWorkspace.layers[row].clear();
+    // The ternary digit sum fixes the layer, so one stamp covers every layer.
+    const uint32_t marker = rootedSplitWorkspace.nextMarker();
+
+    int rootState = 0;
+    uint16_t rootBits = rootPair;
+    while (rootBits) {
+        const int col = std::countr_zero(rootBits);
+        rootBits &= (uint16_t)(rootBits - 1);
+        rootState += powerOfThree[col];
+    }
+    rootedSplitWorkspace.layers[0].push_back(rootState);
+    rootedSplitWorkspace.marks[rootState] = marker;
+    for (int row = 1; row < M; ++row) {
+        const std::vector<int>& current = rootedSplitWorkspace.layers[row - 1];
+        std::vector<int>& next = rootedSplitWorkspace.layers[row];
+        for (int state : current) {
+            uint16_t firstChoices = graph[row];
+            while (firstChoices) {
+                const uint16_t firstBit = firstChoices & (uint16_t)(-firstChoices);
+                firstChoices ^= firstBit;
+                const int firstCol = std::countr_zero(firstBit);
+                if ((state / powerOfThree[firstCol]) % 3 >= 2) continue;
+                uint16_t secondChoices = firstChoices;
+                while (secondChoices) {
+                    const uint16_t secondBit = secondChoices & (uint16_t)(-secondChoices);
+                    secondChoices ^= secondBit;
+                    const int secondCol = std::countr_zero(secondBit);
+                    if ((state / powerOfThree[secondCol]) % 3 >= 2) continue;
+                    const int child = state + powerOfThree[firstCol]
+                                            + powerOfThree[secondCol];
+                    if (rootedSplitWorkspace.marks[child] != marker) {
+                        rootedSplitWorkspace.marks[child] = marker;
+                        next.push_back(child);
+                    }
+                }
+            }
+        }
+    }
+
+    RollbackDsu selected(2 * M);
+    RollbackDsu complement(2 * M);
+    addFactorEdges(selected, 0, rootPair);
+    addFactorEdges(complement, 0, graph[0] ^ rootPair);
+    Degree4RootedResult result;
+    const int target = stateCount - 1;
+    if (rootedSplitWorkspace.marks[target] == marker) {
+        enumerateRootedDegree4Split(graph, powerOfThree,
+                                    rootedSplitWorkspace.marks, marker,
+                                    M - 1, target,
+                                    selected, complement, result);
+    }
+    result.value *= 6;
+    return result;
+}
+
 void enumeratePerfectMatchings(
     const std::array<uint16_t, MAX_M>& graph,
     uint16_t remainingLeft,
@@ -1939,6 +2258,43 @@ std::vector<FactorCount> evaluateDegree4Layered(const std::vector<Residual>& deg
         }
     }
 
+    for (size_t parent : missingParents) {
+        if (rootedTwoFactorProbes[4] <= 0) break;
+        probeRootedTwoFactors(degree4Residuals[parent].graph, 4);
+    }
+
+    if (useDegree4RootedSplit) {
+        for (size_t chunkStart = 0; chunkStart < missingParents.size();
+             chunkStart += degree4ParentChunk) {
+            const size_t chunkEnd = std::min(chunkStart + degree4ParentChunk,
+                                             missingParents.size());
+            const size_t parentCount = chunkEnd - chunkStart;
+            std::vector<Degree4RootedResult> results(parentCount);
+            #pragma omp parallel for if(parallelDegree4ParentEnumeration) schedule(dynamic, 1)
+            for (long long local = 0; local < (long long)parentCount; ++local) {
+                const size_t parent = missingParents[chunkStart + (size_t)local];
+                results[(size_t)local] = computeDegree4RootedSplit(
+                    degree4Residuals[parent].graph);
+            }
+            for (size_t local = 0; local < parentCount; ++local) {
+                const size_t parent = missingParents[chunkStart + local];
+                values[parent] = results[local].value;
+                graphMemo.emplace(degree4Keys[parent], values[parent]);
+                ++degree4RootedCalls;
+                degree4RootedLeaves += results[local].leaves;
+                degree4RootedNodes += results[local].nodes;
+            }
+            if (graphCheckpointParentInterval > 0) {
+                parentsSinceGraphCheckpoint += parentCount;
+                if (parentsSinceGraphCheckpoint >= graphCheckpointParentInterval) {
+                    saveGraphCheckpoint();
+                    parentsSinceGraphCheckpoint = 0;
+                }
+            }
+        }
+        return values;
+    }
+
     for (size_t chunkStart = 0; chunkStart < missingParents.size();
          chunkStart += degree4ParentChunk) {
         const size_t chunkEnd = std::min(chunkStart + degree4ParentChunk,
@@ -2107,6 +2463,17 @@ FactorCount countFactorizations(const std::array<uint16_t, MAX_M>& input, int de
     ++graphMemoMisses;
     ++graphMissesByDegree[degree];
 
+    probeRootedTwoFactors(graph, degree);
+
+    if (degree == 4 && useDegree4RootedSplit) {
+        const Degree4RootedResult result = computeDegree4RootedSplit(graph);
+        ++degree4RootedCalls;
+        degree4RootedLeaves += result.leaves;
+        degree4RootedNodes += result.nodes;
+        graphMemo.emplace(key, result.value);
+        return result.value;
+    }
+
     std::unordered_map<GraphKey, size_t, GraphKeyHash> residualIndex;
     std::vector<Residual> residuals;
     residualIndex.reserve(256);
@@ -2264,8 +2631,17 @@ int main(int argc, char** argv) {
             useDegree3PairIso = true;
         }
         else if (arg == "parallelparents") parallelDegree4ParentEnumeration = true;
+        else if (arg == "rooted4") useDegree4RootedSplit = true;
         else if (arg == "pivot") colorPivotMaxDegree = MAX_C;
         else if (arg == "pivotinner") colorPivotMaxDegree = 5;
+        else if (arg == "rooted2probe") rootedTwoFactorProbes[5] = 1;
+        else if (arg.rfind("rooted2probes=", 0) == 0) {
+            rootedTwoFactorProbes[5] = std::max(0, std::atoi(arg.c_str() + 14));
+        }
+        else if (arg == "rooted2probe4") rootedTwoFactorProbes[4] = 1;
+        else if (arg.rfind("rooted2probes4=", 0) == 0) {
+            rootedTwoFactorProbes[4] = std::max(0, std::atoi(arg.c_str() + 15));
+        }
         else if (arg.rfind("limit=", 0) == 0) limit = std::atoi(arg.c_str() + 6);
         else if (arg.rfind("start=", 0) == 0) startClass = std::atoi(arg.c_str() + 6);
         else if (arg.rfind("canonbudget=", 0) == 0) {
@@ -2394,6 +2770,7 @@ int main(int argc, char** argv) {
         std::printf("stats countTime=%.6fs outerTime=%.6fs graphMemo=%zu calls=%llu hits=%llu misses=%llu PM=%llu "
                     "canonCache=%zu canonCacheEvictions=%llu canonComputations=%llu canonCacheHits=%llu canonFallbacks=%llu canonNodes=%llu "
                     "pivotCalls=%llu pivotAll=%llu pivotSelected=%llu "
+                    "rooted4Calls=%llu rooted4Leaves=%llu rooted4Nodes=%llu "
                     "d3DiscreteInputs=%llu d3DiscreteHits=%llu d3DiscreteClasses=%llu "
                     "d3IsoRep=%llu d3IsoHits=%llu d3IsoChecks=%llu d3IsoUnknown=%llu d3IsoNodes=%llu d3IsoKnownKeyMisses=%llu\n",
                     countSeconds, outerSeconds, graphMemo.size(),
@@ -2410,6 +2787,9 @@ int main(int argc, char** argv) {
                     (unsigned long long)pivotCalls,
                     (unsigned long long)pivotAllMatchings,
                     (unsigned long long)pivotSelectedMatchings,
+                    (unsigned long long)degree4RootedCalls,
+                    (unsigned long long)degree4RootedLeaves,
+                    (unsigned long long)degree4RootedNodes,
                     (unsigned long long)degree3DiscreteInputs,
                     (unsigned long long)degree3DiscreteHits,
                     (unsigned long long)degree3DiscreteClasses,
