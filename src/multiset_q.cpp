@@ -167,6 +167,30 @@ static bool divExactU64(Big& a, uint64_t q){
     a.trim(); return rem==0;
 }
 
+static bool bigToU64(const Big& a, uint64_t& out){
+    unsigned __int128 v=0;
+    for(int i=(int)a.d.size()-1;i>=0;--i){
+        v = v*Big::BASE + a.d[i];
+        if(v > (unsigned __int128)UINT64_MAX) return false;
+    }
+    out=(uint64_t)v;
+    return true;
+}
+
+static uint64_t gcdU64(uint64_t a, uint64_t b){
+    while(b){ uint64_t r=a%b; a=b; b=r; }
+    return a;
+}
+
+static bool lcmU64(uint64_t a, uint64_t b, uint64_t& out){
+    if(a==0 || b==0){ out=0; return true; }
+    uint64_t g=gcdU64(a,b);
+    unsigned __int128 v=(unsigned __int128)(a/g)*b;
+    if(v > (unsigned __int128)UINT64_MAX) return false;
+    out=(uint64_t)v;
+    return true;
+}
+
 // ---- T-seeded equitable refinement (see multiset_c6.cpp for the full rationale) ----
 static void refineColours(const uint16_t* pairs, int xcol[8], int ycol[8]){
     uint8_t T[8][8]={}, U[8][8]={}, V[8][8]={};
@@ -394,6 +418,37 @@ static uint64_t concreteStateCount(const Key& k){
     return (group / aut) * labels;
 }
 
+static bool tryDiscreteCanonMS2(const Key& raw, Key& out){
+    uint16_t src[2][MAXM];
+    int xcol[2][8], ycol[2][8];
+    for(int i=0;i<M;++i){ src[0][i]=raw[i]; src[1][i]=swapPair(raw[i]); }
+    for(int br=0;br<2;++br){
+        refineColours(src[br],xcol[br],ycol[br]);
+        int sx=0, sy=0;
+        for(int c=0;c<C;++c){ sx|=1<<xcol[br][c]; sy|=1<<ycol[br][c]; }
+        if(__builtin_popcount(sx)!=C || __builtin_popcount(sy)!=C) return false;
+    }
+    bool have=false;
+    uint16_t best[MAXM]{};
+    for(int br=0;br<2;++br){
+        uint16_t cand[MAXM]{};
+        for(int i=0;i<M;++i){
+            int xm=src[br][i]&FULLC, ym=(src[br][i]>>C)&FULLC;
+            int rx=0, ry=0;
+            for(int b=xm;b;b&=b-1) rx |= 1<<xcol[br][__builtin_ctz(b)];
+            for(int b=ym;b;b&=b-1) ry |= 1<<ycol[br][__builtin_ctz(b)];
+            cand[i]=(uint16_t)(rx | (ry<<C));
+        }
+        isort(cand,M);
+        if(!have || cmpArr(cand,best,M)<0){
+            std::memcpy(best,cand,MAXM*2);
+            have=true;
+        }
+    }
+    for(int i=0;i<MAXM;++i) out[i]=best[i];
+    return true;
+}
+
 // ---- skeleton-tagged canon, batched per source state ----
 // Precomputes refinement + residual perms once per state (both swap branches), then
 // canonicalises the tagged multiset for every skeleton A cheaply.
@@ -444,6 +499,7 @@ static long long gPartOrbitMax=0;
 
 struct CacheStatsSnapshot {
     unsigned long long hits=0, misses=0, inserts=0, probeFail=0;
+    unsigned long long refineDirect=0, refineFallback=0;
 };
 
 struct RawCanonCache {
@@ -455,7 +511,9 @@ struct RawCanonCache {
         uint64_t h=1469598103934665603ull;
         for(int i=0;i<MAXM;++i){ h^=k[i]; h*=1099511628211ull; }
         h^=h>>33; h*=0xff51afd7ed558ccdull; h^=h>>33;
-        return h|2ull;                        // never 0 or 1
+        h*=0xc4ceb9fe1a85ec53ull; h^=h>>33;
+        if(h<2) h+=2;                         // never 0 or 1; do not bias low index bits
+        return h;
     }
     void init(int log2cap){
         cap=1ull<<log2cap; mask=cap-1;
@@ -475,6 +533,12 @@ struct RawCanonCache {
         s.inserts=statInserts.load(std::memory_order_relaxed);
         s.probeFail=statProbeFail.load(std::memory_order_relaxed);
         return s;
+    }
+    void release(){
+        cap=0; mask=0;
+        fp.clear(); fp.shrink_to_fit();
+        rawv.clear(); rawv.shrink_to_fit();
+        ckv.clear(); ckv.shrink_to_fit();
     }
     Key get(const Key& raw){
         // Linear probe; STOP at the first empty slot (the key cannot be past it except in a
@@ -513,17 +577,180 @@ struct RawCanonCache {
 };
 static RawCanonCache gCache;
 
+__attribute__((noinline)) static std::string invRefineSig(const Key& k);
+__attribute__((noinline)) static std::string invRefineTuvSig(const Key& k);
+#include "mpq_sigkey.hpp"
+
+struct RawIndexCache {
+    size_t cap=0, mask=0;
+    std::vector<std::atomic<uint64_t>> fp;
+    std::vector<uint16_t> rawv;
+    std::vector<int32_t> idxv;
+    std::atomic<unsigned long long> statHits{0}, statMisses{0}, statInserts{0}, statProbeFail{0};
+    std::atomic<unsigned long long> statRefineDirect{0}, statRefineFallback{0};
+
+    void init(size_t ncap){
+        cap=ncap; mask=cap-1;
+        fp=std::vector<std::atomic<uint64_t>>(cap);
+        rawv.assign(cap*MAXM,0);
+        idxv.assign(cap,-1);
+    }
+    CacheStatsSnapshot stats() const {
+        CacheStatsSnapshot s;
+        s.hits=statHits.load(std::memory_order_relaxed);
+        s.misses=statMisses.load(std::memory_order_relaxed);
+        s.inserts=statInserts.load(std::memory_order_relaxed);
+        s.probeFail=statProbeFail.load(std::memory_order_relaxed);
+        s.refineDirect=statRefineDirect.load(std::memory_order_relaxed);
+        s.refineFallback=statRefineFallback.load(std::memory_order_relaxed);
+        return s;
+    }
+    int getBasic(const Key& raw, const std::unordered_map<Key,int,KeyHash>& targetIndex){
+        const int PROBE=64;
+        uint64_t h=RawCanonCache::hash64(raw); size_t idx=h&mask;
+        long long freeIdx=-1;
+        for(int p=0;p<PROBE;++p){
+            uint64_t f=fp[idx].load(std::memory_order_acquire);
+            if(f==h){
+                const uint16_t* r=&rawv[idx*MAXM];
+                bool eq=true; for(int i=0;i<MAXM;++i) if(r[i]!=raw[i]){ eq=false; break; }
+                if(eq){
+                    statHits.fetch_add(1,std::memory_order_relaxed);
+                    return idxv[idx];
+                }
+            } else if(f==0){ freeIdx=(long long)idx; break; }
+            idx=(idx+1)&mask;
+        }
+        statMisses.fetch_add(1,std::memory_order_relaxed);
+        if(freeIdx<0) statProbeFail.fetch_add(1,std::memory_order_relaxed);
+        Key ck;
+        if(!tryDiscreteCanonMS2(raw,ck)) ck=canonMS2(raw.data());
+        auto it=targetIndex.find(ck);
+        int out=(it==targetIndex.end())?-1:it->second;
+        if(freeIdx>=0){
+            uint64_t expect=0;
+            if(fp[freeIdx].compare_exchange_strong(expect,1ull,std::memory_order_acq_rel)){
+                std::memcpy(&rawv[freeIdx*MAXM],raw.data(),MAXM*2);
+                idxv[freeIdx]=out;
+                fp[freeIdx].store(h,std::memory_order_release);
+                statInserts.fetch_add(1,std::memory_order_relaxed);
+            }
+        }
+        return out;
+    }
+    __attribute__((noinline)) int get(const Key& raw, const std::unordered_map<Key,int,KeyHash>& targetIndex,
+            const std::unordered_map<std::string,int>* refineIndex=nullptr, int refineKind=0){
+        const int PROBE=64;
+        uint64_t h=RawCanonCache::hash64(raw); size_t idx=h&mask;
+        long long freeIdx=-1;
+        for(int p=0;p<PROBE;++p){
+            uint64_t f=fp[idx].load(std::memory_order_acquire);
+            if(f==h){
+                const uint16_t* r=&rawv[idx*MAXM];
+                bool eq=true; for(int i=0;i<MAXM;++i) if(r[i]!=raw[i]){ eq=false; break; }
+                if(eq){
+                    statHits.fetch_add(1,std::memory_order_relaxed);
+                    return idxv[idx];
+                }
+            } else if(f==0){ freeIdx=(long long)idx; break; }
+            idx=(idx+1)&mask;
+        }
+        statMisses.fetch_add(1,std::memory_order_relaxed);
+        if(freeIdx<0) statProbeFail.fetch_add(1,std::memory_order_relaxed);
+        int out=-1;
+        bool haveOut=false;
+        if(refineIndex){
+            std::string sig=(refineKind==1)?invRefineSig(raw):invRefineTuvSig(raw);
+            auto rit=refineIndex->find(sig);
+            if(rit!=refineIndex->end() && rit->second>=0){
+                out=rit->second;
+                haveOut=true;
+                statRefineDirect.fetch_add(1,std::memory_order_relaxed);
+            } else {
+                statRefineFallback.fetch_add(1,std::memory_order_relaxed);
+            }
+        }
+        if(!haveOut){
+            Key ck;
+            if(!tryDiscreteCanonMS2(raw,ck)) ck=canonMS2(raw.data());
+            auto it=targetIndex.find(ck);
+            out=(it==targetIndex.end())?-1:it->second;
+        }
+        if(freeIdx>=0){
+            uint64_t expect=0;
+            if(fp[freeIdx].compare_exchange_strong(expect,1ull,std::memory_order_acq_rel)){
+                std::memcpy(&rawv[freeIdx*MAXM],raw.data(),MAXM*2);
+                idxv[freeIdx]=out;
+                fp[freeIdx].store(h,std::memory_order_release);
+                statInserts.fetch_add(1,std::memory_order_relaxed);
+            }
+        }
+        return out;
+    }
+    __attribute__((noinline)) int getSigKey(const Key& raw, const std::unordered_map<Key,int,KeyHash>& targetIndex,
+            const std::unordered_map<SigKey,int,SigKeyHash>& refineIndex){
+        const int PROBE=64;
+        uint64_t h=RawCanonCache::hash64(raw); size_t idx=h&mask;
+        long long freeIdx=-1;
+        for(int p=0;p<PROBE;++p){
+            uint64_t f=fp[idx].load(std::memory_order_acquire);
+            if(f==h){
+                const uint16_t* r=&rawv[idx*MAXM];
+                bool eq=true; for(int i=0;i<MAXM;++i) if(r[i]!=raw[i]){ eq=false; break; }
+                if(eq){
+                    statHits.fetch_add(1,std::memory_order_relaxed);
+                    return idxv[idx];
+                }
+            } else if(f==0){ freeIdx=(long long)idx; break; }
+            idx=(idx+1)&mask;
+        }
+        statMisses.fetch_add(1,std::memory_order_relaxed);
+        if(freeIdx<0) statProbeFail.fetch_add(1,std::memory_order_relaxed);
+        int out=-1;
+        bool haveOut=false;
+        SigKey sig=invRefineSigKey(raw);
+        auto rit=refineIndex.find(sig);
+        if(rit!=refineIndex.end() && rit->second>=0){
+            out=rit->second;
+            haveOut=true;
+            statRefineDirect.fetch_add(1,std::memory_order_relaxed);
+        } else {
+            statRefineFallback.fetch_add(1,std::memory_order_relaxed);
+        }
+        if(!haveOut){
+            Key ck;
+            if(!tryDiscreteCanonMS2(raw,ck)) ck=canonMS2(raw.data());
+            auto it=targetIndex.find(ck);
+            out=(it==targetIndex.end())?-1:it->second;
+        }
+        if(freeIdx>=0){
+            uint64_t expect=0;
+            if(fp[freeIdx].compare_exchange_strong(expect,1ull,std::memory_order_acq_rel)){
+                std::memcpy(&rawv[freeIdx*MAXM],raw.data(),MAXM*2);
+                idxv[freeIdx]=out;
+                fp[freeIdx].store(h,std::memory_order_release);
+                statInserts.fetch_add(1,std::memory_order_relaxed);
+            }
+        }
+        return out;
+    }
+};
+
 struct PhaseStats {
     unsigned long long tasks=0, emptyTop=0, emptyBot=0;
     unsigned long long sideHits=0, sideMisses=0, sideClears=0;
     unsigned long long topEntries=0, botEntries=0, crossPairs=0, targets=0;
     unsigned long long maxTop=0, maxBot=0, maxCross=0, maxTargets=0;
+    unsigned long long missingPhi=0, coeffBigMul=0;
+    unsigned long long sideNs=0, crossNs=0, addNs=0;
     void add(const PhaseStats& o){
         tasks+=o.tasks; emptyTop+=o.emptyTop; emptyBot+=o.emptyBot;
         sideHits+=o.sideHits; sideMisses+=o.sideMisses; sideClears+=o.sideClears;
         topEntries+=o.topEntries; botEntries+=o.botEntries; crossPairs+=o.crossPairs; targets+=o.targets;
         maxTop=std::max(maxTop,o.maxTop); maxBot=std::max(maxBot,o.maxBot);
         maxCross=std::max(maxCross,o.maxCross); maxTargets=std::max(maxTargets,o.maxTargets);
+        missingPhi+=o.missingPhi; coeffBigMul+=o.coeffBigMul;
+        sideNs+=o.sideNs; crossNs+=o.crossNs; addNs+=o.addNs;
     }
 };
 
@@ -1184,6 +1411,83 @@ static std::string invTUV(const Key& k, bool includeUV){
     return s;
 }
 
+static std::string refineSigBranch(const uint16_t* pairs){
+    int xcol[8], ycol[8];
+    refineColours(pairs,xcol,ycol);
+    std::array<std::array<unsigned char,16>,MAXM> toks{};
+    for(int i=0;i<M;++i){
+        for(int j=0;j<2*C;++j) toks[i][j]=0;
+        int xm=pairs[i]&FULLC, ym=(pairs[i]>>C)&FULLC;
+        for(int b=xm;b;b&=b-1) toks[i][xcol[__builtin_ctz(b)]]++;
+        for(int b=ym;b;b&=b-1) toks[i][C+ycol[__builtin_ctz(b)]]++;
+    }
+    std::sort(toks.begin(),toks.begin()+M);
+    std::string s;
+    s.reserve((size_t)M*2*C);
+    for(int i=0;i<M;++i)
+        for(int j=0;j<2*C;++j)
+            s.push_back((char)toks[i][j]);
+    return s;
+}
+
+__attribute__((noinline)) static std::string invRefineSig(const Key& k){
+    uint16_t orig[MAXM], sw[MAXM];
+    for(int i=0;i<M;++i){ orig[i]=k[i]; sw[i]=swapPair(k[i]); }
+    std::string a=refineSigBranch(orig);
+    std::string b=refineSigBranch(sw);
+    return std::min(a,b);
+}
+
+static void appendColourBlock(std::string& s, const uint8_t mat[8][8], const int* ca, const int* cb){
+    unsigned char buf[64];
+    for(int a0=0; a0<C; ++a0) for(int b0=0; b0<C; ++b0){
+        int n=0;
+        for(int a=0;a<C;++a) if(ca[a]==a0)
+            for(int b=0;b<C;++b) if(cb[b]==b0)
+                buf[n++]=(unsigned char)mat[a][b];
+        std::sort(buf,buf+n);
+        s.push_back((char)n);
+        for(int i=0;i<n;++i) s.push_back((char)buf[i]);
+    }
+}
+
+static std::string refineTuvSigBranch(const uint16_t* pairs){
+    int xcol[8], ycol[8];
+    refineColours(pairs,xcol,ycol);
+    uint8_t T[8][8]={}, U[8][8]={}, V[8][8]={};
+    for(int i=0;i<M;++i){
+        int xm=pairs[i]&FULLC, ym=(pairs[i]>>C)&FULLC;
+        for(int bx=xm; bx; bx&=bx-1){
+            int a=__builtin_ctz(bx);
+            for(int by=ym; by; by&=by-1) T[a][__builtin_ctz(by)]++;
+            for(int b2=bx&(bx-1); b2; b2&=b2-1){ int a2=__builtin_ctz(b2); U[a][a2]++; U[a2][a]++; }
+        }
+        for(int by=ym; by; by&=by-1){
+            int b=__builtin_ctz(by);
+            for(int b2=by&(by-1); b2; b2&=b2-1){ int bb=__builtin_ctz(b2); V[b][bb]++; V[bb][b]++; }
+        }
+    }
+    std::string s=refineSigBranch(pairs);
+    for(int ca=0; ca<C; ++ca){
+        int nx=0; for(int a=0;a<C;++a) if(xcol[a]==ca) ++nx;
+        int ny=0; for(int b=0;b<C;++b) if(ycol[b]==ca) ++ny;
+        s.push_back((char)nx);
+        s.push_back((char)ny);
+    }
+    appendColourBlock(s,T,xcol,ycol);
+    appendColourBlock(s,U,xcol,xcol);
+    appendColourBlock(s,V,ycol,ycol);
+    return s;
+}
+
+__attribute__((noinline)) static std::string invRefineTuvSig(const Key& k){
+    uint16_t orig[MAXM], sw[MAXM];
+    for(int i=0;i<M;++i){ orig[i]=k[i]; sw[i]=swapPair(k[i]); }
+    std::string a=refineTuvSigBranch(orig);
+    std::string b=refineTuvSigBranch(sw);
+    return std::min(a,b);
+}
+
 static std::string invAutQ(const Key& k){
     return std::to_string(autCount(k.data())) + "/" + std::to_string(concreteStateCount(k));
 }
@@ -1225,8 +1529,527 @@ static void phiAudit(const std::map<Key,Big>& low){
     phiAuditOne("multiplicity",phi,[](const Key& k){ return invMultiplicity(k); });
     phiAuditOne("T",phi,[](const Key& k){ return invTUV(k,false); });
     phiAuditOne("TUV",phi,[](const Key& k){ return invTUV(k,true); });
+    phiAuditOne("refineSig",phi,[](const Key& k){ return invRefineSig(k); });
+    phiAuditOne("refineTUV",phi,[](const Key& k){ return invRefineTuvSig(k); });
     phiAuditOne("aut/Q",phi,[](const Key& k){ return invAutQ(k); });
     std::fflush(stderr);
+}
+
+static int runKernelBenchBand(
+    int band,
+    const std::vector<std::pair<Key,const Big*>>& ess,
+    long long maxEss,
+    bool useGlobalSide,
+    const std::vector<Key>& globalSideKeys,
+    const std::vector<std::vector<std::pair<PartKey,uint64_t>>>& globalSideVals
+){
+    const long long NE=(long long)ess.size();
+    long long limit=maxEss>0 ? std::min(NE,maxEss) : std::min<long long>(NE,100000);
+    std::vector<std::map<Key,Big>> tnx;
+    std::vector<PhaseStats> pstats;
+    std::atomic<long long> done{0};
+    gCache.resetStats();
+    using Clock=std::chrono::steady_clock;
+    auto nsBetween=[](Clock::time_point a, Clock::time_point b)->unsigned long long{
+        return (unsigned long long)std::chrono::duration_cast<std::chrono::nanoseconds>(b-a).count();
+    };
+    auto benchStart=Clock::now();
+    #pragma omp parallel
+    {
+        int nth=omp_get_num_threads(), tid=omp_get_thread_num();
+        #pragma omp single
+        { tnx.resize(nth); pstats.resize(nth); }
+        #pragma omp barrier
+        std::map<Key,Big>& mynx=tnx[tid];
+        PhaseStats& pst=pstats[tid];
+        std::unordered_map<Key,std::vector<std::pair<PartKey,uint64_t>>,KeyHash> sideMemo;
+        const size_t SIDECAP=200000;
+        auto getSide=[&](const uint16_t* ms)->const std::vector<std::pair<PartKey,uint64_t>>&{
+            Key sk=makeSideKey(ms);
+            if(useGlobalSide){
+                auto it=std::lower_bound(globalSideKeys.begin(),globalSideKeys.end(),sk);
+                if(it!=globalSideKeys.end() && *it==sk){
+                    ++pst.sideHits;
+                    return globalSideVals[(size_t)(it-globalSideKeys.begin())];
+                }
+                ++pst.sideMisses;
+                static const std::vector<std::pair<PartKey,uint64_t>> emptySide;
+                return emptySide;
+            }
+            auto it=sideMemo.find(sk);
+            if(it!=sideMemo.end()){ ++pst.sideHits; return it->second; }
+            ++pst.sideMisses;
+            std::vector<std::pair<PartKey,uint64_t>> flat=buildSideHistFromKey(sk);
+            return sideMemo.emplace(std::move(sk),std::move(flat)).first->second;
+        };
+        std::unordered_map<Key,uint64_t,KeyHash> wtSum;
+        #pragma omp for schedule(dynamic,16)
+        for(long long ei=0; ei<limit; ++ei){
+            if(sideMemo.size()>=SIDECAP){ sideMemo.clear(); ++pst.sideClears; }
+            ++pst.tasks;
+            const Key& tk=ess[(size_t)ei].first;
+            const Big& coeff=*ess[(size_t)ei].second;
+            uint16_t topMS[8], botMS[8]; int nt=0, nb=0;
+            for(int i=0;i<M;++i){ if(tk[i]&TAG) topMS[nt++]=(uint16_t)(tk[i]&VALMASK); else botMS[nb++]=tk[i]; }
+            isort(topMS,C); isort(botMS,C);
+
+            auto tSide0=Clock::now();
+            const auto& hTop=getSide(topMS);
+            const auto& hBot=getSide(botMS);
+            auto tSide1=Clock::now();
+            pst.sideNs+=nsBetween(tSide0,tSide1);
+            if(hTop.empty()){ ++pst.emptyTop; ++done; continue; }
+            if(hBot.empty()){ ++pst.emptyBot; ++done; continue; }
+
+            unsigned long long ht=(unsigned long long)hTop.size(), hb=(unsigned long long)hBot.size();
+            unsigned long long cr=ht*hb;
+            pst.topEntries+=ht; pst.botEntries+=hb; pst.crossPairs+=cr;
+            pst.maxTop=std::max(pst.maxTop,ht); pst.maxBot=std::max(pst.maxBot,hb); pst.maxCross=std::max(pst.maxCross,cr);
+
+            wtSum.clear();
+            auto tCross0=Clock::now();
+            for(const auto&tp:hTop){ const uint16_t* a=tp.first.data(); uint64_t wt=tp.second;
+                for(const auto&bp:hBot){ const uint16_t* b=bp.first.data();
+                    Key raw{}; int i=0,j=0,k=0;
+                    while(i<C&&j<C){ if(a[i]<=b[j]) raw[k++]=a[i++]; else raw[k++]=b[j++]; }
+                    while(i<C) raw[k++]=a[i++];
+                    while(j<C) raw[k++]=b[j++];
+                    wtSum[gCache.get(raw)] += wt*bp.second;
+                }
+            }
+            auto tCross1=Clock::now();
+            pst.crossNs+=nsBetween(tCross0,tCross1);
+
+            unsigned long long ts=(unsigned long long)wtSum.size();
+            pst.targets+=ts; pst.maxTargets=std::max(pst.maxTargets,ts);
+            auto tAdd0=Clock::now();
+            for(auto& lp:wtSum) mynx[lp.first].addMul(coeff, lp.second);
+            auto tAdd1=Clock::now();
+            pst.addNs+=nsBetween(tAdd0,tAdd1);
+
+            long long d=++done;
+            if((d & 0x3FFF)==0){
+                double wall=std::chrono::duration<double>(Clock::now()-benchStart).count();
+                std::fprintf(stderr,"    kernelbench ess %lld/%lld  wall=%.1fs\n",d,limit,wall);
+                std::fflush(stderr);
+            }
+        }
+    }
+    auto benchEnd=Clock::now();
+    auto mergeStart=Clock::now();
+    std::map<Key,Big> nx;
+    for(auto&tm:tnx) for(auto&kv:tm) nx[kv.first]+=kv.second;
+    auto mergeEnd=Clock::now();
+
+    PhaseStats ps; for(const auto& s:pstats) ps.add(s);
+    CacheStatsSnapshot cs=gCache.stats();
+    double taskDen=ps.tasks?double(ps.tasks):1.0;
+    double cacheDen=(cs.hits+cs.misses)?double(cs.hits+cs.misses):1.0;
+    double timedNs=(double)ps.sideNs+(double)ps.crossNs+(double)ps.addNs;
+    if(timedNs<=0.0) timedNs=1.0;
+    auto sec=[](unsigned long long ns){ return (double)ns/1e9; };
+    double wall=std::chrono::duration<double>(benchEnd-benchStart).count();
+    double mergeWall=std::chrono::duration<double>(mergeEnd-mergeStart).count();
+    std::fprintf(stderr,
+        "  kernelbench band %d: sampled=%lld/%lld wall=%.3fs mergeWall=%.3fs outputStates=%zu\n"
+        "    tasks=%llu emptyTop=%llu emptyBot=%llu sideHit=%llu sideMiss=%llu sideClear=%llu\n"
+        "    hist avgTop=%.2f avgBot=%.2f maxTop=%llu maxBot=%llu cross=%llu avgCross=%.2f maxCross=%llu\n"
+        "    targets=%llu avgTargets=%.2f maxTargets=%llu targetCompression=%.2f\n"
+        "    rawCache hit=%llu miss=%llu hitRate=%.2f%% insert=%llu probeFail=%llu\n"
+        "    threadTime side=%.3fs %.1f%% cross+canon+target=%.3fs %.1f%% addMul=%.3fs %.1f%%\n",
+        band,limit,NE,wall,mergeWall,nx.size(),
+        ps.tasks,ps.emptyTop,ps.emptyBot,ps.sideHits,ps.sideMisses,ps.sideClears,
+        ps.topEntries/taskDen,ps.botEntries/taskDen,ps.maxTop,ps.maxBot,ps.crossPairs,ps.crossPairs/taskDen,ps.maxCross,
+        ps.targets,ps.targets/taskDen,ps.maxTargets,ps.crossPairs/(double)std::max<unsigned long long>(ps.targets,1),
+        cs.hits,cs.misses,100.0*cs.hits/cacheDen,cs.inserts,cs.probeFail,
+        sec(ps.sideNs),100.0*(double)ps.sideNs/timedNs,
+        sec(ps.crossNs),100.0*(double)ps.crossNs/timedNs,
+        sec(ps.addNs),100.0*(double)ps.addNs/timedNs);
+    std::fflush(stderr);
+    std::printf("C=%d kernelbench band %d sampled %lld/%lld complete\n",C,band,limit,NE);
+    return 0;
+}
+
+static int runCrossFloorBand(
+    int band,
+    const std::vector<std::pair<Key,const Big*>>& ess,
+    long long maxEss,
+    bool useGlobalSide,
+    const std::vector<Key>& globalSideKeys,
+    const std::vector<std::vector<std::pair<PartKey,uint64_t>>>& globalSideVals
+){
+    const long long NE=(long long)ess.size();
+    long long limit=maxEss>0 ? std::min(NE,maxEss) : std::min<long long>(NE,100000);
+    std::vector<PhaseStats> pstats;
+    std::vector<uint64_t> checksums;
+    std::atomic<long long> done{0};
+    using Clock=std::chrono::steady_clock;
+    auto nsBetween=[](Clock::time_point a, Clock::time_point b)->unsigned long long{
+        return (unsigned long long)std::chrono::duration_cast<std::chrono::nanoseconds>(b-a).count();
+    };
+    auto benchStart=Clock::now();
+    #pragma omp parallel
+    {
+        int nth=omp_get_num_threads(), tid=omp_get_thread_num();
+        #pragma omp single
+        { pstats.resize(nth); checksums.assign(nth,0); }
+        #pragma omp barrier
+        PhaseStats& pst=pstats[tid];
+        uint64_t checksum=0;
+        std::unordered_map<Key,std::vector<std::pair<PartKey,uint64_t>>,KeyHash> sideMemo;
+        const size_t SIDECAP=200000;
+        auto getSide=[&](const uint16_t* ms)->const std::vector<std::pair<PartKey,uint64_t>>&{
+            Key sk=makeSideKey(ms);
+            if(useGlobalSide){
+                auto it=std::lower_bound(globalSideKeys.begin(),globalSideKeys.end(),sk);
+                if(it!=globalSideKeys.end() && *it==sk){
+                    ++pst.sideHits;
+                    return globalSideVals[(size_t)(it-globalSideKeys.begin())];
+                }
+                ++pst.sideMisses;
+                static const std::vector<std::pair<PartKey,uint64_t>> emptySide;
+                return emptySide;
+            }
+            auto it=sideMemo.find(sk);
+            if(it!=sideMemo.end()){ ++pst.sideHits; return it->second; }
+            ++pst.sideMisses;
+            std::vector<std::pair<PartKey,uint64_t>> flat=buildSideHistFromKey(sk);
+            return sideMemo.emplace(std::move(sk),std::move(flat)).first->second;
+        };
+        #pragma omp for schedule(dynamic,16)
+        for(long long ei=0; ei<limit; ++ei){
+            if(sideMemo.size()>=SIDECAP){ sideMemo.clear(); ++pst.sideClears; }
+            ++pst.tasks;
+            const Key& tk=ess[(size_t)ei].first;
+            uint16_t topMS[8], botMS[8]; int nt=0, nb=0;
+            for(int i=0;i<M;++i){ if(tk[i]&TAG) topMS[nt++]=(uint16_t)(tk[i]&VALMASK); else botMS[nb++]=tk[i]; }
+            isort(topMS,C); isort(botMS,C);
+
+            auto tSide0=Clock::now();
+            const auto& hTop=getSide(topMS);
+            const auto& hBot=getSide(botMS);
+            auto tSide1=Clock::now();
+            pst.sideNs+=nsBetween(tSide0,tSide1);
+            if(hTop.empty()){ ++pst.emptyTop; ++done; continue; }
+            if(hBot.empty()){ ++pst.emptyBot; ++done; continue; }
+
+            unsigned long long ht=(unsigned long long)hTop.size(), hb=(unsigned long long)hBot.size();
+            unsigned long long cr=ht*hb;
+            pst.topEntries+=ht; pst.botEntries+=hb; pst.crossPairs+=cr;
+            pst.maxTop=std::max(pst.maxTop,ht); pst.maxBot=std::max(pst.maxBot,hb); pst.maxCross=std::max(pst.maxCross,cr);
+
+            auto tCross0=Clock::now();
+            for(const auto&tp:hTop){ const uint16_t* a=tp.first.data(); uint64_t wt=tp.second;
+                for(const auto&bp:hBot){ const uint16_t* b=bp.first.data();
+                    Key raw{}; int i=0,j=0,k=0;
+                    while(i<C&&j<C){ if(a[i]<=b[j]) raw[k++]=a[i++]; else raw[k++]=b[j++]; }
+                    while(i<C) raw[k++]=a[i++];
+                    while(j<C) raw[k++]=b[j++];
+                    uint64_t h=wt*bp.second + 0x9e3779b97f4a7c15ull;
+                    for(int r=0;r<M;++r){ h^=raw[r]; h*=1099511628211ull; }
+                    checksum += h;
+                }
+            }
+            auto tCross1=Clock::now();
+            pst.crossNs+=nsBetween(tCross0,tCross1);
+            long long d=++done;
+            if((d & 0x3FFF)==0){
+                double wall=std::chrono::duration<double>(Clock::now()-benchStart).count();
+                std::fprintf(stderr,"    crossfloor ess %lld/%lld  wall=%.1fs\n",d,limit,wall);
+                std::fflush(stderr);
+            }
+        }
+        checksums[tid]=checksum;
+    }
+
+    PhaseStats ps; for(const auto& s:pstats) ps.add(s);
+    uint64_t checksum=0; for(uint64_t v:checksums) checksum+=v;
+    double taskDen=ps.tasks?double(ps.tasks):1.0;
+    double timedNs=(double)ps.sideNs+(double)ps.crossNs;
+    if(timedNs<=0.0) timedNs=1.0;
+    auto sec=[](unsigned long long ns){ return (double)ns/1e9; };
+    double wall=std::chrono::duration<double>(Clock::now()-benchStart).count();
+    std::fprintf(stderr,
+        "  crossfloor band %d: sampled=%lld/%lld wall=%.3fs checksum=%llu\n"
+        "    tasks=%llu emptyTop=%llu emptyBot=%llu sideHit=%llu sideMiss=%llu sideClear=%llu\n"
+        "    hist avgTop=%.2f avgBot=%.2f maxTop=%llu maxBot=%llu cross=%llu avgCross=%.2f maxCross=%llu\n"
+        "    threadTime side=%.3fs %.1f%% rawMergeFloor=%.3fs %.1f%%\n",
+        band,limit,NE,wall,(unsigned long long)checksum,
+        ps.tasks,ps.emptyTop,ps.emptyBot,ps.sideHits,ps.sideMisses,ps.sideClears,
+        ps.topEntries/taskDen,ps.botEntries/taskDen,ps.maxTop,ps.maxBot,ps.crossPairs,ps.crossPairs/taskDen,ps.maxCross,
+        sec(ps.sideNs),100.0*(double)ps.sideNs/timedNs,
+        sec(ps.crossNs),100.0*(double)ps.crossNs/timedNs);
+    std::fflush(stderr);
+    std::printf("C=%d crossfloor band %d sampled %lld/%lld complete checksum=%llu\n",
+                C,band,limit,NE,(unsigned long long)checksum);
+    return 0;
+}
+
+static int runScalarOracleBand(
+    int band,
+    const std::vector<std::pair<Key,const Big*>>& ess,
+    const std::map<Key,Big>& low,
+    long long maxEss,
+    bool useIndexCache,
+    int refineKind,
+    bool useGlobalSide,
+    const std::vector<Key>& globalSideKeys,
+    const std::vector<std::vector<std::pair<PartKey,uint64_t>>>& globalSideVals
+){
+    const long long NE=(long long)ess.size();
+    long long limit=maxEss>0 ? std::min(NE,maxEss) : NE;
+
+    uint64_t lcm=1;
+    std::vector<std::pair<Key,Rat>> phi;
+    phi.reserve(low.size());
+    bool lcmOk=true;
+    for(const auto& kv:low){
+        Key target=complementKey(kv.first);
+        uint64_t q=concreteStateCount(target);
+        uint64_t next=0;
+        if(!lcmU64(lcm,q,next)){ lcmOk=false; break; }
+        lcm=next;
+        phi.push_back({target,Rat{kv.second,q}});
+    }
+    if(!lcmOk){
+        std::fprintf(stderr,"scalaroracle: denominator lcm overflow\n");
+        return 2;
+    }
+
+    std::unordered_map<Key,Big,KeyHash> scaledPhi;
+    scaledPhi.reserve(phi.size()*2+1);
+    std::unordered_map<Key,int,KeyHash> targetIndex;
+    std::vector<Big> phiVals;
+    if(useIndexCache){
+        targetIndex.reserve(phi.size()*2+1);
+        phiVals.reserve(phi.size());
+    }
+    for(const auto& kv:phi){
+        uint64_t scale=lcm/kv.second.d;
+        Big v;
+        v.addMul(kv.second.n,scale);
+        scaledPhi[kv.first]=v;
+        if(useIndexCache){
+            int idx=(int)phiVals.size();
+            targetIndex.emplace(kv.first,idx);
+            phiVals.push_back(std::move(v));
+        }
+    }
+    const char* refineLabel =
+        refineKind==1 ? " refineSigCache" :
+        refineKind==2 ? " refineTuvCache" :
+        refineKind==3 ? " refineSigKeyCache" :
+        useIndexCache ? " indexCache" : "";
+    std::fprintf(stderr,"scalaroracle: low=%zu phi=%zu denominatorLCM=%llu%s\n",
+                 low.size(),scaledPhi.size(),(unsigned long long)lcm,refineLabel);
+
+    std::unordered_map<std::string,int> refineIndex;
+    std::unordered_map<SigKey,int,SigKeyHash> sigKeyIndex;
+    if(refineKind==3){
+        sigKeyIndex.reserve(phi.size()*2+1);
+        for(const auto& kv:scaledPhi){
+            SigKey sig=invRefineSigKey(kv.first);
+            auto it=targetIndex.find(kv.first);
+            int idx=(it==targetIndex.end())?-1:it->second;
+            auto r=sigKeyIndex.emplace(sig,idx);
+            if(!r.second && r.first->second>=0 && !(phiVals[(size_t)r.first->second]==kv.second))
+                r.first->second=-2;
+        }
+        size_t direct=0, ambiguous=0;
+        for(const auto& kv:sigKeyIndex){ if(kv.second>=0) ++direct; else ++ambiguous; }
+        std::fprintf(stderr,"scalaroracle: refineSigKey groups=%zu direct=%zu ambiguous=%zu\n",
+                     sigKeyIndex.size(),direct,ambiguous);
+    } else if(refineKind){
+        refineIndex.reserve(phi.size()*2+1);
+        for(const auto& kv:scaledPhi){
+            std::string sig=(refineKind==1)?invRefineSig(kv.first):invRefineTuvSig(kv.first);
+            auto it=targetIndex.find(kv.first);
+            int idx=(it==targetIndex.end())?-1:it->second;
+            auto r=refineIndex.emplace(std::move(sig),idx);
+            if(!r.second && r.first->second>=0 && !(phiVals[(size_t)r.first->second]==kv.second))
+                r.first->second=-2;
+        }
+        size_t direct=0, ambiguous=0;
+        for(const auto& kv:refineIndex){ if(kv.second>=0) ++direct; else ++ambiguous; }
+        std::fprintf(stderr,"scalaroracle: %s groups=%zu direct=%zu ambiguous=%zu\n",
+                     refineKind==1?"refineSig":"refineTUV",refineIndex.size(),direct,ambiguous);
+    }
+
+    RawIndexCache indexCache;
+    if(useIndexCache){
+        size_t cap=gCache.cap;
+        gCache.release();
+        indexCache.init(cap);
+        std::fprintf(stderr,"scalaroracle: raw->phiIndex cache slots=%zu (%.1f GB)\n",
+                     cap,(double)(cap*(MAXM*2+sizeof(int32_t)+sizeof(uint64_t)))/1e9);
+    }
+
+    std::vector<Big> threadNum;
+    std::vector<PhaseStats> pstats;
+    std::atomic<long long> done{0};
+    gCache.resetStats();
+    using Clock=std::chrono::steady_clock;
+    auto nsBetween=[](Clock::time_point a, Clock::time_point b)->unsigned long long{
+        return (unsigned long long)std::chrono::duration_cast<std::chrono::nanoseconds>(b-a).count();
+    };
+    auto benchStart=Clock::now();
+    #pragma omp parallel
+    {
+        int nth=omp_get_num_threads(), tid=omp_get_thread_num();
+        #pragma omp single
+        { threadNum.resize(nth); pstats.resize(nth); }
+        #pragma omp barrier
+        Big& myNum=threadNum[tid];
+        PhaseStats& pst=pstats[tid];
+        std::unordered_map<Key,std::vector<std::pair<PartKey,uint64_t>>,KeyHash> sideMemo;
+        const size_t SIDECAP=200000;
+        auto getSide=[&](const uint16_t* ms)->const std::vector<std::pair<PartKey,uint64_t>>&{
+            Key sk=makeSideKey(ms);
+            if(useGlobalSide){
+                auto it=std::lower_bound(globalSideKeys.begin(),globalSideKeys.end(),sk);
+                if(it!=globalSideKeys.end() && *it==sk){
+                    ++pst.sideHits;
+                    return globalSideVals[(size_t)(it-globalSideKeys.begin())];
+                }
+                ++pst.sideMisses;
+                static const std::vector<std::pair<PartKey,uint64_t>> emptySide;
+                return emptySide;
+            }
+            auto it=sideMemo.find(sk);
+            if(it!=sideMemo.end()){ ++pst.sideHits; return it->second; }
+            ++pst.sideMisses;
+            std::vector<std::pair<PartKey,uint64_t>> flat=buildSideHistFromKey(sk);
+            return sideMemo.emplace(std::move(sk),std::move(flat)).first->second;
+        };
+        std::unordered_map<Key,uint64_t,KeyHash> wtSum;
+        std::unordered_map<int,uint64_t> phiSum;
+        #pragma omp for schedule(dynamic,16)
+        for(long long ei=0; ei<limit; ++ei){
+            if(sideMemo.size()>=SIDECAP){ sideMemo.clear(); ++pst.sideClears; }
+            ++pst.tasks;
+            const Key& tk=ess[(size_t)ei].first;
+            const Big& coeff=*ess[(size_t)ei].second;
+            uint16_t topMS[8], botMS[8]; int nt=0, nb=0;
+            for(int i=0;i<M;++i){ if(tk[i]&TAG) topMS[nt++]=(uint16_t)(tk[i]&VALMASK); else botMS[nb++]=tk[i]; }
+            isort(topMS,C); isort(botMS,C);
+
+            auto tSide0=Clock::now();
+            const auto& hTop=getSide(topMS);
+            const auto& hBot=getSide(botMS);
+            auto tSide1=Clock::now();
+            pst.sideNs+=nsBetween(tSide0,tSide1);
+            if(hTop.empty()){ ++pst.emptyTop; ++done; continue; }
+            if(hBot.empty()){ ++pst.emptyBot; ++done; continue; }
+
+            unsigned long long ht=(unsigned long long)hTop.size(), hb=(unsigned long long)hBot.size();
+            unsigned long long cr=ht*hb;
+            pst.topEntries+=ht; pst.botEntries+=hb; pst.crossPairs+=cr;
+            pst.maxTop=std::max(pst.maxTop,ht); pst.maxBot=std::max(pst.maxBot,hb); pst.maxCross=std::max(pst.maxCross,cr);
+
+            wtSum.clear();
+            phiSum.clear();
+            auto tCross0=Clock::now();
+            for(const auto&tp:hTop){ const uint16_t* a=tp.first.data(); uint64_t wt=tp.second;
+                for(const auto&bp:hBot){ const uint16_t* b=bp.first.data();
+                    Key raw{}; int i=0,j=0,k=0;
+                    while(i<C&&j<C){ if(a[i]<=b[j]) raw[k++]=a[i++]; else raw[k++]=b[j++]; }
+                    while(i<C) raw[k++]=a[i++];
+                    while(j<C) raw[k++]=b[j++];
+                    if(useIndexCache){
+                        int idx=refineKind==3
+                            ? indexCache.getSigKey(raw,targetIndex,sigKeyIndex)
+                            : (refineKind
+                                ? indexCache.get(raw,targetIndex,&refineIndex,refineKind)
+                                : indexCache.getBasic(raw,targetIndex));
+                        if(idx<0) ++pst.missingPhi;
+                        else phiSum[idx] += wt*bp.second;
+                    } else {
+                        wtSum[gCache.get(raw)] += wt*bp.second;
+                    }
+                }
+            }
+            auto tCross1=Clock::now();
+            pst.crossNs+=nsBetween(tCross0,tCross1);
+
+            unsigned long long ts=(unsigned long long)(useIndexCache ? phiSum.size() : wtSum.size());
+            pst.targets+=ts; pst.maxTargets=std::max(pst.maxTargets,ts);
+            auto tAdd0=Clock::now();
+            Big taskNum;
+            if(useIndexCache){
+                for(auto& lp:phiSum)
+                    taskNum.addMul(phiVals[(size_t)lp.first],lp.second);
+            } else {
+                for(auto& lp:wtSum){
+                    auto it=scaledPhi.find(lp.first);
+                    if(it==scaledPhi.end()){ ++pst.missingPhi; continue; }
+                    taskNum.addMul(it->second,lp.second);
+                }
+            }
+            if(!taskNum.isZero()){
+                uint64_t coeffU=0;
+                if(bigToU64(coeff,coeffU)){
+                    myNum.addMul(taskNum,coeffU);
+                } else {
+                    Big prod=mulBig(taskNum,coeff);
+                    myNum += prod;
+                    ++pst.coeffBigMul;
+                }
+            }
+            auto tAdd1=Clock::now();
+            pst.addNs+=nsBetween(tAdd0,tAdd1);
+
+            long long d=++done;
+            if((d & 0x3FFF)==0){
+                double wall=std::chrono::duration<double>(Clock::now()-benchStart).count();
+                std::fprintf(stderr,"    scalaroracle ess %lld/%lld  wall=%.1fs\n",d,limit,wall);
+                std::fflush(stderr);
+            }
+        }
+    }
+    auto benchEnd=Clock::now();
+
+    Big numerator;
+    for(auto& n:threadNum) numerator += n;
+    Big quotient=numerator;
+    bool exact=divExactU64(quotient,lcm);
+
+    PhaseStats ps; for(const auto& s:pstats) ps.add(s);
+    CacheStatsSnapshot cs=useIndexCache?indexCache.stats():gCache.stats();
+    double taskDen=ps.tasks?double(ps.tasks):1.0;
+    double cacheDen=(cs.hits+cs.misses)?double(cs.hits+cs.misses):1.0;
+    double timedNs=(double)ps.sideNs+(double)ps.crossNs+(double)ps.addNs;
+    if(timedNs<=0.0) timedNs=1.0;
+    auto sec=[](unsigned long long ns){ return (double)ns/1e9; };
+    double wall=std::chrono::duration<double>(benchEnd-benchStart).count();
+    std::fprintf(stderr,
+        "  scalaroracle band %d: sampled=%lld/%lld wall=%.3fs denominator=%llu exact=%s\n"
+        "    tasks=%llu emptyTop=%llu emptyBot=%llu sideHit=%llu sideMiss=%llu sideClear=%llu missingPhi=%llu coeffBigMul=%llu\n"
+        "    hist avgTop=%.2f avgBot=%.2f maxTop=%llu maxBot=%llu cross=%llu avgCross=%.2f maxCross=%llu\n"
+        "    targets=%llu avgTargets=%.2f maxTargets=%llu targetCompression=%.2f\n"
+        "    %s hit=%llu miss=%llu hitRate=%.2f%% insert=%llu probeFail=%llu\n"
+        "    refine direct=%llu fallback=%llu\n"
+        "    threadTime side=%.3fs %.1f%% cross+canon+target=%.3fs %.1f%% scalarAdd=%.3fs %.1f%%\n",
+        band,limit,NE,wall,(unsigned long long)lcm,exact?"yes":"no",
+        ps.tasks,ps.emptyTop,ps.emptyBot,ps.sideHits,ps.sideMisses,ps.sideClears,ps.missingPhi,ps.coeffBigMul,
+        ps.topEntries/taskDen,ps.botEntries/taskDen,ps.maxTop,ps.maxBot,ps.crossPairs,ps.crossPairs/taskDen,ps.maxCross,
+        ps.targets,ps.targets/taskDen,ps.maxTargets,ps.crossPairs/(double)std::max<unsigned long long>(ps.targets,1),
+        useIndexCache?"rawPhiIndexCache":"rawCache",
+        cs.hits,cs.misses,100.0*cs.hits/cacheDen,cs.inserts,cs.probeFail,
+        cs.refineDirect,cs.refineFallback,
+        sec(ps.sideNs),100.0*(double)ps.sideNs/timedNs,
+        sec(ps.crossNs),100.0*(double)ps.crossNs/timedNs,
+        sec(ps.addNs),100.0*(double)ps.addNs/timedNs);
+    std::fflush(stderr);
+
+    if(limit==NE){
+        std::printf("C=%d scalaroracle: N=%s\n",C,quotient.str().c_str());
+        const char*e=(C==2)?"288":(C==3)?"28200960":(C==4)?"29136487207403520":(C==5)?"1903816047972624930994913280000":nullptr;
+        if(e)std::printf("  expect %s [%s]\n",e, quotient.str()==std::string(e)?"OK":"BAD");
+    } else {
+        std::printf("C=%d scalaroracle band %d sampled %lld/%lld quotient=%s exact=%s\n",
+                    C,band,limit,NE,quotient.str().c_str(),exact?"yes":"no");
+    }
+    return exact?0:2;
 }
 
 // ---------- main DP ----------
@@ -1257,12 +2080,17 @@ int main(int argc,char**argv){
     }
 
     bool dump=false, dual=false, resume=false, checkpoint=true, profile=false, sideGlobal=false, phiAuditMode=false;
+    bool scalarOracle=false, scalarIndex=false, scalarRefine=false, scalarSig=false, scalarSigKey=false;
+    bool crossFloor=false;
+    bool kernelBench=false;
     std::string checkpointPrefix;
     size_t sideGlobalCap=1000000;
     int auditBand=-1;
     long long auditMax=0;
     int targetAuditBand=-1;
     long long targetAuditMax=0;
+    int kernelBenchBand=2;
+    long long kernelBenchMaxEss=100000;
     int cacheLog2=0;
     for(int ai=2; ai<argc; ++ai){
         std::string a=argv[ai];
@@ -1272,29 +2100,48 @@ int main(int argc,char**argv){
         else if(a=="nocheckpoint") checkpoint=false;
         else if(a=="profile") profile=true;
         else if(a=="phiaudit") phiAuditMode=true;
+        else if(a=="scalaroracle") scalarOracle=true;
+        else if(a=="scalarindex"){ scalarOracle=true; scalarIndex=true; }
+        else if(a=="scalarsig"){ scalarOracle=true; scalarIndex=true; scalarSig=true; }
+        else if(a=="scalarsigkey"){ scalarOracle=true; scalarIndex=true; scalarSigKey=true; }
+        else if(a=="scalarrefine"){ scalarOracle=true; scalarIndex=true; scalarRefine=true; }
+        else if(a=="crossfloor") crossFloor=true;
+        else if(a=="kernelbench") kernelBench=true;
         else if(a=="sideglobal") sideGlobal=true;
         else if(a.rfind("sideglobal=",0)==0){ sideGlobal=true; sideGlobalCap=(size_t)std::strtoull(a.c_str()+11,nullptr,10); }
         else if(a.rfind("auditband=",0)==0) auditBand=atoi(a.c_str()+10);
         else if(a.rfind("auditmax=",0)==0) auditMax=(long long)std::strtoll(a.c_str()+9,nullptr,10);
         else if(a.rfind("targetauditband=",0)==0) targetAuditBand=atoi(a.c_str()+16);
         else if(a.rfind("targetauditmax=",0)==0) targetAuditMax=(long long)std::strtoll(a.c_str()+15,nullptr,10);
+        else if(a.rfind("benchband=",0)==0){ kernelBench=true; kernelBenchBand=atoi(a.c_str()+10); }
+        else if(a.rfind("band=",0)==0){ kernelBench=true; kernelBenchBand=atoi(a.c_str()+5); }
+        else if(a.rfind("maxess=",0)==0){ kernelBenchMaxEss=(long long)std::strtoll(a.c_str()+7,nullptr,10); }
         else if(a=="partorbit") gPartOrbitAudit=true;
         else if(a.rfind("partorbitmax=",0)==0){ gPartOrbitAudit=true; gPartOrbitMax=(long long)std::strtoll(a.c_str()+13,nullptr,10); }
         else if(a.rfind("ckpt=",0)==0) checkpointPrefix=a.substr(5);
         else if(isPositiveIntArg(a)) cacheLog2=atoi(a.c_str());
         else std::fprintf(stderr,"warning: ignoring unknown argument '%s'\n",a.c_str());
     }
+    if(kernelBench || scalarOracle || crossFloor) checkpoint=false;
     const int H=(C+1)/2;      // dual: forward bands 0..H-1, pair S_H against S_{C-H}
     const int L=C-H;
-    const int targetBands=phiAuditMode?L:(dual?H:C);
-    gProfile=profile;
+    if(scalarOracle && (C%2)==0){
+        std::fprintf(stderr,"scalaroracle is only defined for odd C middle bands\n");
+        return 2;
+    }
+    const int targetBands=phiAuditMode?L:(scalarOracle?(L+1):(dual?H:C));
+    gProfile=profile||kernelBench||scalarOracle||crossFloor;
     if(cacheLog2<10) cacheLog2 = (C>=5)?28:20;
     gCache.init(cacheLog2);
     std::fprintf(stderr,"raw-canon cache: 2^%d slots (%.1f GB)\n",cacheLog2,(double)(1ull<<cacheLog2)*56.0/1e9);
-    std::fprintf(stderr,"mode: %s%s%s%s%s\n",
-                 dual?"dual ":"", dump?"dump ":"", resume?"resume ":"",
+    std::fprintf(stderr,"mode: %s%s%s%s%s%s\n",
+                 dual?"dual ":"", scalarOracle?(scalarRefine?"scalarrefine ":(scalarSigKey?"scalarsigkey ":(scalarSig?"scalarsig ":(scalarIndex?"scalarindex ":"scalaroracle ")))):"", dump?"dump ":"", resume?"resume ":"",
                  checkpoint?"checkpoint ":"", profile?"profile ":"");
     if(phiAuditMode) std::fprintf(stderr,"phiaudit: target shallow bands=%d\n",targetBands);
+    if(scalarOracle) std::fprintf(stderr,"%s: middle band=%d maxess=%lld\n",
+                                  scalarRefine?"scalarrefine":(scalarSigKey?"scalarsigkey":(scalarSig?"scalarsig":(scalarIndex?"scalarindex":"scalaroracle"))),L,kernelBenchMaxEss);
+    if(crossFloor) std::fprintf(stderr,"crossfloor: band=%d maxess=%lld\n",kernelBenchBand,kernelBenchMaxEss);
+    if(kernelBench) std::fprintf(stderr,"kernelbench: band=%d maxess=%lld\n",kernelBenchBand,kernelBenchMaxEss);
     if(sideGlobal) std::fprintf(stderr,"sideglobal: cap=%zu unique side keys\n",sideGlobalCap);
     if(auditBand>=0) std::fprintf(stderr,"audit: band=%d max=%lld\n",auditBand,auditMax);
     if(targetAuditBand>=0) std::fprintf(stderr,"targetaudit: band=%d max=%lld\n",targetAuditBand,targetAuditMax);
@@ -1400,6 +2247,19 @@ int main(int argc,char**argv){
                 globalSideKeys.clear();
             }
             std::fflush(stderr);
+        }
+
+        if(scalarOracle && band==L){
+            int refineKind=scalarRefine?2:(scalarSigKey?3:(scalarSig?1:0));
+            return runScalarOracleBand(band,ess,states,kernelBenchMaxEss,scalarIndex,refineKind,useGlobalSide,globalSideKeys,globalSideVals);
+        }
+
+        if(crossFloor && band==kernelBenchBand){
+            return runCrossFloorBand(band,ess,kernelBenchMaxEss,useGlobalSide,globalSideKeys,globalSideVals);
+        }
+
+        if(kernelBench && band==kernelBenchBand){
+            return runKernelBenchBand(band,ess,kernelBenchMaxEss,useGlobalSide,globalSideKeys,globalSideVals);
         }
 
         // ---- PHASE 2 (parallel over essential classes): transitions ----

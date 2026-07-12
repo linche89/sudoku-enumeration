@@ -88,30 +88,97 @@ static Key canonMSbrute(const uint16_t* pairs){
 }
 
 // ---- refinement-based canonical KEY (faithful orbit invariant; NOT lex-min) ----
-// Validated in canon_refine2.cpp: invariant under relabeling + separates orbits exactly
-// like brute (#keys equal, 0 over-merge).  Equitable-partition refinement on exact
-// co-occurrence signatures, then min over the residual within-colour-class symmetry only.
+// T-SEEDED equitable refinement (2026-07-02).  The old degree-based refinement NEVER split
+// real DP states: they are column-regular (every column holds exactly 2d symbols, every
+// symbol has d columns per side), so the initial monochromatic colouring was already a
+// fixed point and the residual search stayed at the full (C!)^2 (the documented
+// "zero discretisation" wall).  The information it could not see is exactly the
+// cross-stack incidence matrix  T[a][b] = #{symbols s: a in xmask_s and b in ymask_s}
+// (proven discriminating: T alone separates 68 classes at C=4 band-1), plus the same-side
+// co-occurrence matrices U[a][a'] (X-X) and V[b][b'] (Y-Y).  We seed the initial colours
+// with sorted T/U (resp. T-column/V) row profiles and keep refining with colour-annotated
+// profiles until fixed point.  Typical reachable states then discretise (avg |Aut| ~ 5 at
+// C=5), so canon costs O(1) relabels instead of (C!)^2.
+//
+// EXACTNESS does not depend on refinement power: the colours are equivariant orbit
+// invariants (pure functions of the state, mapped along by any relabeling), and canonMS
+// still takes the min over ALL residual within-colour-class permutations.  The key is
+// itself a relabeled copy of the state, so equal keys imply equal orbits by construction;
+// the only property to test is relabeling-invariance (see canontest, incl. column-regular
+// balanced states = the hard case).
 static void refineColours(const uint16_t* pairs, int xcol[8], int ycol[8]){
+    uint8_t T[8][8]={}, U[8][8]={}, V[8][8]={};
+    for(int i=0;i<M;++i){
+        int xm=pairs[i]&FULLC, ym=(pairs[i]>>C)&FULLC;
+        for(int bx=xm; bx; bx&=bx-1){
+            int a=__builtin_ctz(bx);
+            for(int by=ym; by; by&=by-1) T[a][__builtin_ctz(by)]++;
+            for(int b2=bx&(bx-1); b2; b2&=b2-1){ int a2=__builtin_ctz(b2); U[a][a2]++; U[a2][a]++; }
+        }
+        for(int by=ym; by; by&=by-1){
+            int b=__builtin_ctz(by);
+            for(int b2=by&(by-1); b2; b2&=b2-1){ int bb=__builtin_ctz(b2); V[b][bb]++; V[bb][b]++; }
+        }
+    }
     for(int c=0;c<C;++c){ xcol[c]=0; ycol[c]=0; }
+    // signature of an X-col a: (own colour; sorted {ycol[b]*16+T[a][b]}; sorted {xcol[a']*16+U[a][a']})
+    // packed into a pair of u64 (entries < 6*16+12 < 128, C<=6 bytes per part).  Y side symmetric.
+    auto rank2=[&](std::pair<uint64_t,uint64_t>* s, int* col)->bool{
+        int o[8]; for(int c=0;c<C;++c)o[c]=c;
+        std::sort(o,o+C,[&](int A,int B){return s[A]<s[B];});
+        int nc[8],g=0; nc[o[0]]=0;
+        for(int i=1;i<C;++i){ if(s[o[i]]!=s[o[i-1]])++g; nc[o[i]]=g; }
+        bool ch=false; for(int c=0;c<C;++c){ if(col[c]!=nc[c])ch=true; col[c]=nc[c]; }
+        return ch;
+    };
+    auto sideSig=[&](const uint8_t cross[8][8], const uint8_t same[8][8],
+                     const int* otherCol, const int* ownCol, bool transpose,
+                     std::pair<uint64_t,uint64_t>* sig){
+        for(int a=0;a<C;++a){
+            uint8_t o[16], u[16];
+            for(int b=0;b<C;++b) o[b]=(uint8_t)(otherCol[b]*16 + (transpose?cross[b][a]:cross[a][b]));
+            for(int a2=0;a2<C;++a2) u[a2]=(uint8_t)(ownCol[a2]*16 + same[a][a2]);
+            std::sort(o,o+C); std::sort(u,u+C);
+            uint64_t p1=(uint64_t)ownCol[a], p2=0;
+            for(int b=0;b<C;++b) p1=(p1<<8)|o[b];
+            for(int b=0;b<C;++b) p2=(p2<<8)|u[b];
+            sig[a]={p1,p2};
+        }
+    };
     for(int it=0; it<2*C+3; ++it){
-        std::vector<std::vector<long long>> xs(C),ys(C);
-        for(int c=0;c<C;++c){ xs[c].push_back(xcol[c]); ys[c].push_back(ycol[c]); }
-        std::vector<std::vector<long long>> xa(C),ya(C);
-        for(int i=0;i<M;++i){ int xm=pairs[i]&FULLC, ym=(pairs[i]>>C)&FULLC;
-            long long yh[8]={0}; for(int b=ym;b;b&=b-1) yh[ycol[__builtin_ctz(b)]]++;
-            long long xh[8]={0}; for(int b=xm;b;b&=b-1) xh[xcol[__builtin_ctz(b)]]++;
-            long long yco=0; for(int q=0;q<C;++q) yco=yco*16+yh[q];
-            long long xco=0; for(int q=0;q<C;++q) xco=xco*16+xh[q];
-            for(int b=xm;b;b&=b-1) xa[__builtin_ctz(b)].push_back(yco);
-            for(int b=ym;b;b&=b-1) ya[__builtin_ctz(b)].push_back(xco); }
-        for(int c=0;c<C;++c){ std::sort(xa[c].begin(),xa[c].end()); for(auto v:xa[c])xs[c].push_back(v);
-            std::sort(ya[c].begin(),ya[c].end()); for(auto v:ya[c])ys[c].push_back(v); }
-        auto rec=[&](std::vector<std::vector<long long>>&s,int*col)->bool{
-            std::vector<int>o(C); for(int c=0;c<C;++c)o[c]=c;
-            std::sort(o.begin(),o.end(),[&](int a,int b){return s[a]<s[b];});
-            int nc[8],g=0; nc[o[0]]=0; for(int i=1;i<C;++i){ if(s[o[i]]!=s[o[i-1]])++g; nc[o[i]]=g; }
-            bool ch=false; for(int c=0;c<C;++c){ if(col[c]!=nc[c])ch=true; col[c]=nc[c]; } return ch; };
-        bool c1=rec(xs,xcol),c2=rec(ys,ycol); if(!c1&&!c2)break;
+        std::pair<uint64_t,uint64_t> sx[8], sy[8];
+        sideSig(T,U,ycol,xcol,false,sx);
+        sideSig(T,V,xcol,ycol,true, sy);
+        bool c1=rank2(sx,xcol), c2=rank2(sy,ycol);
+        if(!c1&&!c2)break;
+    }
+    // If the T/U/V fixed point is not discrete, continue with the finer per-symbol
+    // co-occurrence-profile refinement (the original loop), seeded with current colours.
+    // It can only split further; signatures stay equivariant.
+    {
+        bool discrete=true; int seenx=0, seeny=0;
+        for(int c=0;c<C;++c){ seenx|=1<<xcol[c]; seeny|=1<<ycol[c]; }
+        if(__builtin_popcount(seenx)<C || __builtin_popcount(seeny)<C) discrete=false;
+        if(!discrete) for(int it=0; it<2*C+3; ++it){
+            std::vector<std::vector<long long>> xs(C),ys(C);
+            for(int c=0;c<C;++c){ xs[c].push_back(xcol[c]); ys[c].push_back(ycol[c]); }
+            std::vector<std::vector<long long>> xa(C),ya(C);
+            for(int i=0;i<M;++i){ int xm=pairs[i]&FULLC, ym=(pairs[i]>>C)&FULLC;
+                long long yh[8]={0}; for(int b=ym;b;b&=b-1) yh[ycol[__builtin_ctz(b)]]++;
+                long long xh[8]={0}; for(int b=xm;b;b&=b-1) xh[xcol[__builtin_ctz(b)]]++;
+                long long yco=0; for(int q=0;q<C;++q) yco=yco*16+yh[q];
+                long long xco=0; for(int q=0;q<C;++q) xco=xco*16+xh[q];
+                for(int b=xm;b;b&=b-1) xa[__builtin_ctz(b)].push_back(yco);
+                for(int b=ym;b;b&=b-1) ya[__builtin_ctz(b)].push_back(xco); }
+            for(int c=0;c<C;++c){ std::sort(xa[c].begin(),xa[c].end()); for(auto v:xa[c])xs[c].push_back(v);
+                std::sort(ya[c].begin(),ya[c].end()); for(auto v:ya[c])ys[c].push_back(v); }
+            auto rec=[&](std::vector<std::vector<long long>>&s,int*col)->bool{
+                std::vector<int>o(C); for(int c=0;c<C;++c)o[c]=c;
+                std::sort(o.begin(),o.end(),[&](int a,int b){return s[a]<s[b];});
+                int nc[8],g=0; nc[o[0]]=0; for(int i=1;i<C;++i){ if(s[o[i]]!=s[o[i-1]])++g; nc[o[i]]=g; }
+                bool ch=false; for(int c=0;c<C;++c){ if(col[c]!=nc[c])ch=true; col[c]=nc[c]; } return ch; };
+            bool c1=rec(xs,xcol),c2=rec(ys,ycol); if(!c1&&!c2)break;
+        }
     }
 }
 static void withinClassPerms(const int*col,std::vector<std::array<int,8>>&out){
@@ -162,12 +229,33 @@ static void randomPairs(std::mt19937& rng, uint16_t* out){
     }
 }
 
+// column-regular random state (the REAL-state shape: every symbol has d cols per side,
+// every column holds exactly 2d symbols).  This is the regime where degree-based
+// refinement is provably blind; it must be part of any canon test.
+static bool balancedPairs(std::mt19937& rng, int d, uint16_t* out){
+    for(int side=0; side<2; ++side){
+        int cap[8]; for(int c=0;c<C;++c)cap[c]=2*d;
+        for(int i=0;i<M;++i){
+            int mask=0, got=0, tries=0;
+            while(got<d){
+                int c=(int)(rng()%C);
+                if(!(mask&(1<<c)) && cap[c]>0){ mask|=1<<c; cap[c]--; got++; }
+                if(++tries>2000) return false;
+            }
+            if(side==0) out[i]=(uint16_t)mask; else out[i]|=(uint16_t)(mask<<C);
+        }
+    }
+    return true;
+}
+
 static int canonSelfTest(int ntests, unsigned seed){
     std::mt19937 rng(seed);
     int invariantBad=0;
     uint16_t pr[MAXM], pr2[MAXM];
-    for(int t=0;t<ntests;++t){
-        randomPairs(rng, pr);
+    // half random states, half column-regular balanced states (the real-state shape).
+    for(int t=0;t<2*ntests;++t){
+        if(t&1){ int d=1+(int)(rng()%(C-1)); if(!balancedPairs(rng,d,pr)) continue; }
+        else randomPairs(rng, pr);
         Key k0=canonMS(pr);
         for(int r=0;r<3;++r){
             int sx[8], sy[8];
@@ -191,8 +279,9 @@ static int canonSelfTest(int ntests, unsigned seed){
         didSeparation=true;
         std::map<Key,Key> refineToBrute;
         std::map<Key,int> rk, bk;
-        for(int t=0;t<ntests;++t){
-            randomPairs(rng, pr);
+        for(int t=0;t<2*ntests;++t){
+            if(t&1){ int d=1+(int)(rng()%(C-1)); if(!balancedPairs(rng,d,pr)) continue; }
+            else randomPairs(rng, pr);
             Key kr=canonMS(pr);
             Key kb=canonMSbrute(pr);
             auto it=refineToBrute.find(kr);
@@ -209,7 +298,7 @@ static int canonSelfTest(int ntests, unsigned seed){
     }
 
     bool ok = invariantBad==0 && (!didSeparation || (separationConflicts==0 && refineKeys==bruteKeys));
-    std::printf("canontest C=%d: invarianceTests=%d violations=%d", C, ntests, invariantBad);
+    std::printf("canontest C=%d: invarianceTests=%d violations=%d", C, 2*ntests, invariantBad);
     if(didSeparation){
         std::printf("  separationKeys refine=%zu brute=%zu conflicts=%d",
                     refineKeys, bruteKeys, separationConflicts);

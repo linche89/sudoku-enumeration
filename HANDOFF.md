@@ -21,7 +21,9 @@
 - **闸门全过**:C=2=288、C=3=28200960、C=4=29136487207403520,在三个引擎
   (`ms_fast`/`mp_c6`/`mp_q`)上全部精确;`difftest`/`canontest` 0 失配。
 - **C=5 已完整复现 OEIS A291187 n=5**:新引擎 `mp_q` 在 2026-07-04 09:41 输出
-  `1903816047972624930994913280000 [OK]`。总耗时 43647s(12.1h),峰值 RSS 约 16.33GB。
+  `1903816047972624930994913280000 [OK]`。日志 elapsed 为 43647s(12.1h),但其中
+  2026-07-04 01:22:54..08:03:38(+08:00) 为系统 sleep/hibernate;扣除后 active elapsed
+  约 19603s(5.45h),峰值 RSS 约 16.33GB。
   日志:`data/mp_q-err-20260703-213349.log` / `data/mp_q-out-20260703-213349.log` /
   `data/mp_q-rss-20260703-213349.log`;校准表见 `data/mp_q_c5_calibration_20260704.md`。
 - **独立交叉验证在跑**:`mp_fast`(brute lex-min canon,与新 canon 完全独立)band-1
@@ -97,7 +99,9 @@
 
 - **`mp_q 5` 已完成**(2026-07-03 21:33 启动,watch_rss 110GB 看门狗):
   终点:`C=5: N=1903816047972624930994913280000  expect [OK]`。实测 band-0=3s,
-  band-1=98s,band-2=39777s,band-3=3865s,band-4=4s;真墙是 band-2。
+  band-1=98s,band-2=15635s active,band-3=3865s,band-4=4s;真墙仍是 band-2,但
+  旧的 band-2=39777s 包含 24044s 系统休眠,不可用于 ETA。band-2 平均约 541 essential/s;
+  先前所谓 band-2 末段掉速主要是休眠伪影。
 - ⚠️ 第一次跑(00:55 启动)与 `mp_fast 5` 交叉验证跑都在 01:17 被会话中断**连带杀掉**
   (教训:后台长跑必须用 `Start-Process` detach,别挂在 agent shell 树下)。
   `mp_fast` 死于 band-1 phase B 149.7M/285.4M canon 处;它的 band-1=76249 独立对账**未完成**,
@@ -113,7 +117,9 @@
    注意当前 DP 是 quotient 权重,combine 必须除以规范态代表的具体标号状态数
    `Q(k)=(2*C!*C!/aut(k))*((2C)!/prod multiplicity(pair)!)`;补集也必须重新 `canonMS2`。
    C=2/3/4 普通与 `dual` 已同值通过。含栈交换的 `mp_q` 口径下 C=4 中点态数是 141;
-   旧文档的 232 是无 X/Y 栈交换口径。
+   旧文档的 232 是无 X/Y 栈交换口径。对 C=5 的已完成 normal run,扣除系统休眠后
+   band-3+4 约占 active time 的 19.7%,所以 dual 是有用的常数加速,但不是绕过
+   15,635s band-2 主墙的分钟级解法。
 2. **逐带 checkpoint + resume(已实装)**:`mp_q` 默认每完成一个 band 写
    `data/mp_q_C{C}_band{band}.chk`;显式传 `resume` 会从目标范围内最新 checkpoint 恢复。
    对奇数 C 的 `dual resume`,还会读取浅中点 snapshot。
@@ -126,15 +132,23 @@
    完全相同 side/hist-pair 复用几乎为零,简单 kernel cache 不是 10×–100× 杠杆。
    `phiaudit` 也证伪了 multiplicity/T/TUV/autQ 直接替代 `phi(canon(target))`:C=5 的 TUV
    仍有 4407 个 collision groups。后续不能靠这些粗 invariant 直接去 canon。
-5. **交叉积成本地板的进一步压缩(未实装)**:下一条有希望的精确路线是 group/orbit kernel:
-   把 hist pair 压到 `S_C×S_C×swap` 下的 orbit representative + relative double-coset 数据;
-   或把单侧 restricted-permutation hist 改写成 rook-polynomial / permanent 生成函数。
-6. **B-route permanent DP 原型(已实装旁路,见 `data/b_route_permdp_20260704.md`)**:
+5. **band-2 workbench 结果(2026-07-05,见 `data/band2_optimization_20260704.md`)**:
+   `crossfloor` 显示 C=5 band-2 的 raw merge 地板很低:20k task、约 2.51e8 raw merges,
+   中段 wall 仅 0.189s;真正的墙是 `raw target -> orbit/phiIndex` 的精确分类。
+   `scalarindex` 是当前最好的 scalar oracle 原型;`scalarsigkey` 固定缓冲签名 C=3 全量
+   `28200960 [OK]`,C=5 20k sample middle wall 33.5s,正确但没有实质超过 `scalarindex`。
+   结论:不要再押注 heap/string refine signature;下一步要么让分类器复用 `canonMS2` 已算数据,
+   要么换状态空间。
+6. **交叉积成本地板的进一步压缩(降级为备选)**:group/orbit kernel 仍可能有价值,但如果它
+   仍需逐 raw 做精确分类,就不是 10× 路线。可研究方向是把 hist pair 压到
+   `S_C×S_C×swap` 下的 orbit representative + relative double-coset 数据;或把单侧
+   restricted-permutation hist 改写成 rook-polynomial / permanent 生成函数。
+7. **B-route permanent DP 原型(已实装旁路,见 `data/b_route_permdp_20260704.md`)**:
    `buildHistPermDP` 把单侧 side histogram 写成彩色 restricted permanent 的 column-subset DP。
    C=3/4/5 随机差分全部 OK,但作为 `buildHistFast` 的 drop-in 替换慢 3.5–4.1×;
    因此不要接主路径。它的价值是作为 fused direct kernel 的地基:
    `top side DP × bot side DP -> target-count vector / dual scalar`,目标是绕过 `hTop×hBot`。
-7. **换状态空间(kjellfp a-向量,§A.4b 原建议)**:仍开放,工程量大,C=6 才值得。
+8. **换状态空间(kjellfp a-向量,§A.4b 原建议)**:仍开放,工程量大,C=6 才值得。
 
 ### B.7 接力检查清单
 
@@ -151,7 +165,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\watch_rss.ps1 -Exe .
 
 C=5 各带参考数据(2026-07-04 实测,`mp_q` 扩群口径):逐带状态数
 `7 / 38801 / 38801 / 7 / 1`;band-1 无 swap 口径 76249,distinct raw 285,371,938;
-band-2/band-3 essential 任务均为 8,458,157(raw 态×骨架 = 9,777,852),但 band-3 每任务便宜约 10 倍。
+band-2/band-3 essential 任务均为 8,458,157(raw 态×骨架 = 9,777,852),扣除系统休眠后
+band-2=15,635s、band-3=3,865s,band-3 每任务约便宜 4.0 倍。
 
 ---
 

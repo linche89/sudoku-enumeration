@@ -2,6 +2,13 @@
 
 This file records the current safe workflow for the 2xC enumeration work.
 
+> 2026-07-03 update: the preferred C=5 engine is now `build/mp_q.exe`
+> (`src/multiset_q.cpp`: T-seeded refinement canon + stack-swap symmetry + global
+> raw-canon cache). See `HANDOFF.md` §B for the current campaign state, the corrected
+> facts (C=5 band-1 = 76249 states, ~2.85e8 distinct raws; the real wall is band-2),
+> and the relay checklist. The `mp_fast` C=5 path below still works but is slower
+> and memory-heavy; use it only as an independent cross-check of band-1.
+
 ## Build
 
 From the repository root:
