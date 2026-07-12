@@ -351,3 +351,25 @@ Thus the specialized work is a real bounded improvement and not a new counting
 assumption.  It still does not change the roughly multi-day scale of a full
 first outer class, so the mathematical reformulation remains the main route to
 a complete C=6 result.
+
+After committing the optimized path, the existing partial third degree-5
+state was resumed with `parallelparents d3iso checkpointparents=2048`.  It
+closed exactly as:
+
+```text
+F5 index  value        saved parents before run  resumed elapsed
+3         35733365760                      4096        131.222 s
+```
+
+Together with the earlier 45.95-second partial run, this is about 177.2 seconds
+of useful work for the third value.  The installed checkpoint now contains
+190,171 strong states and occupies 7,797,031 bytes.  A fresh 15-second process
+loaded it and immediately entered the fourth degree-5 value:
+
+```text
+graph checkpoint loaded ... entries=190171
+probe layeredF4 parents=128/24143 ...
+```
+
+The first three degree-5 values are therefore closed and restartable; the
+fourth has 24,143 currently missing degree-4 parents.
