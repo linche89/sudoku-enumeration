@@ -15,6 +15,7 @@ data/*.err
 data/*-rss-*.log
 data/*-out-*.log
 data/*-err-*.log
+data/factorization_orbit_*.log
 experiments/**/*.err
 experiments/**/*.log
 experiments/**/*.out
