@@ -530,3 +530,28 @@ approximately twelve-minute first-class cost, not the earlier six-hour
 estimate.  It does not yet predict the remaining 63,198 classes: the next
 bounded gate must measure how much of this five-million-state memo is reused by
 the second outer graph before any full-run projection is credible.
+
+## Second outer-class frontier
+
+The next gate stopped after 50 new `F5` values for outer graph two.  Unlike the
+highly symmetric first graph, its top residual frontier is much larger:
+
+```text
+top mode       raw degree-5 residuals   strong degree-5 classes
+pivotinner                       192960                       23732
+pivot                            31920                       19850
+```
+
+Thus the degree-6 root pivot still removes a factor of six from the raw list,
+but only 16.4% from the strong frontier.  The first 50 new values averaged
+0.7110 seconds (median 0.7150, range 0.568--0.866) and added 201,127 memo states.
+They were saved exactly; the checkpoint now contains 5,315,962 states and
+217,954,462 bytes.
+
+A straight-line estimate is roughly four hours even with the top pivot, before
+accounting for later reuse.  More importantly, extending the observed early
+memo-growth rate would exceed the tested memory regime.  The second class was
+therefore not hard-run.  The remaining mathematical bottleneck is now precise:
+reduce or aggregate the approximately twenty-thousand nonisomorphic degree-5
+residuals produced by a low-symmetry degree-6 outer graph.  Further inner
+`F4`/`F3` optimization alone cannot change that frontier size.
