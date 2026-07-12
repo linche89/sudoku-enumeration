@@ -487,3 +487,46 @@ Finally, the compatible checkpoint was resumed atomically after every closed
 degree-5 value.  A fresh reload skipped the stored prefix and reproduced the
 next previously observed value, 35,892,157,440.  It now contains 242,937 exact
 states (9,960,437 bytes), with the first 14 degree-5 values closed.
+
+## First complete C=6 outer class
+
+The checkpoint was then expanded in bounded gates: first to 64 closed `F5`
+values, then to 256.  The 50-value steady-state gate averaged 0.7606 seconds
+per value and matched 34 overlapping values from the previous evaluator with
+zero discrepancies.  The following 192-value gate averaged 0.7207 seconds;
+at 1,272,904 memo states its peak working set was only 295.1 MiB.
+
+Those measurements justified completing exactly one outer class, still with
+`limit=1`, 64-value atomic checkpoints, and a 3 GiB memory cutoff.  The run
+finished normally:
+
+```text
+flags: pivotinner parallelparents rooted4 parentchunk=128
+F6(G_1) = 6986348258918400
+class time = 706.652 s
+count time = 707.767 s
+peak working set = 665.6 MiB
+memory cutoff = not triggered
+memo states = 5114835
+checkpoint bytes = 209708255
+```
+
+The 1,366 newly evaluated `F5` values averaged 0.4979 seconds (median 0.4930,
+range 0.022--0.860).  Their final 64-value block averaged 0.3522 seconds, so
+cross-`F5` memo reuse materially improved the rate instead of degrading it.
+They added 3,841,930 states, or 2,812.5 states per value on average.
+
+A cold process then loaded all 5,114,835 states and reproduced the same top
+value by a direct memo hit:
+
+```text
+F6(G_1) = 6986348258918400
+graph calls=1, memo hits=1, memo misses=0
+class time=0.000 s
+```
+
+This closes the first exact C=6 outer-class gate.  It establishes an
+approximately twelve-minute first-class cost, not the earlier six-hour
+estimate.  It does not yet predict the remaining 63,198 classes: the next
+bounded gate must measure how much of this five-million-state memo is reused by
+the second outer graph before any full-run projection is credible.
