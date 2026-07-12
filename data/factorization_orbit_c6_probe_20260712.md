@@ -373,3 +373,55 @@ probe layeredF4 parents=128/24143 ...
 
 The first three degree-5 values are therefore closed and restartable; the
 fourth has 24,143 currently missing degree-4 parents.
+
+## Follow-up: rooted color pivot
+
+The rooted color-block identity
+
+```text
+F_d(G) = d * sum_{perfect matchings M containing e} F_(d-1)(G-M)
+```
+
+was added as the optional `pivot` path.  A (2^{12})-state subset DP computes
+the perfect-matching frequency of every edge incident with row zero, and the
+least-frequent edge is forced.  The enumerated residual multiplicity is checked
+against that DP frequency on every call before the factor (d) is restored.
+Memoized values remain the complete ordered (F_d(G)), so old checkpoints are
+compatible.
+
+All complete C=2/3/4/5 gates passed.  The fastest C=5 combination is now:
+
+```text
+flags: pivot d3pairs
+N(5)=1903816047972624930994913280000 [OK]
+countTime=13.776642s
+perfect matchings enumerated=3256904
+matching count without pivot at the same memo frontier=14095124
+```
+
+For C=6, `pivotinner` leaves degree 6 unchanged so that the previously known
+first degree-5 graph is selected.  With `parallelparents d3iso` it reproduced:
+
+```text
+F5=37186844160
+new elapsed=13.474s
+previous elapsed=178.603s
+speedup=13.3x
+degree-4 parents: 26734 -> 5168
+```
+
+The stronger pair-isomorphism mode was slower at M=12 (29.490 seconds), so
+`d3iso` remains the C=6 choice.
+
+At the top degree-6 graph, full `pivot` reduced the raw matching list exactly
+as predicted but barely changed its isomorphism frontier:
+
+```text
+raw degree-5 residuals:    192528 -> 32088
+strong degree-5 classes:     1622 -> 1617
+```
+
+Thus the first outer class falls from an early estimate near 80 hours to about
+six hours if later degree-5 values resemble the first.  The next decision gate
+is the exact rooted 2-factor count for these degree-5 representatives; only a
+small output count justifies implementing the two-color block enumerator.

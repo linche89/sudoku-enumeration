@@ -742,6 +742,7 @@ std::unordered_map<GraphKey, GraphKey, GraphKeyHash> degree3DiscreteCanonMap;
 bool useDegree3IsoBatch = false;
 bool useDegree3PairIso = false;
 bool parallelDegree4ParentEnumeration = false;
+int colorPivotMaxDegree = 0;
 uint64_t degree3IsoNodeBudget = 1000;
 uint64_t degree3IsoChecks = 0;
 uint64_t degree3IsoHits = 0;
@@ -1593,6 +1594,9 @@ uint64_t graphCalls = 0;
 uint64_t graphMemoHits = 0;
 uint64_t graphMemoMisses = 0;
 uint64_t perfectMatchings = 0;
+uint64_t pivotCalls = 0;
+uint64_t pivotAllMatchings = 0;
+uint64_t pivotSelectedMatchings = 0;
 std::array<uint64_t, MAX_C + 1> graphCallsByDegree{};
 std::array<uint64_t, MAX_C + 1> graphMissesByDegree{};
 std::array<uint64_t, MAX_C + 1> perfectMatchingsByDegree{};
@@ -1699,6 +1703,60 @@ int cycleComponents(const std::array<uint16_t, MAX_M>& graph) {
 }
 
 FactorCount countFactorizations(const std::array<uint16_t, MAX_M>& graph, int degree);
+
+struct PivotEdge {
+    uint16_t rightBit = 0;
+    uint64_t frequency = 0;
+    uint64_t allMatchings = 0;
+};
+
+// F_d(G) = d * sum_{M contains e} F_{d-1}(G-M).  Frequencies at one
+// left vertex sum to pm(G), so its least-frequent incident edge is a safe pivot.
+PivotEdge leastFrequentRootEdge(const std::array<uint16_t, MAX_M>& graph) {
+    std::array<uint64_t, 1 << MAX_M> dp{};
+    dp[0] = 1;
+    for (int row = 1; row < M; ++row) {
+        for (int used = 0; used <= FULL; ++used) {
+            if (std::popcount((unsigned)used) != row - 1 || dp[used] == 0) continue;
+            uint16_t available = graph[row] & (uint16_t)~used;
+            while (available) {
+                const uint16_t bit = available & (uint16_t)(-available);
+                available ^= bit;
+                dp[used | bit] += dp[used];
+            }
+        }
+    }
+
+    PivotEdge result;
+    result.frequency = std::numeric_limits<uint64_t>::max();
+    uint16_t incident = graph[0];
+    while (incident) {
+        const uint16_t bit = incident & (uint16_t)(-incident);
+        incident ^= bit;
+        const uint64_t frequency = dp[FULL ^ bit];
+        result.allMatchings += frequency;
+        if (frequency < result.frequency) {
+            result.rightBit = bit;
+            result.frequency = frequency;
+        }
+    }
+    if (result.rightBit == 0 || result.frequency == 0) {
+        throw std::runtime_error("regular bipartite graph has no usable pivot edge");
+    }
+    return result;
+}
+
+void recordPivot(const PivotEdge& pivot) {
+    ++pivotCalls;
+    pivotAllMatchings += pivot.allMatchings;
+    pivotSelectedMatchings += pivot.frequency;
+}
+
+uint64_t residualMultiplicitySum(const std::vector<Residual>& residuals) {
+    uint64_t total = 0;
+    for (const Residual& residual : residuals) total += residual.multiplicity;
+    return total;
+}
 
 void enumeratePerfectMatchings(
     const std::array<uint16_t, MAX_M>& graph,
@@ -1838,13 +1896,26 @@ FactorCount computeDegree3Direct(const std::array<uint16_t, MAX_M>& graph) {
     residualIndex.reserve(512);
     residuals.reserve(512);
     std::array<uint16_t, MAX_M> chosen{};
-    enumeratePerfectMatchings(graph, (uint16_t)((1u << M) - 1u), 0,
-                              chosen, residualIndex, residuals);
+    int colorMultiplier = 1;
+    if (colorPivotMaxDegree >= 3) {
+        const PivotEdge pivot = leastFrequentRootEdge(graph);
+        recordPivot(pivot);
+        chosen[0] = pivot.rightBit;
+        enumeratePerfectMatchings(graph, (uint16_t)(FULL ^ 1u), pivot.rightBit,
+                                  chosen, residualIndex, residuals);
+        if (residualMultiplicitySum(residuals) != pivot.frequency) {
+            throw std::runtime_error("degree-3 pivot frequency mismatch");
+        }
+        colorMultiplier = 3;
+    } else {
+        enumeratePerfectMatchings(graph, (uint16_t)FULL, 0,
+                                  chosen, residualIndex, residuals);
+    }
     FactorCount total = 0;
     for (const Residual& residual : residuals) {
         total += (FactorCount)residual.multiplicity << cycleComponents(residual.graph);
     }
-    return total;
+    return (FactorCount)colorMultiplier * total;
 }
 
 std::vector<FactorCount> evaluateDegree4Layered(const std::vector<Residual>& degree4Residuals) {
@@ -1876,6 +1947,8 @@ std::vector<FactorCount> evaluateDegree4Layered(const std::vector<Residual>& deg
         std::vector<size_t> offsets(parentCount + 1, 0);
         std::vector<Residual> flat;
         flat.reserve(parentCount * 2800);
+        const bool pivotDegree4 = colorPivotMaxDegree >= 4;
+        std::vector<PivotEdge> parentPivots(pivotDegree4 ? parentCount : 0);
 
         if (parallelDegree4ParentEnumeration) {
             std::vector<std::vector<Residual>> parentResiduals(parentCount);
@@ -1888,17 +1961,35 @@ std::vector<FactorCount> evaluateDegree4Layered(const std::vector<Residual>& deg
                 std::vector<Residual>& residuals = parentResiduals[(size_t)local];
                 residuals.reserve(4096);
                 std::array<uint16_t, MAX_M> chosen{};
-                enumeratePerfectMatchingsQuiet(
-                    degree4Residuals[parent].graph,
-                    (uint16_t)((1u << M) - 1u), 0,
-                    chosen, residualIndex, residuals,
-                    parentMatchingCounts[(size_t)local]);
+                if (pivotDegree4) {
+                    const PivotEdge pivot = leastFrequentRootEdge(
+                        degree4Residuals[parent].graph);
+                    parentPivots[(size_t)local] = pivot;
+                    chosen[0] = pivot.rightBit;
+                    enumeratePerfectMatchingsQuiet(
+                        degree4Residuals[parent].graph,
+                        (uint16_t)(FULL ^ 1u), pivot.rightBit,
+                        chosen, residualIndex, residuals,
+                        parentMatchingCounts[(size_t)local]);
+                } else {
+                    enumeratePerfectMatchingsQuiet(
+                        degree4Residuals[parent].graph,
+                        (uint16_t)FULL, 0,
+                        chosen, residualIndex, residuals,
+                        parentMatchingCounts[(size_t)local]);
+                }
             }
             size_t totalResiduals = 0;
             uint64_t chunkMatchingCount = 0;
             for (size_t local = 0; local < parentCount; ++local) {
                 totalResiduals += parentResiduals[local].size();
                 chunkMatchingCount += parentMatchingCounts[local];
+                if (pivotDegree4) {
+                    if (parentMatchingCounts[local] != parentPivots[local].frequency) {
+                        throw std::runtime_error("degree-4 parallel pivot frequency mismatch");
+                    }
+                    recordPivot(parentPivots[local]);
+                }
             }
             flat.reserve(totalResiduals);
             for (size_t local = 0; local < parentCount; ++local) {
@@ -1916,9 +2007,23 @@ std::vector<FactorCount> evaluateDegree4Layered(const std::vector<Residual>& deg
                 residualIndex.reserve(4096);
                 residuals.reserve(4096);
                 std::array<uint16_t, MAX_M> chosen{};
-                enumeratePerfectMatchings(degree4Residuals[parent].graph,
-                                          (uint16_t)((1u << M) - 1u), 0,
-                                          chosen, residualIndex, residuals);
+                if (pivotDegree4) {
+                    const PivotEdge pivot = leastFrequentRootEdge(
+                        degree4Residuals[parent].graph);
+                    parentPivots[local] = pivot;
+                    recordPivot(pivot);
+                    chosen[0] = pivot.rightBit;
+                    enumeratePerfectMatchings(degree4Residuals[parent].graph,
+                                              (uint16_t)(FULL ^ 1u), pivot.rightBit,
+                                              chosen, residualIndex, residuals);
+                    if (residualMultiplicitySum(residuals) != pivot.frequency) {
+                        throw std::runtime_error("degree-4 pivot frequency mismatch");
+                    }
+                } else {
+                    enumeratePerfectMatchings(degree4Residuals[parent].graph,
+                                              (uint16_t)FULL, 0,
+                                              chosen, residualIndex, residuals);
+                }
                 flat.insert(flat.end(), residuals.begin(), residuals.end());
                 offsets[local + 1] = flat.size();
             }
@@ -1950,8 +2055,8 @@ std::vector<FactorCount> evaluateDegree4Layered(const std::vector<Residual>& deg
                 value += (FactorCount)flat[i].multiplicity * degree3Values.find(degree3Keys[i])->second;
             }
             const size_t parent = missingParents[chunkStart + local];
-            values[parent] = value;
-            graphMemo.emplace(degree4Keys[parent], value);
+            values[parent] = pivotDegree4 ? (FactorCount)4 * value : value;
+            graphMemo.emplace(degree4Keys[parent], values[parent]);
         }
 
         if (graphCheckpointParentInterval > 0) {
@@ -2007,8 +2112,21 @@ FactorCount countFactorizations(const std::array<uint16_t, MAX_M>& input, int de
     residualIndex.reserve(256);
     residuals.reserve(256);
     std::array<uint16_t, MAX_M> chosen{};
-    enumeratePerfectMatchings(graph, (uint16_t)((1u << M) - 1u), 0,
-                              chosen, residualIndex, residuals);
+    int colorMultiplier = 1;
+    if (colorPivotMaxDegree >= degree) {
+        const PivotEdge pivot = leastFrequentRootEdge(graph);
+        recordPivot(pivot);
+        chosen[0] = pivot.rightBit;
+        enumeratePerfectMatchings(graph, (uint16_t)(FULL ^ 1u), pivot.rightBit,
+                                  chosen, residualIndex, residuals);
+        if (residualMultiplicitySum(residuals) != pivot.frequency) {
+            throw std::runtime_error("factorization pivot frequency mismatch");
+        }
+        colorMultiplier = degree;
+    } else {
+        enumeratePerfectMatchings(graph, (uint16_t)FULL, 0,
+                                  chosen, residualIndex, residuals);
+    }
     // At degree 3 the residuals are 2-regular, and F_2 is available directly
     // as 2^(number of cycle components).  Canonicalizing those residuals is
     // strictly wasted work; weak-key grouping is already exact for summation.
@@ -2026,6 +2144,7 @@ FactorCount countFactorizations(const std::array<uint16_t, MAX_M>& input, int de
                      countFactorizations(residual.graph, degree - 1);
         }
     }
+    total *= (FactorCount)colorMultiplier;
     graphMemo.emplace(key, total);
     if (degree == 5) {
         ++completedDegree5;
@@ -2145,6 +2264,8 @@ int main(int argc, char** argv) {
             useDegree3PairIso = true;
         }
         else if (arg == "parallelparents") parallelDegree4ParentEnumeration = true;
+        else if (arg == "pivot") colorPivotMaxDegree = MAX_C;
+        else if (arg == "pivotinner") colorPivotMaxDegree = 5;
         else if (arg.rfind("limit=", 0) == 0) limit = std::atoi(arg.c_str() + 6);
         else if (arg.rfind("start=", 0) == 0) startClass = std::atoi(arg.c_str() + 6);
         else if (arg.rfind("canonbudget=", 0) == 0) {
@@ -2272,6 +2393,7 @@ int main(int argc, char** argv) {
         }
         std::printf("stats countTime=%.6fs outerTime=%.6fs graphMemo=%zu calls=%llu hits=%llu misses=%llu PM=%llu "
                     "canonCache=%zu canonCacheEvictions=%llu canonComputations=%llu canonCacheHits=%llu canonFallbacks=%llu canonNodes=%llu "
+                    "pivotCalls=%llu pivotAll=%llu pivotSelected=%llu "
                     "d3DiscreteInputs=%llu d3DiscreteHits=%llu d3DiscreteClasses=%llu "
                     "d3IsoRep=%llu d3IsoHits=%llu d3IsoChecks=%llu d3IsoUnknown=%llu d3IsoNodes=%llu d3IsoKnownKeyMisses=%llu\n",
                     countSeconds, outerSeconds, graphMemo.size(),
@@ -2285,6 +2407,9 @@ int main(int argc, char** argv) {
                     (unsigned long long)canonCacheHits,
                     (unsigned long long)canonFallbacks,
                     (unsigned long long)canonSearchNodes,
+                    (unsigned long long)pivotCalls,
+                    (unsigned long long)pivotAllMatchings,
+                    (unsigned long long)pivotSelectedMatchings,
                     (unsigned long long)degree3DiscreteInputs,
                     (unsigned long long)degree3DiscreteHits,
                     (unsigned long long)degree3DiscreteClasses,
