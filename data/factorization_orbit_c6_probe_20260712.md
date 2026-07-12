@@ -284,3 +284,70 @@ The unsaved total had therefore fallen exactly from 24,715 to
 `24,715 - 4,096 = 20,619`.  Partial degree-5 work is now restartable using only
 closed, exact degree-4 and degree-3 values; no half-computed accumulator is ever
 trusted.
+
+## Follow-up: degree-3 structural keys and parallel parent enumeration
+
+The generic canonicalizer was augmented with an exact degree-3 experimental
+path.  It builds label-invariant vertex profiles from common-neighbor counts
+and incident four-cycles, then refines both the original bipartite graph and
+the weighted common-neighbor graphs on each side.  When all vertices receive
+distinct structural colors, their order is already a canonical label.  The
+resulting structural key is mapped once into the legacy strong-key namespace,
+so existing graph checkpoints remain reusable.
+
+Graphs whose structural colors remain tied have two exact fallbacks:
+
+- `d3iso`: parallel generic canonicalization for the unresolved minority;
+- `d3pairs`: synchronized two-graph color refinement and backtracking, with a
+  generic canonicalization fallback if the isomorphism search is inconclusive.
+
+The complete C=5 gate passed with `d3pairs`:
+
+```text
+N(5)=1903816047972624930994913280000 [OK]
+countTime=37.863814s
+degree-3 discrete classes=403
+degree-3 pair representatives=757
+degree-3 pair hits=2687724
+degree-3 pair checks=2811166
+unknown searches=0
+known-key misses=0
+```
+
+This is about 30.9% faster than the previous 54.79-second C=5 baseline.  The
+pair-isomorphism path did not scale well to M=12, however; the lighter `d3iso`
+fallback is the C=6 choice.
+
+Profiling then showed that reducing degree-3 canonicalization exposed a serial
+stage: the 128 independent degree-4 parents in a layer were enumerating their
+perfect matchings one at a time.  `parallelparents` gives every parent a local
+residual map, merges the completed maps in deterministic parent order, and
+updates the global counters only after the OpenMP region.
+
+Repeatable probes from the same 161,741-entry checkpoint gave:
+
+```text
+configuration                       D4 parents / window   peak working set
+baseline                            3072 / 30.59 s           178.3 MB
+parallelparents                     3712 / 30.65 s           187.5 MB
+parallelparents + d3iso             4096 / 30.56 s           199.3 MB
+
+baseline                            6528 / 60.15 s           177.9 MB
+d3iso only                          7040 / 60.13 s           198.6 MB
+```
+
+Finally, the combined `parallelparents d3iso` path recomputed the first C=6
+degree-5 graph from an empty memo and reproduced its previously established
+exact value:
+
+```text
+F5=37186844160
+new elapsed=178.603s
+old elapsed=209.775s
+improvement=14.9%
+```
+
+Thus the specialized work is a real bounded improvement and not a new counting
+assumption.  It still does not change the roughly multi-day scale of a full
+first outer class, so the mathematical reformulation remains the main route to
+a complete C=6 result.

@@ -690,6 +690,551 @@ int regularGraphDegree(const std::array<uint16_t, MAX_M>& graph) {
     return std::popcount(graph[0]);
 }
 
+// Degree-3 residuals dominate the C=6 layered evaluator.  Keep a cheap,
+// label-invariant bucket for them, then prove equivalence with a two-graph
+// individualization/refinement search.  A successful isomorphism test can stop
+// at its first mapping; only genuinely new classes need a canonical label.
+struct Degree3Invariant {
+    uint64_t first = 0;
+    uint64_t second = 0;
+    bool operator==(const Degree3Invariant&) const = default;
+};
+
+struct Degree3InvariantHash {
+    size_t operator()(const Degree3Invariant& value) const noexcept {
+        uint64_t x = value.first ^ std::rotl(value.second, 23);
+        x ^= x >> 30;
+        x *= 0xbf58476d1ce4e5b9ULL;
+        x ^= x >> 27;
+        return (size_t)x;
+    }
+};
+
+struct Degree3IsoGraph {
+    std::array<std::array<uint8_t, 3>, 2 * MAX_M> neighbors{};
+    std::array<std::array<uint16_t, MAX_M>, 2> sideMasks{};
+    std::array<uint32_t, 2 * MAX_M> vertexProfiles{};
+    std::array<uint8_t, 2 * MAX_M> structuralColors{};
+    uint8_t structuralColorCount = 0;
+};
+
+struct Degree3StructuralSignature {
+    uint8_t own = 0;
+    std::array<uint16_t, MAX_M - 1> sameSide{};
+    std::array<uint8_t, 3> opposite{};
+    bool operator==(const Degree3StructuralSignature&) const = default;
+    bool operator<(const Degree3StructuralSignature& other) const noexcept {
+        if (own != other.own) return own < other.own;
+        if (sameSide != other.sameSide) return sameSide < other.sameSide;
+        return opposite < other.opposite;
+    }
+};
+
+struct Degree3IsoRepresentative {
+    std::array<uint16_t, MAX_M> graph{};
+    Degree3IsoGraph prepared{};
+    GraphKey key{};
+};
+
+std::unordered_map<Degree3Invariant, std::vector<Degree3IsoRepresentative>,
+                   Degree3InvariantHash> degree3IsoBuckets;
+std::unordered_map<GraphKey, GraphKey, GraphKeyHash> degree3DiscreteCanonMap;
+bool useDegree3IsoBatch = false;
+bool useDegree3PairIso = false;
+bool parallelDegree4ParentEnumeration = false;
+uint64_t degree3IsoNodeBudget = 1000;
+uint64_t degree3IsoChecks = 0;
+uint64_t degree3IsoHits = 0;
+uint64_t degree3IsoUnknown = 0;
+uint64_t degree3IsoNodes = 0;
+uint64_t degree3IsoRepresentatives = 0;
+uint64_t degree3IsoKnownKeyMisses = 0;
+uint64_t degree3DiscreteInputs = 0;
+uint64_t degree3DiscreteHits = 0;
+uint64_t degree3DiscreteClasses = 0;
+
+void refineDegree3Structure(Degree3IsoGraph& graph);
+
+Degree3IsoGraph prepareDegree3IsoGraph(const std::array<uint16_t, MAX_M>& graph) {
+    Degree3IsoGraph prepared;
+    for (int row = 0; row < M; ++row) {
+        prepared.sideMasks[0][row] = graph[row];
+        uint16_t bits = graph[row];
+        int position = 0;
+        while (bits) {
+            const int col = std::countr_zero(bits);
+            bits &= (uint16_t)(bits - 1);
+            prepared.neighbors[row][position++] = (uint8_t)(M + col);
+            prepared.sideMasks[1][col] |= (uint16_t)(1u << row);
+        }
+    }
+    for (int col = 0; col < M; ++col) {
+        uint16_t bits = prepared.sideMasks[1][col];
+        int position = 0;
+        while (bits) {
+            const int row = std::countr_zero(bits);
+            bits &= (uint16_t)(bits - 1);
+            prepared.neighbors[M + col][position++] = (uint8_t)row;
+        }
+    }
+
+    for (int side = 0; side < 2; ++side) {
+        for (int vertex = 0; vertex < M; ++vertex) {
+            std::array<uint8_t, 4> commonCounts{};
+            for (int other = 0; other < M; ++other) {
+                if (other == vertex) continue;
+                const int common = std::popcount((uint16_t)(
+                    prepared.sideMasks[side][vertex] & prepared.sideMasks[side][other]));
+                ++commonCounts[common];
+            }
+
+            std::array<uint8_t, 3> edgeFourCycles{};
+            for (int edge = 0; edge < 3; ++edge) {
+                const int opposite = side == 0
+                    ? prepared.neighbors[vertex][edge] - M
+                    : prepared.neighbors[M + vertex][edge];
+                int cycles = 0;
+                for (int other = 0; other < M; ++other) {
+                    if (other == vertex ||
+                        ((prepared.sideMasks[side][other] >> opposite) & 1u) == 0) {
+                        continue;
+                    }
+                    cycles += std::popcount((uint16_t)(prepared.sideMasks[side][vertex] &
+                                                       prepared.sideMasks[side][other])) - 1;
+                }
+                edgeFourCycles[edge] = (uint8_t)cycles;
+            }
+            std::sort(edgeFourCycles.begin(), edgeFourCycles.end());
+
+            uint32_t profile = (uint32_t)side << 31;
+            for (int common = 0; common <= 3; ++common) {
+                profile |= (uint32_t)commonCounts[common] << (4 * common);
+            }
+            for (int edge = 0; edge < 3; ++edge) {
+                profile |= (uint32_t)edgeFourCycles[edge] << (16 + 3 * edge);
+            }
+            prepared.vertexProfiles[side * M + vertex] = profile;
+        }
+    }
+    refineDegree3Structure(prepared);
+    return prepared;
+}
+
+void refineDegree3Structure(Degree3IsoGraph& graph) {
+    std::array<uint32_t, 2 * MAX_M> profiles = graph.vertexProfiles;
+    std::sort(profiles.begin(), profiles.begin() + 2 * M);
+    std::array<uint32_t, 2 * MAX_M> uniqueProfiles{};
+    int uniqueProfileCount = 0;
+    for (int i = 0; i < 2 * M; ++i) {
+        if (i == 0 || profiles[i] != profiles[i - 1]) {
+            uniqueProfiles[uniqueProfileCount++] = profiles[i];
+        }
+    }
+    for (int vertex = 0; vertex < 2 * M; ++vertex) {
+        graph.structuralColors[vertex] = (uint8_t)(std::lower_bound(
+            uniqueProfiles.begin(), uniqueProfiles.begin() + uniqueProfileCount,
+            graph.vertexProfiles[vertex]) - uniqueProfiles.begin());
+    }
+    graph.structuralColorCount = (uint8_t)uniqueProfileCount;
+
+    for (;;) {
+        auto makeSignature = [&](int vertex) {
+            Degree3StructuralSignature signature;
+            signature.own = graph.structuralColors[vertex];
+            signature.sameSide.fill(std::numeric_limits<uint16_t>::max());
+            const int side = vertex >= M ? 1 : 0;
+            const int local = side == 0 ? vertex : vertex - M;
+            int position = 0;
+            for (int other = 0; other < M; ++other) {
+                if (other == local) continue;
+                const int common = std::popcount((uint16_t)(
+                    graph.sideMasks[side][local] & graph.sideMasks[side][other]));
+                signature.sameSide[position++] = (uint16_t)(
+                    (common << 8) | graph.structuralColors[side * M + other]);
+            }
+            std::sort(signature.sameSide.begin(), signature.sameSide.end());
+            for (int edge = 0; edge < 3; ++edge) {
+                signature.opposite[edge] = graph.structuralColors[
+                    graph.neighbors[vertex][edge]];
+            }
+            std::sort(signature.opposite.begin(), signature.opposite.end());
+            return signature;
+        };
+
+        std::array<Degree3StructuralSignature, 2 * MAX_M> signatures{};
+        for (int vertex = 0; vertex < 2 * M; ++vertex) {
+            signatures[vertex] = makeSignature(vertex);
+        }
+        std::sort(signatures.begin(), signatures.begin() + 2 * M);
+        std::array<Degree3StructuralSignature, 2 * MAX_M> unique{};
+        int uniqueCount = 0;
+        for (int i = 0; i < 2 * M; ++i) {
+            if (i == 0 || !(signatures[i] == signatures[i - 1])) {
+                unique[uniqueCount++] = signatures[i];
+            }
+        }
+
+        std::array<uint8_t, 2 * MAX_M> next{};
+        for (int vertex = 0; vertex < 2 * M; ++vertex) {
+            const Degree3StructuralSignature signature = makeSignature(vertex);
+            next[vertex] = (uint8_t)(std::lower_bound(
+                unique.begin(), unique.begin() + uniqueCount, signature) - unique.begin());
+        }
+        const bool stable = next == graph.structuralColors;
+        graph.structuralColors = next;
+        graph.structuralColorCount = (uint8_t)uniqueCount;
+        if (stable) return;
+    }
+}
+
+GraphKey degree3DiscreteKey(const Degree3IsoGraph& graph) {
+    std::array<int, MAX_M> rowOrder{};
+    std::array<int, MAX_M> colOrder{};
+    for (int vertex = 0; vertex < M; ++vertex) {
+        rowOrder[vertex] = vertex;
+        colOrder[vertex] = vertex;
+    }
+    std::sort(rowOrder.begin(), rowOrder.begin() + M,
+              [&](int a, int b) {
+                  return graph.structuralColors[a] < graph.structuralColors[b];
+              });
+    std::sort(colOrder.begin(), colOrder.begin() + M,
+              [&](int a, int b) {
+                  return graph.structuralColors[M + a] < graph.structuralColors[M + b];
+              });
+    GraphKey key;
+    key.keyKind = 2; // exact discrete structural label; map it to the legacy strong namespace
+    int position = 0;
+    for (int rowPosition = 0; rowPosition < M; ++rowPosition) {
+        const uint16_t row = graph.sideMasks[0][rowOrder[rowPosition]];
+        for (int colPosition = 0; colPosition < M; ++colPosition) {
+            appendKeyBit(key, position, (row >> colOrder[colPosition]) & 1u);
+        }
+    }
+    return key;
+}
+
+Degree3Invariant degree3Invariant(const Degree3IsoGraph& graph) {
+    uint64_t first = 0x243f6a8885a308d3ULL;
+    uint64_t second = 0x13198a2e03707344ULL;
+    auto feed = [&](uint64_t value) {
+        value += 0x9e3779b97f4a7c15ULL;
+        value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9ULL;
+        value = (value ^ (value >> 27)) * 0x94d049bb133111ebULL;
+        value ^= value >> 31;
+        first = std::rotl(first ^ value, 19) * 0x9e3779b185ebca87ULL;
+        second = std::rotl(second + value, 31) * 0xc2b2ae3d27d4eb4fULL;
+    };
+
+    for (int side = 0; side < 2; ++side) {
+        std::array<uint32_t, MAX_M> profiles{};
+        for (int vertex = 0; vertex < M; ++vertex) {
+            profiles[vertex] = graph.vertexProfiles[side * M + vertex];
+        }
+        std::sort(profiles.begin(), profiles.begin() + M);
+        feed(0x100 + side);
+        for (int vertex = 0; vertex < M; ++vertex) feed(profiles[vertex]);
+
+        std::array<uint8_t, MAX_M * (MAX_M - 1) / 2> intersections{};
+        int count = 0;
+        for (int a = 0; a < M; ++a) {
+            for (int b = a + 1; b < M; ++b) {
+                intersections[count++] = (uint8_t)std::popcount((uint16_t)(
+                    graph.sideMasks[side][a] & graph.sideMasks[side][b]));
+            }
+        }
+        std::sort(intersections.begin(), intersections.begin() + count);
+        feed(0x200 + side);
+        for (int i = 0; i < count; ++i) feed(intersections[i]);
+    }
+
+    struct EdgeFeature {
+        uint32_t rowProfile = 0;
+        uint32_t colProfile = 0;
+        uint8_t fourCycles = 0;
+        bool operator<(const EdgeFeature& other) const noexcept {
+            if (rowProfile != other.rowProfile) return rowProfile < other.rowProfile;
+            if (colProfile != other.colProfile) return colProfile < other.colProfile;
+            return fourCycles < other.fourCycles;
+        }
+    };
+    std::array<EdgeFeature, 3 * MAX_M> edges{};
+    int edgeCount = 0;
+    for (int row = 0; row < M; ++row) {
+        for (int edge = 0; edge < 3; ++edge) {
+            const int col = graph.neighbors[row][edge] - M;
+            int fourCycles = 0;
+            for (int other = 0; other < M; ++other) {
+                if (other == row || ((graph.sideMasks[0][other] >> col) & 1u) == 0) continue;
+                fourCycles += std::popcount((uint16_t)(graph.sideMasks[0][row] &
+                                                       graph.sideMasks[0][other])) - 1;
+            }
+            edges[edgeCount++] = {graph.vertexProfiles[row],
+                                  graph.vertexProfiles[M + col],
+                                  (uint8_t)fourCycles};
+        }
+    }
+    std::sort(edges.begin(), edges.begin() + edgeCount);
+    feed(0x300);
+    for (int i = 0; i < edgeCount; ++i) {
+        feed(((uint64_t)edges[i].rowProfile << 32) | edges[i].colProfile);
+        feed(edges[i].fourCycles);
+    }
+
+    std::array<uint8_t, 2 * MAX_M> seen{};
+    std::array<uint8_t, 2 * MAX_M> componentSizes{};
+    int componentCount = 0;
+    for (int start = 0; start < 2 * M; ++start) {
+        if (seen[start]) continue;
+        std::array<uint8_t, 2 * MAX_M> queue{};
+        int begin = 0, end = 0;
+        queue[end++] = (uint8_t)start;
+        seen[start] = 1;
+        while (begin < end) {
+            const int vertex = queue[begin++];
+            for (int edge = 0; edge < 3; ++edge) {
+                const int next = graph.neighbors[vertex][edge];
+                if (!seen[next]) {
+                    seen[next] = 1;
+                    queue[end++] = (uint8_t)next;
+                }
+            }
+        }
+        componentSizes[componentCount++] = (uint8_t)end;
+    }
+    std::sort(componentSizes.begin(), componentSizes.begin() + componentCount);
+    feed(0x400);
+    for (int i = 0; i < componentCount; ++i) feed(componentSizes[i]);
+
+    feed(0x500);
+    feed(graph.structuralColorCount);
+    std::array<uint64_t, 2 * MAX_M> coloredVertices{};
+    for (int vertex = 0; vertex < 2 * M; ++vertex) {
+        coloredVertices[vertex] = ((uint64_t)graph.structuralColors[vertex] << 32) |
+                                  graph.vertexProfiles[vertex];
+    }
+    std::sort(coloredVertices.begin(), coloredVertices.begin() + 2 * M);
+    for (int vertex = 0; vertex < 2 * M; ++vertex) feed(coloredVertices[vertex]);
+
+    std::array<uint32_t, 3 * MAX_M> coloredEdges{};
+    int coloredEdgeCount = 0;
+    for (int row = 0; row < M; ++row) {
+        for (int edge = 0; edge < 3; ++edge) {
+            const int col = graph.neighbors[row][edge] - M;
+            coloredEdges[coloredEdgeCount++] =
+                ((uint32_t)graph.structuralColors[row] << 8) |
+                graph.structuralColors[M + col];
+        }
+    }
+    std::sort(coloredEdges.begin(), coloredEdges.begin() + coloredEdgeCount);
+    for (int i = 0; i < coloredEdgeCount; ++i) feed(coloredEdges[i]);
+
+    for (int side = 0; side < 2; ++side) {
+        std::array<uint32_t, MAX_M * (MAX_M - 1) / 2> coloredPairs{};
+        int pairCount = 0;
+        for (int a = 0; a < M; ++a) {
+            for (int b = a + 1; b < M; ++b) {
+                const uint8_t firstColor = std::min(
+                    graph.structuralColors[side * M + a],
+                    graph.structuralColors[side * M + b]);
+                const uint8_t secondColor = std::max(
+                    graph.structuralColors[side * M + a],
+                    graph.structuralColors[side * M + b]);
+                const uint8_t common = (uint8_t)std::popcount((uint16_t)(
+                    graph.sideMasks[side][a] & graph.sideMasks[side][b]));
+                coloredPairs[pairCount++] = ((uint32_t)firstColor << 16) |
+                                            ((uint32_t)secondColor << 8) | common;
+            }
+        }
+        std::sort(coloredPairs.begin(), coloredPairs.begin() + pairCount);
+        feed(0x510 + side);
+        for (int i = 0; i < pairCount; ++i) feed(coloredPairs[i]);
+    }
+    return {first, second};
+}
+
+struct Degree3IsoColorSignature {
+    uint8_t own = 0;
+    std::array<uint8_t, 3> neighbors{};
+    bool operator==(const Degree3IsoColorSignature&) const = default;
+    bool operator<(const Degree3IsoColorSignature& other) const noexcept {
+        if (own != other.own) return own < other.own;
+        return neighbors < other.neighbors;
+    }
+};
+
+bool refineDegree3Iso(const Degree3IsoGraph& firstGraph,
+                      const Degree3IsoGraph& secondGraph,
+                      std::array<uint8_t, 2 * MAX_M>& firstColors,
+                      std::array<uint8_t, 2 * MAX_M>& secondColors,
+                      int& colorCount) {
+    for (;;) {
+        std::array<Degree3IsoColorSignature, 4 * MAX_M> signatures{};
+        auto makeSignature = [](const Degree3IsoGraph& graph,
+                                const std::array<uint8_t, 2 * MAX_M>& colors,
+                                int vertex) {
+            Degree3IsoColorSignature signature;
+            signature.own = colors[vertex];
+            for (int edge = 0; edge < 3; ++edge) {
+                signature.neighbors[edge] = colors[graph.neighbors[vertex][edge]];
+            }
+            std::sort(signature.neighbors.begin(), signature.neighbors.end());
+            return signature;
+        };
+        for (int vertex = 0; vertex < 2 * M; ++vertex) {
+            signatures[vertex] = makeSignature(firstGraph, firstColors, vertex);
+            signatures[2 * M + vertex] = makeSignature(secondGraph, secondColors, vertex);
+        }
+        std::sort(signatures.begin(), signatures.begin() + 4 * M);
+        std::array<Degree3IsoColorSignature, 4 * MAX_M> unique{};
+        int uniqueCount = 0;
+        for (int i = 0; i < 4 * M; ++i) {
+            if (i == 0 || !(signatures[i] == signatures[i - 1])) {
+                unique[uniqueCount++] = signatures[i];
+            }
+        }
+
+        std::array<uint8_t, 2 * MAX_M> nextFirst{};
+        std::array<uint8_t, 2 * MAX_M> nextSecond{};
+        std::array<uint8_t, 4 * MAX_M> firstSizes{};
+        std::array<uint8_t, 4 * MAX_M> secondSizes{};
+        for (int vertex = 0; vertex < 2 * M; ++vertex) {
+            const auto firstSignature = makeSignature(firstGraph, firstColors, vertex);
+            const auto secondSignature = makeSignature(secondGraph, secondColors, vertex);
+            nextFirst[vertex] = (uint8_t)(std::lower_bound(
+                unique.begin(), unique.begin() + uniqueCount, firstSignature) - unique.begin());
+            nextSecond[vertex] = (uint8_t)(std::lower_bound(
+                unique.begin(), unique.begin() + uniqueCount, secondSignature) - unique.begin());
+            ++firstSizes[nextFirst[vertex]];
+            ++secondSizes[nextSecond[vertex]];
+        }
+        for (int color = 0; color < uniqueCount; ++color) {
+            if (firstSizes[color] != secondSizes[color]) return false;
+        }
+        const bool stable = nextFirst == firstColors && nextSecond == secondColors;
+        firstColors = nextFirst;
+        secondColors = nextSecond;
+        colorCount = uniqueCount;
+        if (stable) return true;
+    }
+}
+
+enum class Degree3IsoResult : uint8_t { no, yes, unknown };
+
+bool verifyDegree3IsoMapping(const Degree3IsoGraph& firstGraph,
+                             const Degree3IsoGraph& secondGraph,
+                             const std::array<uint8_t, 2 * MAX_M>& firstColors,
+                             const std::array<uint8_t, 2 * MAX_M>& secondColors) {
+    std::array<int, 2 * MAX_M> mapped{};
+    mapped.fill(-1);
+    for (int firstVertex = 0; firstVertex < 2 * M; ++firstVertex) {
+        for (int secondVertex = 0; secondVertex < 2 * M; ++secondVertex) {
+            if (firstColors[firstVertex] == secondColors[secondVertex]) {
+                mapped[firstVertex] = secondVertex;
+                break;
+            }
+        }
+        if (mapped[firstVertex] < 0) return false;
+    }
+    for (int firstVertex = 0; firstVertex < 2 * M; ++firstVertex) {
+        const int secondVertex = mapped[firstVertex];
+        for (int edge = 0; edge < 3; ++edge) {
+            const int wanted = mapped[firstGraph.neighbors[firstVertex][edge]];
+            bool found = false;
+            for (int otherEdge = 0; otherEdge < 3; ++otherEdge) {
+                if (secondGraph.neighbors[secondVertex][otherEdge] == wanted) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return false;
+        }
+    }
+    return true;
+}
+
+Degree3IsoResult searchDegree3Iso(
+    const Degree3IsoGraph& firstGraph,
+    const Degree3IsoGraph& secondGraph,
+    std::array<uint8_t, 2 * MAX_M> firstColors,
+    std::array<uint8_t, 2 * MAX_M> secondColors,
+    uint64_t& nodes) {
+    if (degree3IsoNodeBudget != 0 && nodes >= degree3IsoNodeBudget) {
+        return Degree3IsoResult::unknown;
+    }
+    ++nodes;
+    int colorCount = 0;
+    if (!refineDegree3Iso(firstGraph, secondGraph,
+                          firstColors, secondColors, colorCount)) {
+        return Degree3IsoResult::no;
+    }
+
+    std::array<uint8_t, 2 * MAX_M> firstSizes{};
+    for (int vertex = 0; vertex < 2 * M; ++vertex) ++firstSizes[firstColors[vertex]];
+    int selectedColor = -1;
+    int selectedSize = 2 * M + 1;
+    for (int color = 0; color < colorCount; ++color) {
+        if (firstSizes[color] > 1 && firstSizes[color] < selectedSize) {
+            selectedColor = color;
+            selectedSize = firstSizes[color];
+        }
+    }
+    if (selectedColor < 0) {
+        return verifyDegree3IsoMapping(firstGraph, secondGraph,
+                                       firstColors, secondColors)
+            ? Degree3IsoResult::yes : Degree3IsoResult::no;
+    }
+
+    int firstVertex = 0;
+    while (firstColors[firstVertex] != selectedColor) ++firstVertex;
+    bool sawUnknown = false;
+    std::array<std::array<uint8_t, 3>, 2 * MAX_M> triedNeighborhoods{};
+    int triedCount = 0;
+    for (int secondVertex = 0; secondVertex < 2 * M; ++secondVertex) {
+        if (secondColors[secondVertex] != selectedColor) continue;
+        bool twin = false;
+        for (int i = 0; i < triedCount; ++i) {
+            if (triedNeighborhoods[i] == secondGraph.neighbors[secondVertex]) {
+                twin = true;
+                break;
+            }
+        }
+        if (twin) continue;
+        triedNeighborhoods[triedCount++] = secondGraph.neighbors[secondVertex];
+
+        auto childFirst = firstColors;
+        auto childSecond = secondColors;
+        childFirst[firstVertex] = (uint8_t)colorCount;
+        childSecond[secondVertex] = (uint8_t)colorCount;
+        const Degree3IsoResult result = searchDegree3Iso(
+            firstGraph, secondGraph, childFirst, childSecond, nodes);
+        if (result == Degree3IsoResult::yes) return result;
+        if (result == Degree3IsoResult::unknown) sawUnknown = true;
+    }
+    return sawUnknown ? Degree3IsoResult::unknown : Degree3IsoResult::no;
+}
+
+Degree3IsoResult areDegree3Isomorphic(const Degree3IsoGraph& firstGraph,
+                                      const Degree3IsoGraph& secondGraph,
+                                      uint64_t& nodes) {
+    if (firstGraph.structuralColorCount != secondGraph.structuralColorCount) {
+        return Degree3IsoResult::no;
+    }
+    std::array<uint8_t, 2 * MAX_M> firstColors = firstGraph.structuralColors;
+    std::array<uint8_t, 2 * MAX_M> secondColors = secondGraph.structuralColors;
+    std::array<uint8_t, 2 * MAX_M> firstSizes{};
+    std::array<uint8_t, 2 * MAX_M> secondSizes{};
+    for (int vertex = 0; vertex < 2 * M; ++vertex) {
+        ++firstSizes[firstColors[vertex]];
+        ++secondSizes[secondColors[vertex]];
+    }
+    for (int color = 0; color < firstGraph.structuralColorCount; ++color) {
+        if (firstSizes[color] != secondSizes[color]) return Degree3IsoResult::no;
+    }
+    return searchDegree3Iso(firstGraph, secondGraph,
+                            firstColors, secondColors, nodes);
+}
+
 size_t canonCacheSize() {
     size_t total = 0;
     for (const DegreeCanonCache& cache : canonCacheByDegree) total += cache.map.size();
@@ -712,6 +1257,7 @@ struct CanonComputation {
     GraphKey key{};
     uint64_t nodes = 0;
     bool fallback = false;
+    bool genericCanonicalization = true;
 };
 
 CanonComputation computeCanonicalGraphKey(
@@ -759,7 +1305,8 @@ struct Residual {
 std::vector<GraphKey> canonicalizeResidualKeys(
     const std::vector<Residual>& weakResiduals, size_t* missingUniqueOut = nullptr) {
     if (weakResiduals.empty()) return {};
-    DegreeCanonCache& cache = canonCacheByDegree[regularGraphDegree(weakResiduals[0].graph)];
+    const int residualDegree = regularGraphDegree(weakResiduals[0].graph);
+    DegreeCanonCache& cache = canonCacheByDegree[residualDegree];
     std::vector<GraphKey> strongKeys(weakResiduals.size());
     std::vector<size_t> pendingOf(weakResiduals.size(), std::numeric_limits<size_t>::max());
     struct Pending {
@@ -785,16 +1332,224 @@ std::vector<GraphKey> canonicalizeResidualKeys(
     }
 
     std::vector<CanonComputation> computed(pending.size());
-    #pragma omp parallel for schedule(dynamic, 64)
-    for (long long j = 0; j < (long long)pending.size(); ++j) {
-        const Pending& item = pending[(size_t)j];
-        computed[(size_t)j] = computeCanonicalGraphKey(
-            weakResiduals[item.firstIndex].graph, item.weak);
+    if (useDegree3IsoBatch && residualDegree == 3) {
+        const auto isoBatchStart = std::chrono::steady_clock::now();
+        std::vector<Degree3Invariant> invariants(pending.size());
+        std::vector<GraphKey> discreteKeys(pending.size());
+        std::vector<uint8_t> isDiscrete(pending.size(), 0);
+        #pragma omp parallel for schedule(static)
+        for (long long j = 0; j < (long long)pending.size(); ++j) {
+            const Degree3IsoGraph prepared = prepareDegree3IsoGraph(
+                weakResiduals[pending[(size_t)j].firstIndex].graph);
+            if (useDegree3PairIso) {
+                invariants[(size_t)j] = degree3Invariant(prepared);
+            }
+            if (prepared.structuralColorCount == 2 * M) {
+                isDiscrete[(size_t)j] = 1;
+                discreteKeys[(size_t)j] = degree3DiscreteKey(prepared);
+            }
+        }
+        const auto preparedAt = std::chrono::steady_clock::now();
+
+        struct MissingDiscrete {
+            GraphKey structuralKey{};
+            size_t firstPendingIndex = 0;
+        };
+        std::unordered_map<GraphKey, size_t, GraphKeyHash> missingDiscreteIndex;
+        missingDiscreteIndex.reserve(pending.size());
+        std::vector<MissingDiscrete> missingDiscrete;
+        std::vector<size_t> missingDiscreteOf(
+            pending.size(), std::numeric_limits<size_t>::max());
+        std::vector<size_t> unresolved;
+        unresolved.reserve(pending.size());
+        degree3DiscreteCanonMap.reserve(degree3DiscreteCanonMap.size() + pending.size() / 8);
+        for (size_t j = 0; j < pending.size(); ++j) {
+            if (!isDiscrete[j]) {
+                unresolved.push_back(j);
+                continue;
+            }
+            ++degree3DiscreteInputs;
+            auto found = degree3DiscreteCanonMap.find(discreteKeys[j]);
+            if (found != degree3DiscreteCanonMap.end()) {
+                computed[j].key = found->second;
+                computed[j].genericCanonicalization = false;
+                ++degree3DiscreteHits;
+                continue;
+            }
+            auto [it, inserted] = missingDiscreteIndex.emplace(
+                discreteKeys[j], missingDiscrete.size());
+            if (inserted) missingDiscrete.push_back({discreteKeys[j], j});
+            else ++degree3DiscreteHits;
+            missingDiscreteOf[j] = it->second;
+        }
+        const auto discreteIndexedAt = std::chrono::steady_clock::now();
+
+        std::vector<CanonComputation> missingDiscreteComputed(missingDiscrete.size());
+        #pragma omp parallel for schedule(dynamic, 64)
+        for (long long itemNumber = 0;
+             itemNumber < (long long)missingDiscrete.size(); ++itemNumber) {
+            const size_t pendingIndex = missingDiscrete[(size_t)itemNumber].firstPendingIndex;
+            const Pending& item = pending[pendingIndex];
+            missingDiscreteComputed[(size_t)itemNumber] = computeCanonicalGraphKey(
+                weakResiduals[item.firstIndex].graph, item.weak);
+        }
+        for (size_t itemNumber = 0; itemNumber < missingDiscrete.size(); ++itemNumber) {
+            degree3DiscreteCanonMap.emplace(
+                missingDiscrete[itemNumber].structuralKey,
+                missingDiscreteComputed[itemNumber].key);
+            ++degree3DiscreteClasses;
+        }
+        for (size_t j = 0; j < pending.size(); ++j) {
+            if (missingDiscreteOf[j] == std::numeric_limits<size_t>::max()) continue;
+            const size_t itemNumber = missingDiscreteOf[j];
+            if (missingDiscrete[itemNumber].firstPendingIndex == j) {
+                computed[j] = missingDiscreteComputed[itemNumber];
+            } else {
+                computed[j].key = missingDiscreteComputed[itemNumber].key;
+                computed[j].genericCanonicalization = false;
+            }
+        }
+        const auto discreteCanonicalizedAt = std::chrono::steady_clock::now();
+
+        if (!useDegree3PairIso) {
+            const auto fallbackStartedAt = std::chrono::steady_clock::now();
+            #pragma omp parallel for schedule(dynamic, 64)
+            for (long long unresolvedNumber = 0;
+                 unresolvedNumber < (long long)unresolved.size(); ++unresolvedNumber) {
+                const size_t pendingIndex = unresolved[(size_t)unresolvedNumber];
+                const Pending& item = pending[pendingIndex];
+                computed[pendingIndex] = computeCanonicalGraphKey(
+                    weakResiduals[item.firstIndex].graph, item.weak);
+            }
+            if (verboseProbeProgress && C == 6) {
+                const auto finishedAt = std::chrono::steady_clock::now();
+                std::fprintf(stderr,
+                             "probe d3DiscreteTiming pending=%zu unresolved=%zu "
+                             "prepare=%.3fs discreteIndex=%.3fs discreteCanon=%.3fs "
+                             "genericFallback=%.3fs total=%.3fs\n",
+                             pending.size(), unresolved.size(),
+                             std::chrono::duration<double>(preparedAt - isoBatchStart).count(),
+                             std::chrono::duration<double>(discreteIndexedAt - preparedAt).count(),
+                             std::chrono::duration<double>(discreteCanonicalizedAt - discreteIndexedAt).count(),
+                             std::chrono::duration<double>(finishedAt - fallbackStartedAt).count(),
+                             std::chrono::duration<double>(finishedAt - isoBatchStart).count());
+                std::fflush(stderr);
+            }
+        } else {
+        struct IsoGroup {
+            Degree3Invariant invariant{};
+            std::vector<size_t> pendingIndices;
+            std::vector<Degree3IsoRepresentative>* representatives = nullptr;
+            uint64_t checks = 0;
+            uint64_t hits = 0;
+            uint64_t unknown = 0;
+            uint64_t nodes = 0;
+            uint64_t newRepresentatives = 0;
+            uint64_t knownKeyMisses = 0;
+        };
+        std::unordered_map<Degree3Invariant, size_t, Degree3InvariantHash> groupIndex;
+        groupIndex.reserve(unresolved.size());
+        std::vector<IsoGroup> groups;
+        groups.reserve(unresolved.size());
+        for (size_t j : unresolved) {
+            auto [it, inserted] = groupIndex.emplace(invariants[j], groups.size());
+            if (inserted) {
+                IsoGroup group;
+                group.invariant = invariants[j];
+                groups.push_back(std::move(group));
+            }
+            groups[it->second].pendingIndices.push_back(j);
+        }
+
+        degree3IsoBuckets.reserve(degree3IsoBuckets.size() + groups.size());
+        for (IsoGroup& group : groups) {
+            auto [it, inserted] = degree3IsoBuckets.try_emplace(group.invariant);
+            (void)inserted;
+            group.representatives = &it->second;
+        }
+        const auto groupsBuiltAt = std::chrono::steady_clock::now();
+
+        #pragma omp parallel for schedule(dynamic, 1)
+        for (long long groupNumber = 0; groupNumber < (long long)groups.size(); ++groupNumber) {
+            IsoGroup& group = groups[(size_t)groupNumber];
+            std::vector<Degree3IsoRepresentative>& representatives = *group.representatives;
+            for (size_t pendingIndex : group.pendingIndices) {
+                const Pending& item = pending[pendingIndex];
+                const auto& graph = weakResiduals[item.firstIndex].graph;
+                const Degree3IsoGraph prepared = prepareDegree3IsoGraph(graph);
+                bool matched = false;
+                for (const Degree3IsoRepresentative& representative : representatives) {
+                    uint64_t nodes = 0;
+                    ++group.checks;
+                    const Degree3IsoResult result = areDegree3Isomorphic(
+                        prepared, representative.prepared, nodes);
+                    group.nodes += nodes;
+                    if (result == Degree3IsoResult::yes) {
+                        computed[pendingIndex].key = representative.key;
+                        computed[pendingIndex].genericCanonicalization = false;
+                        ++group.hits;
+                        matched = true;
+                        break;
+                    }
+                    if (result == Degree3IsoResult::unknown) ++group.unknown;
+                }
+                if (matched) continue;
+
+                computed[pendingIndex] = computeCanonicalGraphKey(graph, item.weak);
+                bool knownKey = false;
+                for (const Degree3IsoRepresentative& representative : representatives) {
+                    if (representative.key == computed[pendingIndex].key) {
+                        knownKey = true;
+                        break;
+                    }
+                }
+                if (knownKey) {
+                    ++group.knownKeyMisses;
+                }
+                if (!knownKey) {
+                    representatives.push_back({graph, prepared, computed[pendingIndex].key});
+                    ++group.newRepresentatives;
+                }
+            }
+        }
+        for (const IsoGroup& group : groups) {
+            degree3IsoChecks += group.checks;
+            degree3IsoHits += group.hits;
+            degree3IsoUnknown += group.unknown;
+            degree3IsoNodes += group.nodes;
+            degree3IsoRepresentatives += group.newRepresentatives;
+            degree3IsoKnownKeyMisses += group.knownKeyMisses;
+        }
+        if (verboseProbeProgress && C == 6) {
+            const auto finishedAt = std::chrono::steady_clock::now();
+            std::fprintf(stderr,
+                         "probe d3IsoTiming pending=%zu unresolved=%zu groups=%zu "
+                         "prepare=%.3fs discreteIndex=%.3fs discreteCanon=%.3fs "
+                         "groupBuild=%.3fs iso=%.3fs total=%.3fs\n",
+                         pending.size(), unresolved.size(), groups.size(),
+                         std::chrono::duration<double>(preparedAt - isoBatchStart).count(),
+                         std::chrono::duration<double>(discreteIndexedAt - preparedAt).count(),
+                         std::chrono::duration<double>(discreteCanonicalizedAt - discreteIndexedAt).count(),
+                         std::chrono::duration<double>(groupsBuiltAt - discreteCanonicalizedAt).count(),
+                         std::chrono::duration<double>(finishedAt - groupsBuiltAt).count(),
+                         std::chrono::duration<double>(finishedAt - isoBatchStart).count());
+            std::fflush(stderr);
+        }
+        }
+    } else {
+        #pragma omp parallel for schedule(dynamic, 64)
+        for (long long j = 0; j < (long long)pending.size(); ++j) {
+            const Pending& item = pending[(size_t)j];
+            computed[(size_t)j] = computeCanonicalGraphKey(
+                weakResiduals[item.firstIndex].graph, item.weak);
+        }
     }
     for (size_t j = 0; j < pending.size(); ++j) {
-        ++canonComputations;
-        canonSearchNodes += computed[j].nodes;
-        if (computed[j].fallback) ++canonFallbacks;
+        if (computed[j].genericCanonicalization) {
+            ++canonComputations;
+            canonSearchNodes += computed[j].nodes;
+            if (computed[j].fallback) ++canonFallbacks;
+        }
         insertCanonCache(cache, pending[j].weak, computed[j].key);
     }
     for (size_t i = 0; i < weakResiduals.size(); ++i) {
@@ -1024,6 +1779,59 @@ void enumeratePerfectMatchings(
     chosen[bestLeft] = 0;
 }
 
+void enumeratePerfectMatchingsQuiet(
+    const std::array<uint16_t, MAX_M>& graph,
+    uint16_t remainingLeft,
+    uint16_t usedRight,
+    std::array<uint16_t, MAX_M>& chosen,
+    std::unordered_map<GraphKey, size_t, GraphKeyHash>& residualIndex,
+    std::vector<Residual>& residuals,
+    uint64_t& matchingCount) {
+    if (remainingLeft == 0) {
+        ++matchingCount;
+        std::array<uint16_t, MAX_M> residual{};
+        for (int i = 0; i < M; ++i) residual[i] = graph[i] ^ chosen[i];
+        const GraphKey key = weakGraphKey(residual);
+        auto [it, inserted] = residualIndex.emplace(key, residuals.size());
+        if (inserted) residuals.push_back({residual, 1});
+        else ++residuals[it->second].multiplicity;
+        return;
+    }
+
+    int bestLeft = -1;
+    uint16_t bestAvailable = 0;
+    int bestCount = M + 1;
+    uint16_t leftBits = remainingLeft;
+    while (leftBits) {
+        const int left = std::countr_zero(leftBits);
+        leftBits &= (uint16_t)(leftBits - 1);
+        const uint16_t available = graph[left] & (uint16_t)~usedRight;
+        const int count = std::popcount(available);
+        if (count < bestCount) {
+            bestCount = count;
+            bestLeft = left;
+            bestAvailable = available;
+            if (count <= 1) break;
+        }
+    }
+    if (bestCount == 0) return;
+
+    uint16_t available = bestAvailable;
+    while (available) {
+        const uint16_t bit = available & (uint16_t)(-available);
+        available ^= bit;
+        chosen[bestLeft] = bit;
+        enumeratePerfectMatchingsQuiet(graph,
+                                       remainingLeft ^ (uint16_t)(1u << bestLeft),
+                                       usedRight | bit,
+                                       chosen,
+                                       residualIndex,
+                                       residuals,
+                                       matchingCount);
+    }
+    chosen[bestLeft] = 0;
+}
+
 FactorCount computeDegree3Direct(const std::array<uint16_t, MAX_M>& graph) {
     std::unordered_map<GraphKey, size_t, GraphKeyHash> residualIndex;
     std::vector<Residual> residuals;
@@ -1069,18 +1877,51 @@ std::vector<FactorCount> evaluateDegree4Layered(const std::vector<Residual>& deg
         std::vector<Residual> flat;
         flat.reserve(parentCount * 2800);
 
-        for (size_t local = 0; local < parentCount; ++local) {
-            const size_t parent = missingParents[chunkStart + local];
-            std::unordered_map<GraphKey, size_t, GraphKeyHash> residualIndex;
-            std::vector<Residual> residuals;
-            residualIndex.reserve(4096);
-            residuals.reserve(4096);
-            std::array<uint16_t, MAX_M> chosen{};
-            enumeratePerfectMatchings(degree4Residuals[parent].graph,
-                                      (uint16_t)((1u << M) - 1u), 0,
-                                      chosen, residualIndex, residuals);
-            flat.insert(flat.end(), residuals.begin(), residuals.end());
-            offsets[local + 1] = flat.size();
+        if (parallelDegree4ParentEnumeration) {
+            std::vector<std::vector<Residual>> parentResiduals(parentCount);
+            std::vector<uint64_t> parentMatchingCounts(parentCount, 0);
+            #pragma omp parallel for schedule(dynamic, 1)
+            for (long long local = 0; local < (long long)parentCount; ++local) {
+                const size_t parent = missingParents[chunkStart + (size_t)local];
+                std::unordered_map<GraphKey, size_t, GraphKeyHash> residualIndex;
+                residualIndex.reserve(4096);
+                std::vector<Residual>& residuals = parentResiduals[(size_t)local];
+                residuals.reserve(4096);
+                std::array<uint16_t, MAX_M> chosen{};
+                enumeratePerfectMatchingsQuiet(
+                    degree4Residuals[parent].graph,
+                    (uint16_t)((1u << M) - 1u), 0,
+                    chosen, residualIndex, residuals,
+                    parentMatchingCounts[(size_t)local]);
+            }
+            size_t totalResiduals = 0;
+            uint64_t chunkMatchingCount = 0;
+            for (size_t local = 0; local < parentCount; ++local) {
+                totalResiduals += parentResiduals[local].size();
+                chunkMatchingCount += parentMatchingCounts[local];
+            }
+            flat.reserve(totalResiduals);
+            for (size_t local = 0; local < parentCount; ++local) {
+                flat.insert(flat.end(), parentResiduals[local].begin(),
+                            parentResiduals[local].end());
+                offsets[local + 1] = flat.size();
+            }
+            perfectMatchings += chunkMatchingCount;
+            perfectMatchingsByDegree[4] += chunkMatchingCount;
+        } else {
+            for (size_t local = 0; local < parentCount; ++local) {
+                const size_t parent = missingParents[chunkStart + local];
+                std::unordered_map<GraphKey, size_t, GraphKeyHash> residualIndex;
+                std::vector<Residual> residuals;
+                residualIndex.reserve(4096);
+                residuals.reserve(4096);
+                std::array<uint16_t, MAX_M> chosen{};
+                enumeratePerfectMatchings(degree4Residuals[parent].graph,
+                                          (uint16_t)((1u << M) - 1u), 0,
+                                          chosen, residualIndex, residuals);
+                flat.insert(flat.end(), residuals.begin(), residuals.end());
+                offsets[local + 1] = flat.size();
+            }
         }
 
         std::vector<GraphKey> degree3Keys = canonicalizeResidualKeys(flat);
@@ -1123,9 +1964,19 @@ std::vector<FactorCount> evaluateDegree4Layered(const std::vector<Residual>& deg
 
         if (verboseProbeProgress) {
             std::fprintf(stderr,
-                         "probe layeredF4 parents=%zu/%zu flatD3=%zu strongD3=%zu graphMemo=%zu cache=%zu\n",
+                         "probe layeredF4 parents=%zu/%zu flatD3=%zu strongD3=%zu graphMemo=%zu cache=%zu "
+                         "d3Discrete=[input=%llu hit=%llu class=%llu] "
+                         "d3Iso=[rep=%llu hit=%llu check=%llu unknown=%llu nodes=%llu]\n",
                          chunkEnd, missingParents.size(), flat.size(), degree3Values.size(),
-                         graphMemo.size(), canonCacheSize());
+                         graphMemo.size(), canonCacheSize(),
+                         (unsigned long long)degree3DiscreteInputs,
+                         (unsigned long long)degree3DiscreteHits,
+                         (unsigned long long)degree3DiscreteClasses,
+                         (unsigned long long)degree3IsoRepresentatives,
+                         (unsigned long long)degree3IsoHits,
+                         (unsigned long long)degree3IsoChecks,
+                         (unsigned long long)degree3IsoUnknown,
+                         (unsigned long long)degree3IsoNodes);
             std::fflush(stderr);
         }
     }
@@ -1288,6 +2139,12 @@ int main(int argc, char** argv) {
         if (arg == "outer") outerOnly = true;
         else if (arg == "inspect") inspectOnly = true;
         else if (arg == "progress") verboseProbeProgress = true;
+        else if (arg == "d3iso") useDegree3IsoBatch = true;
+        else if (arg == "d3pairs") {
+            useDegree3IsoBatch = true;
+            useDegree3PairIso = true;
+        }
+        else if (arg == "parallelparents") parallelDegree4ParentEnumeration = true;
         else if (arg.rfind("limit=", 0) == 0) limit = std::atoi(arg.c_str() + 6);
         else if (arg.rfind("start=", 0) == 0) startClass = std::atoi(arg.c_str() + 6);
         else if (arg.rfind("canonbudget=", 0) == 0) {
@@ -1318,6 +2175,9 @@ int main(int argc, char** argv) {
         else if (arg.rfind("parentchunk=", 0) == 0) {
             degree4ParentChunk = std::max<size_t>(
                 1, (size_t)std::strtoull(arg.c_str() + 12, nullptr, 10));
+        }
+        else if (arg.rfind("d3isobudget=", 0) == 0) {
+            degree3IsoNodeBudget = std::strtoull(arg.c_str() + 12, nullptr, 10);
         }
     }
 
@@ -1411,7 +2271,9 @@ int main(int argc, char** argv) {
                         C, startClass, totalClasses, classes.size());
         }
         std::printf("stats countTime=%.6fs outerTime=%.6fs graphMemo=%zu calls=%llu hits=%llu misses=%llu PM=%llu "
-                    "canonCache=%zu canonCacheEvictions=%llu canonComputations=%llu canonCacheHits=%llu canonFallbacks=%llu canonNodes=%llu\n",
+                    "canonCache=%zu canonCacheEvictions=%llu canonComputations=%llu canonCacheHits=%llu canonFallbacks=%llu canonNodes=%llu "
+                    "d3DiscreteInputs=%llu d3DiscreteHits=%llu d3DiscreteClasses=%llu "
+                    "d3IsoRep=%llu d3IsoHits=%llu d3IsoChecks=%llu d3IsoUnknown=%llu d3IsoNodes=%llu d3IsoKnownKeyMisses=%llu\n",
                     countSeconds, outerSeconds, graphMemo.size(),
                     (unsigned long long)graphCalls,
                     (unsigned long long)graphMemoHits,
@@ -1422,7 +2284,16 @@ int main(int argc, char** argv) {
                     (unsigned long long)canonComputations,
                     (unsigned long long)canonCacheHits,
                     (unsigned long long)canonFallbacks,
-                    (unsigned long long)canonSearchNodes);
+                    (unsigned long long)canonSearchNodes,
+                    (unsigned long long)degree3DiscreteInputs,
+                    (unsigned long long)degree3DiscreteHits,
+                    (unsigned long long)degree3DiscreteClasses,
+                    (unsigned long long)degree3IsoRepresentatives,
+                    (unsigned long long)degree3IsoHits,
+                    (unsigned long long)degree3IsoChecks,
+                    (unsigned long long)degree3IsoUnknown,
+                    (unsigned long long)degree3IsoNodes,
+                    (unsigned long long)degree3IsoKnownKeyMisses);
         if (limit < 0 && startClass == 0) {
             const std::string expected = expectedValue(C);
             if (!expected.empty()) {
