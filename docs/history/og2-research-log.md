@@ -1,3 +1,6 @@
+> **ARCHIVED:** This chronological log preserves experiments and may reference
+> former source paths. Current conclusions live in `../../STATUS.md`.
+
 # OG-2 研究日志:PatmaxDaddy 多项式带计数法（思路B）
 
 > 目标:实现一个**不正比于 B 本身大小**的多项式时间带填计数 $B(\sigma)$（乃至直接的带计数），

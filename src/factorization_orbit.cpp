@@ -1606,13 +1606,14 @@ std::array<uint64_t, MAX_C + 1> graphCallsByDegree{};
 std::array<uint64_t, MAX_C + 1> graphMissesByDegree{};
 std::array<uint64_t, MAX_C + 1> perfectMatchingsByDegree{};
 std::string graphCheckpointPath;
+bool graphCheckpointReadOnly = false;
 int graphCheckpointInterval = 0;
 size_t graphCheckpointParentInterval = 0;
 size_t parentsSinceGraphCheckpoint = 0;
 uint64_t completedDegree5 = 0;
 
 void saveGraphCheckpoint() {
-    if (graphCheckpointPath.empty()) return;
+    if (graphCheckpointPath.empty() || graphCheckpointReadOnly) return;
     const std::string temporary = graphCheckpointPath + ".tmp";
     std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
     if (!out) throw std::runtime_error("cannot create graph checkpoint");
@@ -2662,6 +2663,7 @@ int main(int argc, char** argv) {
         else if (arg.rfind("checkpoint=", 0) == 0) {
             graphCheckpointPath = arg.substr(11);
         }
+        else if (arg == "checkpointreadonly") graphCheckpointReadOnly = true;
         else if (arg.rfind("checkpointinterval=", 0) == 0) {
             graphCheckpointInterval = std::max(0, std::atoi(arg.c_str() + 19));
         }

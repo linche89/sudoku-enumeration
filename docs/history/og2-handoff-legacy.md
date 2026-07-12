@@ -1,3 +1,6 @@
+> **ARCHIVED:** This handoff records earlier campaigns. Paths and "current"
+> claims are historical. Use `../../STATUS.md` and `../runbooks/og2.md` now.
+
 # HANDOFF — 2×C 数独枚举:接力文档
 
 > **给接力 agent**:本文件自包含,假设你**没有**之前的对话上下文。读完即可接手。

@@ -10,13 +10,17 @@ build/
 .DS_Store
 Thumbs.db
 
-# transient run scratch
+# generated research artifacts
+data/checkpoints/*.bin
+data/checkpoints/*.chk
+data/checkpoints/*.tmp
+data/logs/**
+
+# legacy scratch names (kept while old commands remain reproducible)
 data/*.err
-data/*-rss-*.log
-data/*-out-*.log
-data/*-err-*.log
-data/factorization_orbit_*.log
-data/factorization_orbit_*.bin
+data/*.log
+data/*.out
+data/*.bin
 experiments/**/*.err
 experiments/**/*.log
 experiments/**/*.out

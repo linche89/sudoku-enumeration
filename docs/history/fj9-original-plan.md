@@ -1,4 +1,7 @@
 
+> **ARCHIVED:** Original implementation specification. The accepted result is
+> documented in `../fj9/reproduction.md`.
+
 # SUDOKU ENUMERATION: FJ05 ALGORITHM REPRODUCTION SPECIFICATION
 
 ## 1. 架构目标与上下文 (Architecture Objective)

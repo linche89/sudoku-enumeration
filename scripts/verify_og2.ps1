@@ -29,6 +29,9 @@ Invoke-Checked "mp_q C=2" { & ".\build\mp_q.exe" 2 20 nocheckpoint }
 Invoke-Checked "mp_q C=3" { & ".\build\mp_q.exe" 3 20 nocheckpoint }
 Invoke-Checked "mp_q C=4" { & ".\build\mp_q.exe" 4 20 nocheckpoint }
 Invoke-Checked "mp_q dual C=4" { & ".\build\mp_q.exe" 4 dual 20 nocheckpoint }
+Invoke-Checked "factorization C=2" { & ".\build\factorization_orbit.exe" 2 pivot rooted4 }
+Invoke-Checked "factorization C=3" { & ".\build\factorization_orbit.exe" 3 pivot rooted4 }
+Invoke-Checked "factorization C=4" { & ".\build\factorization_orbit.exe" 4 pivot rooted4 }
 
 Invoke-Checked "mp_fast histogram difftest C=4" { & ".\build\mp_fast.exe" 4 difftest $HistTests }
 Invoke-Checked "mp_c6 refinement canontest C=4" { & ".\build\mp_c6.exe" 4 canontest $CanonTests }

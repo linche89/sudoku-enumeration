@@ -1,3 +1,5 @@
+> **ARCHIVED:** Completed milestone history; not the current project plan.
+
 # Milestone — 数独终局计数：从枚举到组合计数
 
 > **终极目标：** 用**纯组合计数**（不逐一枚举终局）算出

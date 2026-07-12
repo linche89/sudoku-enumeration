@@ -1,55 +1,62 @@
 # sudoku_FJ
 
-Independent C++20 reproduction and extension work around the Felgenhauer-Jarvis Sudoku enumeration.
+Exact Sudoku enumeration research in C++20.
 
-The repository has two active tracks:
+The repository contains three related tracks:
 
-- Reproduce the FJ05 9x9 Sudoku terminal-grid count, including the 71-class reduction and independent cross-checks.
-- Explore exact counts for 2 x C Sudoku boxes, with C=2..5 validation gates and C=6 research notes.
+- a completed, independently verified reproduction of the Felgenhauer-Jarvis
+  9x9 terminal-grid count;
+- exact 2xC engines with complete C=2..5 gates and active C=6 research;
+- mathematical work on aggregating the 63,199 C=6 outer skeleton classes.
 
-## Repository Map
+Read [STATUS.md](STATUS.md) first. It is the only authoritative statement of
+current results and open problems. The full documentation map is
+[docs/index.md](docs/index.md).
 
-- `src/` - C++ engines, validators, profilers, and experimental kernels.
-- `scripts/` - PowerShell build, verification, and RSS-guarded run helpers.
-- `docs/` - research logs, frontier notes, and the OG-2 runbook.
-- `data/` - curated run outputs, golden tables, progress records, and retained measurement data.
-- `reference/` - original papers, source snapshots, OEIS/forum material, and verification fixtures.
-- `experiments/proto/` - archived prototype code and differential tests referenced by the handoff notes.
-- `build/` - generated binaries only; ignored and safe to recreate.
+## Repository map
 
-Root documents:
-
-- `FJ_sudoku.md` - main 9x9 reproduction write-up.
-- `HANDOFF.md` - current 2 x C relay state and lessons learned.
-- `milestone.md` - completed milestone history.
-- `plan.md` - original implementation plan.
+- `src/` — active engines and verified tools; see `src/README.md`.
+- `scripts/` — Windows build, verification, and guarded-run helpers.
+- `docs/` — methods, math, reports, raw expert material, and history.
+- `data/golden/` — small tracked verification data.
+- `data/checkpoints/` — ignored binary checkpoints plus a tracked manifest.
+- `data/logs/` — ignored transient output.
+- `experiments/` — archived prototypes and legacy kernels.
+- `reference/` — immutable external material and verification fixtures.
+- `build/` — generated binaries; ignored and safe to recreate.
 
 ## Build
 
 On Windows with MinGW `g++`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_og2.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_all.ps1
 ```
 
-For the original FJ05 reproduction tools, a POSIX-like shell can use:
-
-```bash
-./build.sh
-```
-
-Do not use `-march=native` on this Windows/MinGW setup; the scripts intentionally use narrower CPU flags.
+Do not use `-march=native` on this Windows/MinGW setup. The scripts use the
+known-safe scalar instruction flags for the FJ9 engine.
 
 ## Verification
 
-Short OG-2 gate:
+Complete repository gate:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_all.ps1
+```
+
+The gate rebuilds active binaries, reproduces the full 9x9 value, checks all
+short independent OG-2 engines, runs the factorization C=2..5 exact gates, and
+optionally verifies the C=6 checkpoint read-only when it is present.
+
+For a faster inner development loop:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_og2.ps1
 ```
 
-This verifies the known C=2, C=3, and C=4 values and runs the differential checks documented in `docs/OG2_runbook.md`.
+## Research artifact policy
 
-## Retention Policy
-
-Keep the curated `data/`, `reference/`, `docs/`, `scripts/`, `src/`, and `experiments/proto/` content. Generated binaries, root scratch `*.err` files, transient RSS/output logs, and the old root `proto/` scratch directory are ignored.
+Large checkpoints and bulk logs are never committed to ordinary Git. Every
+important checkpoint needs a tracked manifest containing its size, SHA-256,
+entry count, compatible code revision, and semantic coverage. Raw logs may be
+removed only after their conclusions are captured in a dated report.

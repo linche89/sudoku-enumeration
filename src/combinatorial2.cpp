@@ -147,7 +147,7 @@ int main() {
 
     struct Rep { std::string t[6]; long long mult, sol; };
     std::vector<Rep> reps;
-    { std::ifstream in("data/ed44.txt"); Rep r;
+    { std::ifstream in("data/golden/fj9/ed44.txt"); Rep r;
       while (in >> r.t[0]>>r.t[1]>>r.t[2]>>r.t[3]>>r.t[4]>>r.t[5]>>r.mult>>r.sol) reps.push_back(r); }
 
     int ok = 0; unsigned __int128 sum_mult_C = 0;

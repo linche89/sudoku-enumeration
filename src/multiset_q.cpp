@@ -1281,7 +1281,7 @@ static bool isPositiveIntArg(const std::string& s){
 
 static std::string checkpointPath(const std::string& prefix, int c, int band){
     char buf[256];
-    const char* pre = prefix.empty() ? "data/mp_q" : prefix.c_str();
+    const char* pre = prefix.empty() ? "data/checkpoints/mp_q" : prefix.c_str();
     std::snprintf(buf,sizeof(buf),"%s_C%d_band%d.chk",pre,c,band);
     return std::string(buf);
 }

@@ -23,12 +23,14 @@ $resolvedExe = (Resolve-Path -LiteralPath $Exe).Path
 if ($LogPath -eq "") {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $name = [IO.Path]::GetFileNameWithoutExtension($resolvedExe)
-    $LogPath = Join-Path (Get-Location) "data\$name-rss-$stamp.log"
+    $logDir = Join-Path (Get-Location) "data\logs"
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    $LogPath = Join-Path $logDir "$name-rss-$stamp.log"
     if ($StdoutPath -eq "") {
-        $StdoutPath = Join-Path (Get-Location) "data\$name-out-$stamp.log"
+        $StdoutPath = Join-Path $logDir "$name-out-$stamp.log"
     }
     if ($StderrPath -eq "") {
-        $StderrPath = Join-Path (Get-Location) "data\$name-err-$stamp.log"
+        $StderrPath = Join-Path $logDir "$name-err-$stamp.log"
     }
 }
 

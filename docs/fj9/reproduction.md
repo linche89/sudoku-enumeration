@@ -276,8 +276,9 @@ $$N_0 = 2^{20}\cdot 3^{8}\cdot 5\cdot 7\cdot 27\,704\,267\,971$$
 
 ```text
 sudoku_FJ/
-├── plan.md                  规格说明（输入）
-├── FJ_sudoku.md             本复现文档
+├── STATUS.md                全项目当前状态
+├── docs/fj9/reproduction.md 本复现文档
+├── docs/history/            原始规格与里程碑历史
 ├── src/
 │   ├── band.hpp             顶带表示 + 规范化（normalize / key / pretty）
 │   ├── reduce.hpp           Phase 2+3：generate() 生成 36288；reduce() 并查集归并到 71
@@ -289,12 +290,12 @@ sudoku_FJ/
 │   ├── sudoku_equiv.cc  sudoku2.cc  sudoku_verify.py  equiv.c  sudoku.hs
 │   └── jobs2.txt  results2.txt  sudoku.pdf
 ├── build/                   可执行文件
-└── data/                    运行输出与对拍数据
+└── data/golden/fj9/         保留的运行输出与对拍数据
 ```
 
 **数据流（无堆分配的热点路径）：** `reduce()` 一次性算出 71 个 `Class{mult, repr, band}` → `count_all()` 为每类预计算 B1+B2+B3 的基掩码 → 工作线程对 `(类, rem)` 调用 `count_branch()` → 模板 DFS `dfs<K>` 在栈上的 `State{uint16_t row[9],col[9],box[9]}`（扁平定长数组，DFS 核心**零 `std::vector`/`Vec` 堆分配**）上计数 → 归并 → `__int128` 聚合。
 
-设计要点对应 plan 的验收标准：
+设计要点对应原始规格的验收标准：
 
 | plan 验收项 | 本实现 |
 |:--|:--|
@@ -502,8 +503,8 @@ g++ -O3 -mtune=native -mbmi -mbmi2 -mpopcnt -mlzcnt -funroll-loops \
 ./build/fj_sudoku.exe --threads 24
 
 # 3) 仅导出 71 类作业表，与官方 jobs2.txt 对拍
-./build/fj_sudoku.exe --emit-jobs > data/my_jobs.txt
-diff <(grep -v '^#' data/my_jobs.txt) <(grep -v '^#' reference/jobs2.txt)   # 应无差异
+./build/fj_sudoku.exe --emit-jobs > build/my_jobs.generated.txt
+diff <(grep -v '^#' build/my_jobs.generated.txt) <(grep -v '^#' reference/jobs2.txt)   # 应无差异
 
 # 4) 快速冒烟测试（只算前 3 类，验证流水线/打印路径，总数会按设计 MISMATCH）
 ./build/fj_sudoku.exe --limit 3

@@ -2,7 +2,9 @@
 
 This directory keeps research prototypes and differential tests that still have audit value.
 
-These files are not part of the normal build. They are retained because `HANDOFF.md` and source comments cite them as evidence for rejected shortcuts, profiling results, or validation of helper identities.
+These files are not part of the normal build. They are retained because the
+legacy handoff and source comments cite them as evidence for rejected
+shortcuts, profiling results, or validation of helper identities.
 
 Highlights:
 
