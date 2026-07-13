@@ -9,6 +9,7 @@
 ## Verified methods
 
 - `methods/factorization-orbit.md` — current factorization/orbit algorithm.
+- `methods/future-twin.md` — optional exact future-twin recurrence and gates.
 - `../fj9/reproduction.md` — complete FJ05 9x9 reproduction.
 
 ## Current mathematics
@@ -19,6 +20,7 @@
 
 ## Dated evidence
 
+- `reports/og2/future-twin-c6-20260714.md`
 - `reports/og2/c6-expert-routes-audit-20260713.md`
 - `reports/og2/literature-audit-20260712.md`
 - `reports/og2/c5-paper-ablation-20260712.md`

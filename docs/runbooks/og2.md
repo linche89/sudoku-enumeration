@@ -55,6 +55,25 @@ F=6986348258918400
 canonicalization budget or cache policy from rewriting an otherwise valid
 checkpoint with additional equivalent key forms.
 
+## Cold future-twin gate
+
+The optional backend never accepts a graph checkpoint:
+
+```powershell
+.\build\factorization_orbit.exe 6 limit=1 future `
+  futureorder=canonical-last futureprogress
+```
+
+Expected first value:
+
+```text
+F=6986348258918400
+```
+
+The reference run took 1592.867 seconds and peaked at 1.670 GiB. Wrap any
+repeat with explicit time and RSS limits. For a bounded probe of the second
+outer class, add `start=1 limit=1`; do not remove the positive limit.
+
 ## Writable C=6 experiments
 
 Before a writable run:

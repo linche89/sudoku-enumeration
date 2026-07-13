@@ -27,7 +27,7 @@ state spaces larger than the orbit list.
 
 ## Audited future-twin route
 
-There is an exact candidate that attacks the single-graph wall directly.  Let
+There is a verified exact backend that attacks the single-graph wall directly. Let
 `P` be the processed left vertices.  For every right column `j`, retain
 
 ```text
@@ -42,12 +42,17 @@ neighborhoods differed.  When the next left vertex is processed, each affected
 group of multiplicity `m_g` receives a disjoint color subset of size `m_g`;
 the exact labelled transition weight is `product_g m_g!`.
 
-This recurrence does not enumerate perfect matchings or residual graphs.  Its
-normalization and sufficiency proof have been audited, and an independent
-scratch implementation agreed with direct perfect-matching recursion on
-random C=2..4 graphs.  The supplied C=6 profile was for a random graph, not the
-actual second outer graph.  Color canonicalization cost and the real C=6
-frontier therefore remain unmeasured.
+This recurrence does not enumerate perfect matchings or residual graphs. Its
+normalization and grouped transitions pass brute-force differential tests;
+the implementation agrees per outer class with the primary engine for complete
+C=2..5 and independently reproduces the cold G1 value in 1592.867 seconds at
+1.670 GiB peak RSS.
+
+The actual second graph has now been measured under two five-minute, 3-GiB
+bounds. `canonical-last` completed five layers and entered its central layer;
+`canonical-first` completed only three. The better order accumulated 7,981,359
+next states after processing 2,000,000 of 7,630,873 parents. Thus the route is
+exact and implemented, but the low-symmetry central frontier remains open.
 
 ## Audited 3+3 result
 
@@ -77,15 +82,11 @@ all implicit full-rank contractions.
 
 ## Required next result
 
-The next project result is now an implementation result:
-
-1. implement the future-twin recurrence with an exact reference color
-   canonicalizer;
-2. pass per-class C=2..5 differential gates against the current engine;
-3. reproduce the first C=6 outer graph from a cold state;
-4. close the actual second graph under explicit time and memory bounds using
-   two deterministic elimination orders;
-5. measure a spread-out bounded sample before making any full-run estimate.
+The next project result must reduce the G2 central frontier. Useful candidates
+must either lower its memory representation, add a provably safe quotient, or
+avoid materializing the full middle layer. A longer G2 run and a spread-out
+full-run sample are not justified until such a reduction passes the existing
+C=2..5 and cold-G1 gates.
 
 The 3+3 route should be reopened only if a new proposal explains how to build
 or apply the full-rank block operator without materializing the 63,199 outer
@@ -93,4 +94,5 @@ coordinates or the larger midpoint algebra.
 
 Raw source material is preserved under `../expert/2026-07-12/` and
 `../expert/2026-07-13/`.  Reproduction evidence is in
-`../reports/og2/c6-expert-routes-audit-20260713.md`.
+`../reports/og2/c6-expert-routes-audit-20260713.md` and
+`../reports/og2/future-twin-c6-20260714.md`.

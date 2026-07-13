@@ -3,6 +3,8 @@
 ## Primary programs
 
 - `factorization_orbit.cpp` — primary exact 2xC factorization/orbit engine.
+- `future_twin.hpp` — optional exact future-twin backend used by
+  `factorization_orbit.cpp`; it is never selected by default.
 - `multiset_q.cpp` — independent transfer-kernel research engine.
 - `multiset_fast.cpp`, `multiset_par.cpp`, `multiset_c6.cpp` — independent
   exact validators and bounded-memory variants.

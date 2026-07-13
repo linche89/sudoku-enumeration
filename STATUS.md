@@ -1,6 +1,6 @@
 # Current Project Status
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.
@@ -30,6 +30,10 @@ machine.  A same-binary controlled ablation measured factor-stage times of
 edge pivot, 11.48 seconds with only the degree-four split, and 8.58 seconds
 with both.  See `docs/reports/og2/c5-paper-ablation-20260712.md`.
 
+The optional future-twin backend independently agrees with the primary engine
+on every outer class for complete C=2..5. It is selected explicitly with
+`future`; the default engine and checkpoint format are unchanged.
+
 ## Historical C=6 target
 
 The C=6 decimal value is not an unpublished target.  Kjell Fredrik Pettersen
@@ -56,6 +60,17 @@ class time = 706.652 s
 peak working set = 665.6 MiB
 ```
 
+The future-twin backend now gives an independent cold reproduction with no
+checkpoint input:
+
+```text
+F6(G1) = 6986348258918400
+class time = 1592.867 s
+peak working set = 1.670 GiB
+peak frontier = 10025564 states
+canonical fallbacks = 0
+```
+
 The second, lower-symmetry graph exposes the remaining wall:
 
 ```text
@@ -67,17 +82,24 @@ pivot                     31920               19850
 Its first 50 new F5 values are closed. A straight hard run remains a multi-hour
 operation, so no full C=6 count is currently in progress.
 
+A cold five-minute future-twin probe of this second graph completed frontiers
+of 1, 420, 26,028, 643,605, and 7,630,873 states with `canonical-last`. At the
+bound it had processed 2,000,000 of the 7,630,873 parents in the next layer and
+had accumulated 7,981,359 next states at 2.186 GiB. Under the same bound,
+`canonical-first` completed only three layers (1, 352, 81,663). Thus the last
+order is clearly better, but the G2 central frontier remains unresolved.
+
 ## Audited route decision
 
-The single-graph aggregation question now has a concrete exact candidate.  A
+The single-graph aggregation question now has a verified optional backend. A
 future-twin recurrence processes the 12 left vertices directly and identifies
 right columns by their remaining neighborhood and used-color set
 `(tau, K)`.  It never enumerates a top perfect matching, constructs a residual
-`Q-M`, or calls `F5` separately.  The recurrence and its labelled transition
-multiplicities have been independently audited and spot-checked against a
-separate perfect-matching recurrence on random C=2..4 graphs.  It has not yet
-been integrated into the repository or passed the complete C=2..5 gate, so it
-is not yet a verified engine or a C=6 timing result.
+`Q-M`, or calls `F5` separately. Canonical keys, labelled transition
+multiplicities, complete per-class C=2..5 agreement, a forced safe-fallback
+gate, and the cold G1 value have all been verified. Joint canonicalization is
+essential for C=6, but the bounded G2 result shows that it does not by itself
+remove the low-symmetry central frontier.
 
 The proposed natural 3+3 low-rank route did not pass its required small-C
 decision gate.  The exact symmetry-block endpoint exists, but reproduced
@@ -90,20 +112,18 @@ different fast implicit contraction for a full-rank operator.
 The external derivations, supplied code, local reproduction commands, hashes,
 and limitations are recorded in
 `docs/reports/og2/c6-expert-routes-audit-20260713.md`.
+The implemented recurrence and its C=6 evidence are recorded in
+`docs/methods/future-twin.md` and
+`docs/reports/og2/future-twin-c6-20260714.md`.
 
 ## Immediate objective
 
-Implement the future-twin recurrence as an optional exact backend while
-leaving the current factorization engine and checkpoint format unchanged.  Its
-mandatory decision gates are, in order:
+The future-twin implementation gates are complete. The next technical target
+is the G2 central frontier: reduce its memory footprint or find a stronger
+exact quotient before attempting a longer G2 closure. The present bounded
+evidence does not justify a spread-out full-run projection.
 
-1. canonical-key and grouped-transition differential tests;
-2. per-outer-class agreement with the current engine for complete C=2..5;
-3. a cold reproduction of `F6(G1) = 6986348258918400`;
-4. a bounded two-order evaluation of the low-symmetry second outer graph;
-5. only if those pass, a spread-out bounded sample for a full-run projection.
-
-No full 63,199-class C=6 run is authorized by this objective.
+No full 63,199-class C=6 run is authorized.
 
 ## Current checkpoint
 
