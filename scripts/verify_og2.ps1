@@ -32,6 +32,16 @@ Invoke-Checked "mp_q dual C=4" { & ".\build\mp_q.exe" 4 dual 20 nocheckpoint }
 Invoke-Checked "factorization C=2" { & ".\build\factorization_orbit.exe" 2 pivot rooted4 }
 Invoke-Checked "factorization C=3" { & ".\build\factorization_orbit.exe" 3 pivot rooted4 }
 Invoke-Checked "factorization C=4" { & ".\build\factorization_orbit.exe" 4 pivot rooted4 }
+Invoke-Checked "future-twin local differential" { & ".\build\factorization_orbit.exe" 4 futuretest }
+Invoke-Checked "future-twin per-class C=2" { & ".\build\factorization_orbit.exe" 2 futurecheck pivot rooted4 }
+Invoke-Checked "future-twin per-class C=3" { & ".\build\factorization_orbit.exe" 3 futurecheck pivot rooted4 }
+Invoke-Checked "future-twin per-class C=4" { & ".\build\factorization_orbit.exe" 4 futurecheck pivot rooted4 }
+Invoke-Checked "future-twin joint C=4" {
+    & ".\build\factorization_orbit.exe" 4 futurecheck futureorder=canonical-last pivot rooted4
+}
+Invoke-Checked "future-twin safe fallback C=4" {
+    & ".\build\factorization_orbit.exe" 4 futurecheck futureorder=canonical-last futurecanonbudget=1 pivot rooted4
+}
 
 Invoke-Checked "mp_fast histogram difftest C=4" { & ".\build\mp_fast.exe" 4 difftest $HistTests }
 Invoke-Checked "mp_c6 refinement canontest C=4" { & ".\build\mp_c6.exe" 4 canontest $CanonTests }

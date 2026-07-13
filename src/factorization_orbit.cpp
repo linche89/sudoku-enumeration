@@ -32,11 +32,14 @@
 #include <fstream>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "future_twin.hpp"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -2619,12 +2622,38 @@ int main(int argc, char** argv) {
 
     bool outerOnly = false;
     bool inspectOnly = false;
+    bool useFutureTwin = false;
+    bool futureTwinCheck = false;
+    bool futureTwinSelfTest = false;
+    bool futureTwinProgress = false;
+    future_twin::OrderMode futureTwinOrder = future_twin::OrderMode::Minimax;
+    size_t futureTwinCanonCacheCap = 500000;
+    uint64_t futureTwinCanonNodeBudget = 20000;
     int limit = -1;
     int startClass = 0;
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "outer") outerOnly = true;
         else if (arg == "inspect") inspectOnly = true;
+        else if (arg == "future") useFutureTwin = true;
+        else if (arg == "futurecheck") {
+            useFutureTwin = true;
+            futureTwinCheck = true;
+        }
+        else if (arg == "futuretest") futureTwinSelfTest = true;
+        else if (arg == "futureprogress") futureTwinProgress = true;
+        else if (arg == "futureorder=minimax") futureTwinOrder = future_twin::OrderMode::Minimax;
+        else if (arg == "futureorder=greedy") futureTwinOrder = future_twin::OrderMode::Greedy;
+        else if (arg == "futureorder=reverse") futureTwinOrder = future_twin::OrderMode::ReverseMinimax;
+        else if (arg == "futureorder=reachable") futureTwinOrder = future_twin::OrderMode::ReachableGreedy;
+        else if (arg == "futureorder=canonical-first") futureTwinOrder = future_twin::OrderMode::CanonicalFirst;
+        else if (arg == "futureorder=canonical-last") futureTwinOrder = future_twin::OrderMode::CanonicalLast;
+        else if (arg.rfind("futurecachecap=", 0) == 0) {
+            futureTwinCanonCacheCap = (size_t)std::strtoull(arg.c_str() + 15, nullptr, 10);
+        }
+        else if (arg.rfind("futurecanonbudget=", 0) == 0) {
+            futureTwinCanonNodeBudget = std::strtoull(arg.c_str() + 18, nullptr, 10);
+        }
         else if (arg == "progress") verboseProbeProgress = true;
         else if (arg == "d3iso") useDegree3IsoBatch = true;
         else if (arg == "d3pairs") {
@@ -2681,6 +2710,14 @@ int main(int argc, char** argv) {
     }
 
     try {
+        if (futureTwinSelfTest) {
+            future_twin::Engine::runSelfTests();
+            return 0;
+        }
+        if (useFutureTwin && !graphCheckpointPath.empty()) {
+            throw std::runtime_error(
+                "future-twin mode is cold and does not accept a graph checkpoint");
+        }
         const auto outerStart = std::chrono::steady_clock::now();
         std::vector<OuterClass> classes = enumerateOuterClasses();
         const double outerSeconds = std::chrono::duration<double>(
@@ -2707,17 +2744,32 @@ int main(int argc, char** argv) {
                 "full C=6 counting is intentionally disabled; use a positive limit= for a bounded probe");
         }
 
-        graphMemo.reserve(C >= 5 ? 1000000 : 10000);
-        for (int degree = 3; degree <= C; ++degree) {
-            DegreeCanonCache& cache = canonCacheByDegree[degree];
-            cache.cap = requestedCanonCacheCaps[degree] != 0
-                ? requestedCanonCacheCaps[degree] : canonCacheCapPerDegree;
-            const size_t reserveCount = cache.cap != 0
-                ? std::min<size_t>(cache.cap, 500000)
-                : (C >= 5 ? 500000 : 5000);
-            cache.map.reserve(reserveCount);
+        const bool needFactorizationEngine = !useFutureTwin || futureTwinCheck;
+        if (needFactorizationEngine) {
+            graphMemo.reserve(C >= 5 ? 1000000 : 10000);
+            for (int degree = 3; degree <= C; ++degree) {
+                DegreeCanonCache& cache = canonCacheByDegree[degree];
+                cache.cap = requestedCanonCacheCaps[degree] != 0
+                    ? requestedCanonCacheCaps[degree] : canonCacheCapPerDegree;
+                const size_t reserveCount = cache.cap != 0
+                    ? std::min<size_t>(cache.cap, 500000)
+                    : (C >= 5 ? 500000 : 5000);
+                cache.map.reserve(reserveCount);
+            }
+            loadGraphCheckpoint();
         }
-        loadGraphCheckpoint();
+        std::unique_ptr<future_twin::Engine> futureEngine;
+        if (useFutureTwin) futureEngine = std::make_unique<future_twin::Engine>(C);
+        uint64_t futureChecks = 0;
+        uint64_t futurePeakStates = 0;
+        uint64_t futureStatesExpanded = 0;
+        uint64_t futureLeaves = 0;
+        uint64_t futureCanonicalCalls = 0;
+        uint64_t futureCanonicalHits = 0;
+        uint64_t futureColorPermutations = 0;
+        uint64_t futureCanonicalSearchNodes = 0;
+        uint64_t futureCanonicalFallbacks = 0;
+        uint64_t futureMaxCanonicalSearchNodes = 0;
         unsigned __int128 answer = 0;
         startClass = std::clamp(startClass, 0, (int)classes.size());
         const int endClass = limit < 0 ? (int)classes.size()
@@ -2728,7 +2780,57 @@ int main(int argc, char** argv) {
             OuterClass& oc = classes[i];
             const auto graph = graphFromHistogram(oc.representative);
             const auto classStart = std::chrono::steady_clock::now();
-            oc.factorizationCount = countFactorizations(graph, C);
+            if (useFutureTwin) {
+                future_twin::Options options;
+                options.order = futureTwinOrder;
+                options.canonicalCacheCap = futureTwinCanonCacheCap;
+                options.canonicalNodeBudget = futureTwinCanonNodeBudget;
+                options.validateStates = futureTwinCheck;
+                options.progress = futureTwinProgress;
+                const future_twin::Result future = futureEngine->count(graph, options);
+                oc.factorizationCount = future.value;
+                futurePeakStates = std::max(futurePeakStates, future.stats.peakStates);
+                futureStatesExpanded += future.stats.statesExpanded;
+                futureLeaves += future.stats.groupedLeaves;
+                futureCanonicalCalls += future.stats.canonicalCalls;
+                futureCanonicalHits += future.stats.canonicalCacheHits;
+                futureColorPermutations += future.stats.colorPermutationsTried;
+                futureCanonicalSearchNodes += future.stats.canonicalSearchNodes;
+                futureCanonicalFallbacks += future.stats.canonicalFallbacks;
+                futureMaxCanonicalSearchNodes = std::max(
+                    futureMaxCanonicalSearchNodes, future.stats.maxCanonicalSearchNodes);
+                if (futureTwinCheck) {
+                    const FactorCount reference = countFactorizations(graph, C);
+                    if (reference != oc.factorizationCount) {
+                        throw std::runtime_error(
+                            "future-twin class " + std::to_string(i + 1) +
+                            " mismatch future=" + u128ToString(oc.factorizationCount) +
+                            " reference=" + u128ToString(reference));
+                    }
+                    ++futureChecks;
+                }
+                if (futureTwinProgress || C == 6) {
+                    std::string orderText;
+                    for (size_t k = 0; k < future.stats.order.size(); ++k) {
+                        if (k) orderText.push_back(',');
+                        orderText += std::to_string(future.stats.order[k] + 1);
+                    }
+                    std::fprintf(stderr,
+                        "future class=%d order=%s sequence=%s peak=%llu expanded=%llu leaves=%llu canon=%llu hits=%llu perms=%llu searchNodes=%llu fallbacks=%llu maxSearch=%llu\n",
+                        i + 1, future_twin::orderName(futureTwinOrder), orderText.c_str(),
+                        (unsigned long long)future.stats.peakStates,
+                        (unsigned long long)future.stats.statesExpanded,
+                        (unsigned long long)future.stats.groupedLeaves,
+                        (unsigned long long)future.stats.canonicalCalls,
+                        (unsigned long long)future.stats.canonicalCacheHits,
+                        (unsigned long long)future.stats.colorPermutationsTried,
+                        (unsigned long long)future.stats.canonicalSearchNodes,
+                        (unsigned long long)future.stats.canonicalFallbacks,
+                        (unsigned long long)future.stats.maxCanonicalSearchNodes);
+                }
+            } else {
+                oc.factorizationCount = countFactorizations(graph, C);
+            }
             const double classSeconds = std::chrono::duration<double>(
                 std::chrono::steady_clock::now() - classStart).count();
             if (C <= 5) {
@@ -2758,7 +2860,7 @@ int main(int argc, char** argv) {
                          (unsigned long long)canonSearchNodes);
             std::fflush(stderr);
         }
-        if (!graphCheckpointPath.empty()) saveGraphCheckpoint();
+        if (needFactorizationEngine && !graphCheckpointPath.empty()) saveGraphCheckpoint();
 
         const double countSeconds = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - countStart).count();
@@ -2801,6 +2903,21 @@ int main(int argc, char** argv) {
                     (unsigned long long)degree3IsoUnknown,
                     (unsigned long long)degree3IsoNodes,
                     (unsigned long long)degree3IsoKnownKeyMisses);
+        if (useFutureTwin) {
+            std::printf(
+                "futureStats order=%s checks=%llu peakStates=%llu expanded=%llu leaves=%llu canon=%llu cacheHits=%llu colorPerms=%llu searchNodes=%llu fallbacks=%llu maxSearch=%llu\n",
+                future_twin::orderName(futureTwinOrder),
+                (unsigned long long)futureChecks,
+                (unsigned long long)futurePeakStates,
+                (unsigned long long)futureStatesExpanded,
+                (unsigned long long)futureLeaves,
+                (unsigned long long)futureCanonicalCalls,
+                (unsigned long long)futureCanonicalHits,
+                (unsigned long long)futureColorPermutations,
+                (unsigned long long)futureCanonicalSearchNodes,
+                (unsigned long long)futureCanonicalFallbacks,
+                (unsigned long long)futureMaxCanonicalSearchNodes);
+        }
         if (limit < 0 && startClass == 0) {
             const std::string expected = expectedValue(C);
             if (!expected.empty()) {

@@ -28,6 +28,14 @@ foreach ($c in 2,3,4,5) {
     }
 }
 
+Invoke-Checked "future-twin per-class C=5" {
+    & ".\build\factorization_orbit.exe" 5 futurecheck pivot rooted4
+}
+
+Invoke-Checked "future-twin joint C=5" {
+    & ".\build\factorization_orbit.exe" 5 futurecheck futureorder=canonical-last pivot rooted4
+}
+
 Invoke-Checked "FJ9 full reproduction" {
     & ".\build\fj_sudoku.exe" --threads $Threads
 }
