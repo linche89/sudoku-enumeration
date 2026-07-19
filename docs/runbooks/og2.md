@@ -74,6 +74,42 @@ states, or 100,000,000 records.  It reports `F=PROBE` and performs no `F6` or
 lookup key.  The decision evidence is in
 `../reports/og2/f4-lookup-coverage-20260719.md`.
 
+## Reduced band-kernel rank prototype
+
+This decision prototype is outside the standard build:
+
+```powershell
+g++ -O3 -mpopcnt -fopenmp -std=c++20 -I src `
+  experiments\proto\band_kernel_rank.cpp `
+  -o build\band_kernel_rank.exe
+
+.\build\band_kernel_rank.exe 2
+.\build\band_kernel_rank.exe 3
+.\build\band_kernel_rank.exe 4
+```
+
+The complete exact gates must report dimensions `1,2,1`, `1,3,3,1`, and
+`1,5,141,5,1`, with C=3 middle determinant 2,048,000 and all known endpoints
+`[OK]`.  Every C<=4 side histogram is differentially compared with the brute
+builder.
+
+The retained C=5 certificate uses a closed 38,801-state band-1 checkpoint in
+`data/logs`, never the active C=6 checkpoint.  A bounded sketch requires
+`samples=16..2048`, `cachelog=20..28`, an existing `basis=`, and a new `out=`
+path.  Always wrap it in `watch_rss.ps1`; the verified 1,024-row command used
+7 GiB and 15 minute limits.  The installed certificate can be checked without
+regenerating transitions:
+
+```powershell
+.\build\band_kernel_rank.exe verify `
+  data\logs\band-kernel-rank-sketch-c5-m1024-20260719.bin
+```
+
+It must report both ranks as 1,024, `exactCertificate=yes`, the embedded data
+hash `F8620CF513430C4B`, and `[OK]`.  This proves only the exact lower bound
+`rank_Q >= 1024`; it does not prove full rank 38,801.  See
+`../reports/og2/band-kernel-rank-20260719.md`.
+
 ## Reverse-gluing decision prototype
 
 This prototype is intentionally outside the standard build:

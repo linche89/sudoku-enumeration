@@ -305,6 +305,32 @@ and no representation-dimension loss is forced at C=6.  This is a decision
 against ordinary low-rank channel truncation, not an impossibility theorem for
 all implicit full-rank contractions.
 
+## Reduced band-kernel rank result
+
+The reduced paired band kernel is a different operator from the 3+3 channel
+maps.  Its complete stack-swap matrices have now been materialized through
+C=4.  C=3 has dimensions `1,3,3,1`; its square middle matrix has nine nonzero
+entries, determinant 2,048,000, and exact rank 3.  C=4 has dimensions
+`1,5,141,5,1`; its layer ranks are the maximum possible `1,5,5,1`, with the
+small values forced by the adjacent five-dimensional grades.
+
+The first unbottlenecked map is the C=5 `38801 x 38801` middle layer.  A
+deterministic selection of 1,024 complete source rows followed by a signed
+target CountSketch gives a `1024 x 1024` matrix of full rank modulo both
+1,000,000,007 and 1,000,000,009.  Because the sketch is an integer left/right
+compression of the true matrix, either nonzero maximal minor proves
+
+```text
+rank_Q(Kbar_2 at C=5) >= 1024.
+```
+
+All 2,084,272,587 canonical task-target entries belonged to the exact
+38,801-state complement basis.  This rejects the proposed few-hundred-channel
+factorization, including a factorization through the 126-dimensional C=5
+matching-cycle kernel.  It does not prove full rank or exclude a rank of 1,024
+or several thousand, so it is a bounded negative decision rather than an
+impossibility theorem for every structured factorization.
+
 ## Required next result
 
 Both proposed local operator lifts, both fixed-table reuse proposals, and the
@@ -339,13 +365,15 @@ The 3+3 route should be reopened only if a new proposal explains how to build
 or apply the full-rank block operator without materializing the 63,199 outer
 coordinates or the larger midpoint algebra.
 
-Two older Problem-B questions remain open.  The exact rank of the reduced band
-kernel was never computed; this is a different operator from the rejected 3+3
-channel maps and is now the next bounded executable falsification experiment,
-starting at C=3/C=4 before any C=5 modular extension.  Also, the naive
-per-symbol Johnson commutation proposal is inadequate, but a balanced-switch or
-coherent-configuration algebra has not been constructed or ruled out.  Neither
-currently supplies an algorithm.
+The reduced-kernel rank ladder is complete through its declared 1,024 bound.
+Larger CountSketches would only raise a lower bound without a structural upper
+bound, so the next executable Problem-B decision is the fused joint
+within-band column frontier.  It must reproduce every C=3/C=4 matrix entry,
+then measure bounded C=5 sources while retaining target identity and cycle
+weight.  If its partial state recovers nearly every assignment prefix, as in
+the rejected labelled operator lifts, it is not a route.  The naive per-symbol
+Johnson commutation proposal is also inadequate; a balanced-switch or
+coherent-configuration algebra has not been constructed or ruled out.
 
 Raw source material is preserved under `../expert/2026-07-12/`,
 `../expert/2026-07-13/`, `../expert/2026-07-14/`,
@@ -367,6 +395,8 @@ inventory and bounded pair samples are in
 `../reports/og2/reverse-gluing-c6-frontier-probe-20260718.md`.
 The exact class-local two-level differential and F4 lookup-coverage decision
 are in `../reports/og2/f4-lookup-coverage-20260719.md`.
+The complete small-C reduced matrices and C=5 rank lower-bound certificate are
+in `../reports/og2/band-kernel-rank-20260719.md`.
 The box-order operator frontier is in
 `../reports/og2/joint-histogram-operator-frontier-20260719.md`.
 The connectivity subset-operator proof and measurements are in

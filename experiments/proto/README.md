@@ -8,6 +8,11 @@ shortcuts, profiling results, or validation of helper identities.
 
 Highlights:
 
+- `band_kernel_rank.cpp` - complete explicit reduced band-kernel matrices and
+  exact rank certificates through C=4, plus a safety-bounded C=5 signed target
+  CountSketch.  The retained 1,024-square sketch proves the `38801 x 38801`
+  middle map has rational rank at least 1,024; it does not claim full rank.
+  See `../../docs/reports/og2/band-kernel-rank-20260719.md`.
 - `connectivity_operator.cpp` - exact Windows decision prototype for the
   symbol-synchronous connectivity recurrence and its proposed
   double-permanent subset transition.  Direct/subset raw coefficients agree

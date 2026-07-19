@@ -168,6 +168,17 @@ forces no channel loss.  This rules out ordinary irreducible-channel
 truncation as a justified C=6 implementation route; it does not rule out a
 different fast implicit contraction for a full-rank operator.
 
+The distinct reduced band-kernel rank gate is now also measured.  Complete
+explicit matrices reproduce C=2--4, including dimensions `1,3,3,1` and exact
+middle determinant 2,048,000 at C=3, plus dimensions `1,5,141,5,1` and ranks
+`1,5,5,1` at C=4.  The first unbottlenecked C=5 middle map is
+`38801 x 38801`.  A deterministic 1,024-row, signed target CountSketch is full
+rank modulo both 1,000,000,007 and 1,000,000,009, proving exactly that its
+rational rank is at least 1,024.  All 2,084,272,587 canonical task-target
+entries belonged to the precomputed complement basis.  This rejects a
+few-hundred-dimensional factorization, but it neither proves full rank nor
+excludes a factorization of rank 1,024 or several thousand.
+
 The 132-state global recurrence supplied on 2026-07-15 is exact for the linear
 quantity `sum_[G] w([G]) F_C(G)`, but the Sudoku objective is the weighted
 square `sum_[G] w([G]) F_C(G)^2`.  Its C=2 and C=3 outputs are 96 and 460800,
@@ -316,6 +327,9 @@ inventory and bounded four-row samples are recorded in
 The exact two-level differential, C=6 two-factor counts, and F4 reuse decision
 are recorded in
 `docs/reports/og2/f4-lookup-coverage-20260719.md`.
+The complete C=2--4 reduced matrices and the exact C=5 rank lower-bound
+certificate are recorded in
+`docs/reports/og2/band-kernel-rank-20260719.md`.
 The exact joint-histogram recurrence, orbit normalization, C=2..4 differential
 gates, bounded C=5 frontier, and current boundary are recorded in
 `docs/methods/joint-histogram.md`,
@@ -353,7 +367,7 @@ impossible.
 | rejected implementation | target-labelled residual operator | Exact per raw target through C=4; six C=5 sources exceed 10M states and the completed source is 97.0359% unique |
 | rejected implementation | naive symbol-synchronous double-permanent subset DP | Exact per raw target through C=4; its labelled partial state uniquely determines every assignment prefix, with zero merges in bounded C=5 probes |
 | rejected as broad reuse | fixed G1/G2 table coverage and naive kernel-pair batching | In classes 10,001--10,010 only 5,234/30,000 half occurrences hit, with zero cross-class reuse among 4,962 selected pairs and 5,000 full signatures |
-| open, next bounded decision | exact rank of the reduced band kernel | Distinct from the rejected 3+3 ranks; start with exact C=3/C=4 matrices before deciding whether a C=5 modular-rank extension is justified |
+| bounded negative for tiny-rank B1 | reduced band-kernel rank | Exact C=2--4 matrices; the `38801 x 38801` C=5 middle map has certified rational rank at least 1,024, rejecting a few-hundred-channel factorization but not proving full rank |
 | open theory route | balanced-switch/coherent-configuration transform | The naive Johnson version is inadequate; no compact algebra or fast exact transform is known |
 | open high-upside route | cross-class symbolic prefix/global contraction | Could remove class-local frontiers; no bounded exact implementation yet |
 
@@ -385,20 +399,27 @@ low-stabilizer placements and the roughly 1.3-billion top-down two-factor list
 per ordinary outer class.  Pettersen's “more than 900 million” lookup statement
 is a rough comparison point, not authorization or an acceptance oracle.
 
-The next executable decision gate is the exact rank of the distinct reduced
-band kernel from `docs/math/og2-band-kernel-lowrank.md`:
+The reduced band-kernel rank gate is complete through its predeclared C=5
+threshold.  C=3 is full rank 3, C=4 has only the forced adjacent-dimension
+ranks, and C=5 has certified rational rank at least 1,024.  This is enough to
+reject a few-hundred-channel B1 factorization.  It is not an exact C=5 rank;
+larger sketches would only raise a lower bound without providing the missing
+structural upper bound, so they are not the next priority.
 
-1. explicitly construct every reduced transition matrix at C=2--4 and
-   differentially verify its entries and endpoint totals;
-2. compute exact rational ranks at C=2--4, with independent modular checks;
-3. continue to a bounded C=5 modular-rank experiment only if the small-C rank
-   profile leaves meaningful compression possible.
+The next executable Problem-B decision is the distinct B2/E3 fused
+within-band column frontier:
 
-This is a falsification experiment, not yet a C=6 algorithm.  Full or nearly
-full small-C rank closes the proposed ordinary low-rank factorization; a small
-rank would justify the C=5 extension and an implicit factor search.  The
-cross-class symbolic-prefix/global-contraction and balanced-switch algebra
-remain higher-upside theory alternatives without implementations.
+1. implement the cycle-weighted direct transition at C=3 and C=4 and compare
+   every canonical matrix entry with the retained explicit matrices;
+2. expose the exact joint column-by-column frontier while preserving target
+   identity and cycle weight, rather than only the single-side permanent;
+3. run bounded C=5 source samples with explicit frontier-state, emitted-record,
+   time, and RSS limits.  Continue only if the frontier aggregates target
+   weights without becoming nearly injective in the assignment prefix.
+
+This remains a falsification experiment, not a C=6 algorithm.  The cross-class
+symbolic-prefix/global-contraction and balanced-switch algebra remain
+higher-upside theory alternatives without implementations.
 
 No full 63,199-class C=6 run is authorized.
 
