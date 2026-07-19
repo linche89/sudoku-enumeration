@@ -2651,6 +2651,11 @@ int main(int argc, char** argv) {
     std::string futureTwinTailKernelInventoryReference;
     uint64_t futureTwinTailKernelInventoryRecords = 0;
     std::string futureTwinTailKernelTableDirectory;
+    uint64_t futureTwinTailCoverageParents = 0;
+    uint64_t futureTwinTailCoverageMiddleParents = 0;
+    uint64_t futureTwinTailCoverageSamples = 0;
+    size_t futureTwinTailCoverageMaxStates = 0;
+    uint64_t futureTwinTailCoverageMaxRecords = 0;
     bool futureTwinTailColorCanonical = false;
     bool futureTwinForceTailRescan = false;
     int limit = -1;
@@ -2762,6 +2767,31 @@ int main(int argc, char** argv) {
         else if (arg.rfind("futuretailkerneltable=", 0) == 0) {
             futureTwinTailKernelTableDirectory = arg.substr(22);
         }
+        else if (arg.rfind("futuretailcoverageparents=", 0) == 0) {
+            futureTwinTailCoverageParents = std::strtoull(
+                arg.c_str() + std::string(
+                    "futuretailcoverageparents=").size(), nullptr, 10);
+        }
+        else if (arg.rfind("futuretailcoveragemidparents=", 0) == 0) {
+            futureTwinTailCoverageMiddleParents = std::strtoull(
+                arg.c_str() + std::string(
+                    "futuretailcoveragemidparents=").size(), nullptr, 10);
+        }
+        else if (arg.rfind("futuretailcoveragesamples=", 0) == 0) {
+            futureTwinTailCoverageSamples = std::strtoull(
+                arg.c_str() + std::string(
+                    "futuretailcoveragesamples=").size(), nullptr, 10);
+        }
+        else if (arg.rfind("futuretailcoveragemaxstates=", 0) == 0) {
+            futureTwinTailCoverageMaxStates = (size_t)std::strtoull(
+                arg.c_str() + std::string(
+                    "futuretailcoveragemaxstates=").size(), nullptr, 10);
+        }
+        else if (arg.rfind("futuretailcoveragemaxrecords=", 0) == 0) {
+            futureTwinTailCoverageMaxRecords = std::strtoull(
+                arg.c_str() + std::string(
+                    "futuretailcoveragemaxrecords=").size(), nullptr, 10);
+        }
         else if (arg == "futuretailcolorcanon") {
             futureTwinTailColorCanonical = true;
         }
@@ -2824,6 +2854,12 @@ int main(int argc, char** argv) {
     }
 
     try {
+        const bool futureTwinTailCoverage =
+            futureTwinTailCoverageParents != 0 ||
+            futureTwinTailCoverageMiddleParents != 0 ||
+            futureTwinTailCoverageSamples != 0 ||
+            futureTwinTailCoverageMaxStates != 0 ||
+            futureTwinTailCoverageMaxRecords != 0;
         if (futureTwinSelfTest) {
             future_twin::Engine::runSelfTests();
             return 0;
@@ -2882,6 +2918,7 @@ int main(int argc, char** argv) {
                 "futuretailinventoryreference requires futuretailinventory");
         }
         if (!futureTwinTailKernelTableDirectory.empty() &&
+            !futureTwinTailCoverage &&
             (futureTwinExternalBase.empty() || !graphCheckpointReadOnly ||
              futureTwinTailRows != 7 ||
              !futureTwinTailColorCanonical)) {
@@ -2889,6 +2926,37 @@ int main(int argc, char** argv) {
                 "futuretailkerneltable requires futureexternal, "
                 "checkpointreadonly, futuretailrows=7, and "
                 "futuretailcolorcanon");
+        }
+        if (futureTwinTailCoverage &&
+            (!useFutureTwin || futureTwinCheck || C < 4 ||
+             !future_twin::isPairTailOrder(futureTwinOrder) ||
+             futureTwinTailRows != 7 ||
+             !futureTwinTailColorCanonical ||
+             !graphCheckpointReadOnly ||
+             !futureTwinExternalBase.empty() ||
+             !futureTwinTailSignatureBase.empty() ||
+             !futureTwinTailKernelInventoryBase.empty() ||
+             futureTwinForceTailRescan ||
+             futureTwinTailKernelTableDirectory.empty() ||
+             futureTwinTailCoverageParents == 0 ||
+             futureTwinTailCoverageMiddleParents == 0 ||
+             futureTwinTailCoverageSamples == 0 ||
+             futureTwinTailCoverageMaxStates == 0 ||
+             futureTwinTailCoverageMaxRecords == 0 ||
+             limit <= 0 || limit > 64 ||
+             futureTwinTailCoverageParents > 1000 ||
+             futureTwinTailCoverageMiddleParents > 10000 ||
+             futureTwinTailCoverageSamples > 100000 ||
+             futureTwinTailCoverageMaxStates > 2000000 ||
+             futureTwinTailCoverageMaxRecords > 100000000)) {
+            throw std::runtime_error(
+                "future tail coverage requires future, C>=4, a pair tail, "
+                "futuretailrows=7, futuretailcolorcanon, checkpointreadonly, "
+                "a kernel table, positive limit and all five positive "
+                "futuretailcoverage bounds; external/scan/inventory/check "
+                "modes are not allowed; hard maxima are 64 classes, 1000 "
+                "source parents, 10000 middle parents, 100000 samples, "
+                "2000000 states, and 100000000 records");
         }
         if (futureTwinTailColorCanonical && futureTwinTailRows != 7) {
             throw std::runtime_error(
@@ -2979,6 +3047,26 @@ int main(int argc, char** argv) {
         uint64_t futureExternalGenerationResumedParents = 0;
         uint64_t futureExternalTailResumedRecords = 0;
         double futureExternalSeconds = 0;
+        uint64_t futureTailCoverageProbes = 0;
+        uint64_t futureTailCoveragePrefixStates = 0;
+        uint64_t futureTailCoverageSourceParents = 0;
+        uint64_t futureTailCoverageMiddleStates = 0;
+        uint64_t futureTailCoverageMiddleParents = 0;
+        uint64_t futureTailCoverageFinalStates = 0;
+        uint64_t futureTailCoverageSampleStates = 0;
+        uint64_t futureTailCoverageGeneratedRecords = 0;
+        uint64_t futureTailCoverageHalfOccurrences = 0;
+        uint64_t futureTailCoverageHalfHits = 0;
+        uint64_t futureTailCoverageUniqueHalfKeys = 0;
+        uint64_t futureTailCoverageUniqueHalfHits = 0;
+        uint64_t futureTailCoveragePairUnique = 0;
+        uint64_t futureTailCoverageSignatureUnique = 0;
+        std::array<uint64_t, 3> futureTailCoverageBestHitStates{};
+        std::vector<uint64_t> futureTailCoverageHalfKeyUnion;
+        std::vector<std::array<uint64_t, 2>>
+            futureTailCoverageKernelPairUnion;
+        std::vector<std::array<uint64_t, 3>>
+            futureTailCoverageSignatureUnion;
         unsigned __int128 answer = 0;
         startClass = std::clamp(startClass, 0, (int)classes.size());
         const int endClass = limit < 0 ? (int)classes.size()
@@ -3048,6 +3136,16 @@ int main(int argc, char** argv) {
                 }
                 options.tailKernelTableDirectory =
                     futureTwinTailKernelTableDirectory;
+                options.tailCoverageParents =
+                    futureTwinTailCoverageParents;
+                options.tailCoverageMiddleParents =
+                    futureTwinTailCoverageMiddleParents;
+                options.tailCoverageSamples =
+                    futureTwinTailCoverageSamples;
+                options.tailCoverageMaxStates =
+                    futureTwinTailCoverageMaxStates;
+                options.tailCoverageMaxRecords =
+                    futureTwinTailCoverageMaxRecords;
                 const future_twin::Result future = futureEngine->count(graph, options);
                 oc.factorizationCount = future.value;
                 futurePeakStates = std::max(futurePeakStates, future.stats.peakStates);
@@ -3091,6 +3189,51 @@ int main(int argc, char** argv) {
                 futureExternalTailResumedRecords +=
                     future.stats.externalTailResumedRecords;
                 futureExternalSeconds += future.stats.externalSeconds;
+                if (future.stats.tailCoverageProbe) {
+                    ++futureTailCoverageProbes;
+                    futureTailCoveragePrefixStates +=
+                        future.stats.tailCoveragePrefixStates;
+                    futureTailCoverageSourceParents +=
+                        future.stats.tailCoverageSourceParents;
+                    futureTailCoverageMiddleStates +=
+                        future.stats.tailCoverageMiddleStates;
+                    futureTailCoverageMiddleParents +=
+                        future.stats.tailCoverageMiddleParents;
+                    futureTailCoverageFinalStates +=
+                        future.stats.tailCoverageFinalStates;
+                    futureTailCoverageSampleStates +=
+                        future.stats.tailCoverageSampleStates;
+                    futureTailCoverageGeneratedRecords +=
+                        future.stats.tailCoverageGeneratedRecords;
+                    futureTailCoverageHalfOccurrences +=
+                        future.stats.tailCoverageHalfOccurrences;
+                    futureTailCoverageHalfHits +=
+                        future.stats.tailCoverageHalfHits;
+                    futureTailCoverageUniqueHalfKeys +=
+                        future.stats.tailCoverageUniqueHalfKeys;
+                    futureTailCoverageUniqueHalfHits +=
+                        future.stats.tailCoverageUniqueHalfHits;
+                    futureTailCoveragePairUnique +=
+                        future.stats.tailCoveragePairUnique;
+                    futureTailCoverageSignatureUnique +=
+                        future.stats.tailCoverageSignatureUnique;
+                    for (size_t hits = 0; hits < 3; ++hits) {
+                        futureTailCoverageBestHitStates[hits] +=
+                            future.stats.tailCoverageBestHitStates[hits];
+                    }
+                    futureTailCoverageHalfKeyUnion.insert(
+                        futureTailCoverageHalfKeyUnion.end(),
+                        future.tailCoverageHalfKeys.begin(),
+                        future.tailCoverageHalfKeys.end());
+                    futureTailCoverageKernelPairUnion.insert(
+                        futureTailCoverageKernelPairUnion.end(),
+                        future.tailCoverageKernelPairs.begin(),
+                        future.tailCoverageKernelPairs.end());
+                    futureTailCoverageSignatureUnion.insert(
+                        futureTailCoverageSignatureUnion.end(),
+                        future.tailCoverageSignatures.begin(),
+                        future.tailCoverageSignatures.end());
+                }
                 if (futureTwinCheck) {
                     const FactorCount reference = countFactorizations(graph, C);
                     if (reference != oc.factorizationCount) {
@@ -3151,12 +3294,52 @@ int main(int argc, char** argv) {
                         (unsigned long long)future.stats.externalTailResumedRecords,
                         future.stats.externalSeconds);
                 }
+                if (future.stats.tailCoverageProbe) {
+                    std::fprintf(stderr,
+                        "future coverage class=%d startLayer=%llu prefixStates=%llu sourceParents=%llu middleStates=%llu middleParents=%llu finalStates=%llu samples=%llu generated=%llu halfHits=%llu/%llu uniqueHalfHits=%llu/%llu bestHits=0:%llu,1:%llu,2:%llu pairUnique=%llu signatureUnique=%llu\n",
+                        i + 1,
+                        (unsigned long long)
+                            future.stats.tailCoverageStartLayer,
+                        (unsigned long long)
+                            future.stats.tailCoveragePrefixStates,
+                        (unsigned long long)
+                            future.stats.tailCoverageSourceParents,
+                        (unsigned long long)
+                            future.stats.tailCoverageMiddleStates,
+                        (unsigned long long)
+                            future.stats.tailCoverageMiddleParents,
+                        (unsigned long long)
+                            future.stats.tailCoverageFinalStates,
+                        (unsigned long long)
+                            future.stats.tailCoverageSampleStates,
+                        (unsigned long long)
+                            future.stats.tailCoverageGeneratedRecords,
+                        (unsigned long long)
+                            future.stats.tailCoverageHalfHits,
+                        (unsigned long long)
+                            future.stats.tailCoverageHalfOccurrences,
+                        (unsigned long long)
+                            future.stats.tailCoverageUniqueHalfHits,
+                        (unsigned long long)
+                            future.stats.tailCoverageUniqueHalfKeys,
+                        (unsigned long long)
+                            future.stats.tailCoverageBestHitStates[0],
+                        (unsigned long long)
+                            future.stats.tailCoverageBestHitStates[1],
+                        (unsigned long long)
+                            future.stats.tailCoverageBestHitStates[2],
+                        (unsigned long long)
+                            future.stats.tailCoveragePairUnique,
+                        (unsigned long long)
+                            future.stats.tailCoverageSignatureUnique);
+                    std::fflush(stderr);
+                }
             } else {
                 oc.factorizationCount = countFactorizations(graph, C);
             }
             const double classSeconds = std::chrono::duration<double>(
                 std::chrono::steady_clock::now() - classStart).count();
-            if (C <= 5) {
+            if (C <= 5 && !futureTwinTailCoverage) {
                 answer += (unsigned __int128)oc.labelledMultiplicity *
                           oc.factorizationCount * oc.factorizationCount;
             }
@@ -3164,7 +3347,8 @@ int main(int argc, char** argv) {
                 std::chrono::steady_clock::now() - countStart).count();
             const int completed = i - startClass + 1;
             const double eta = elapsed * (endClass - i - 1) / completed;
-            const std::string factorizationString = u128ToString(oc.factorizationCount);
+            const std::string factorizationString = futureTwinTailCoverage
+                ? "PROBE" : u128ToString(oc.factorizationCount);
             std::fprintf(stderr,
                          "class %d/%zu sample=%d/%d orbit=%llu mult=%llu F=%s class=%.3fs elapsed=%.3fs ETA=%.3fs "
                          "memo=%zu hit=%llu miss=%llu PM=%llu canonCache=%zu evict=%llu canon=%llu fallback=%llu nodes=%llu\n",
@@ -3187,7 +3371,11 @@ int main(int argc, char** argv) {
 
         const double countSeconds = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - countStart).count();
-        if (C <= 5) {
+        if (futureTwinTailCoverage) {
+            std::printf(
+                "C=%d tail coverage probe start=%d classes=%d/%zu (no F/N accumulation)\n",
+                C, startClass, totalClasses, classes.size());
+        } else if (C <= 5) {
             std::printf("C=%d classes=%d/%zu N=%s\n", C, totalClasses, classes.size(),
                         u128ToString(answer).c_str());
         } else {
@@ -3264,6 +3452,42 @@ int main(int argc, char** argv) {
                 (unsigned long long)futureExternalGenerationResumedParents,
                 (unsigned long long)futureExternalTailResumedRecords,
                 futureExternalSeconds);
+            if (futureTailCoverageProbes != 0) {
+                auto exactUnionSize = [](auto& values) {
+                    std::sort(values.begin(), values.end());
+                    return (uint64_t)std::distance(
+                        values.begin(),
+                        std::unique(values.begin(), values.end()));
+                };
+                const uint64_t halfUnion = exactUnionSize(
+                    futureTailCoverageHalfKeyUnion);
+                const uint64_t pairUnion = exactUnionSize(
+                    futureTailCoverageKernelPairUnion);
+                const uint64_t signatureUnion = exactUnionSize(
+                    futureTailCoverageSignatureUnion);
+                std::printf(
+                    "futureCoverage probes=%llu prefixStates=%llu sourceParents=%llu middleStates=%llu middleParents=%llu finalStates=%llu samples=%llu generated=%llu halfHits=%llu/%llu uniqueHalfHits=%llu/%llu bestHits=0:%llu,1:%llu,2:%llu halfUnion=%llu pairUniqueSum=%llu pairUnion=%llu signatureUniqueSum=%llu signatureUnion=%llu\n",
+                    (unsigned long long)futureTailCoverageProbes,
+                    (unsigned long long)futureTailCoveragePrefixStates,
+                    (unsigned long long)futureTailCoverageSourceParents,
+                    (unsigned long long)futureTailCoverageMiddleStates,
+                    (unsigned long long)futureTailCoverageMiddleParents,
+                    (unsigned long long)futureTailCoverageFinalStates,
+                    (unsigned long long)futureTailCoverageSampleStates,
+                    (unsigned long long)futureTailCoverageGeneratedRecords,
+                    (unsigned long long)futureTailCoverageHalfHits,
+                    (unsigned long long)futureTailCoverageHalfOccurrences,
+                    (unsigned long long)futureTailCoverageUniqueHalfHits,
+                    (unsigned long long)futureTailCoverageUniqueHalfKeys,
+                    (unsigned long long)futureTailCoverageBestHitStates[0],
+                    (unsigned long long)futureTailCoverageBestHitStates[1],
+                    (unsigned long long)futureTailCoverageBestHitStates[2],
+                    (unsigned long long)halfUnion,
+                    (unsigned long long)futureTailCoveragePairUnique,
+                    (unsigned long long)pairUnion,
+                    (unsigned long long)futureTailCoverageSignatureUnique,
+                    (unsigned long long)signatureUnion);
+            }
         }
         if (limit < 0 && startClass == 0) {
             const std::string expected = expectedValue(C);

@@ -24,6 +24,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -130,6 +131,22 @@ struct Stats {
     uint64_t externalGenerationResumedParents = 0;
     uint64_t externalTailResumedRecords = 0;
     double externalSeconds = 0;
+    bool tailCoverageProbe = false;
+    uint64_t tailCoverageStartLayer = 0;
+    uint64_t tailCoveragePrefixStates = 0;
+    uint64_t tailCoverageSourceParents = 0;
+    uint64_t tailCoverageMiddleStates = 0;
+    uint64_t tailCoverageMiddleParents = 0;
+    uint64_t tailCoverageFinalStates = 0;
+    uint64_t tailCoverageSampleStates = 0;
+    uint64_t tailCoverageGeneratedRecords = 0;
+    uint64_t tailCoverageHalfOccurrences = 0;
+    uint64_t tailCoverageHalfHits = 0;
+    uint64_t tailCoverageUniqueHalfKeys = 0;
+    uint64_t tailCoverageUniqueHalfHits = 0;
+    uint64_t tailCoveragePairUnique = 0;
+    uint64_t tailCoverageSignatureUnique = 0;
+    std::array<uint64_t, 3> tailCoverageBestHitStates{};
 };
 
 struct Options {
@@ -164,6 +181,11 @@ struct Options {
     std::string tailKernelInventoryReferenceDirectory;
     uint64_t tailKernelInventoryRecords = 0;
     std::string tailKernelTableDirectory;
+    uint64_t tailCoverageParents = 0;
+    uint64_t tailCoverageMiddleParents = 0;
+    uint64_t tailCoverageSamples = 0;
+    size_t tailCoverageMaxStates = 0;
+    uint64_t tailCoverageMaxRecords = 0;
     bool useColorCanonicalTail = false;
     bool testTailSignatureDifferential = false;
 };
@@ -171,6 +193,10 @@ struct Options {
 struct Result {
     Count value = 0;
     Stats stats;
+    bool probe = false;
+    std::vector<uint64_t> tailCoverageHalfKeys;
+    std::vector<std::array<uint64_t, 2>> tailCoverageKernelPairs;
+    std::vector<std::array<uint64_t, 3>> tailCoverageSignatures;
 };
 
 class Engine {
@@ -5028,6 +5054,282 @@ class Engine {
         }
     }
 
+    struct TailCoverageKernelPair {
+        uint64_t first = 0;
+        uint64_t second = 0;
+
+        bool operator==(const TailCoverageKernelPair&) const = default;
+    };
+
+    struct TailCoverageKernelPairHash {
+        size_t operator()(const TailCoverageKernelPair& pair) const noexcept {
+            auto mix = [](uint64_t value) {
+                value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9ULL;
+                value = (value ^ (value >> 27)) * 0x94d049bb133111ebULL;
+                return value ^ (value >> 31);
+            };
+            uint64_t hash = mix(pair.first + 0x9e3779b97f4a7c15ULL);
+            hash ^= mix(pair.second + 0xd6e8feb86659fd93ULL) +
+                0x9e3779b97f4a7c15ULL + (hash << 6) + (hash >> 2);
+            return (size_t)hash;
+        }
+    };
+
+    Result runSevenRowTailCoverageProbe(
+        WeightedLayer& current, int startLayer, int prefixLayers,
+        JointCanonicalizer& canonicalizer, const Options& options,
+        Result result) const {
+        if (ctx_.m - prefixLayers != 7 ||
+            options.tailCoverageParents == 0 ||
+            options.tailCoverageMiddleParents == 0 ||
+            options.tailCoverageSamples == 0 ||
+            options.tailCoverageMaxStates == 0 ||
+            options.tailCoverageMaxRecords == 0 ||
+            options.tailKernelTableDirectory.empty()) {
+            throw std::runtime_error(
+                "future tail coverage probe options are incomplete");
+        }
+        if (startLayer < 0 || startLayer >= prefixLayers ||
+            prefixLayers - startLayer > 2) {
+            throw std::runtime_error(
+                "future tail coverage probe boundary is invalid");
+        }
+
+        result.probe = true;
+        result.stats.tailCoverageProbe = true;
+        result.stats.tailCoverageStartLayer = (uint64_t)startLayer;
+        result.stats.tailCoveragePrefixStates = current.size();
+        uint64_t generatedRecords = result.stats.groupedLeaves;
+
+        auto sortedEntries = [](const WeightedLayer& layer) {
+            using Entry = typename WeightedLayer::value_type;
+            std::vector<const Entry*> entries;
+            entries.reserve(layer.size());
+            for (const auto& entry : layer) entries.push_back(&entry);
+            std::sort(entries.begin(), entries.end(),
+                [](const Entry* left, const Entry* right) {
+                    if (left->first.record != right->first.record) {
+                        return left->first.record < right->first.record;
+                    }
+                    return left->first.keyKind < right->first.keyKind;
+                });
+            return entries;
+        };
+        auto sampledEntry = [](const auto& entries, size_t sample,
+                               size_t sampleCount) {
+            const size_t index = (size_t)(
+                (Count)sample * entries.size() / sampleCount);
+            return entries[index];
+        };
+
+        for (int layer = startLayer; layer < prefixLayers; ++layer) {
+            const int remainingRows = ctx_.m - layer;
+            const bool mateLayer = (layer & 1) != 0;
+            const bool firstChoice = options.order == OrderMode::PairFirstTail;
+            const bool adaptiveChoice =
+                options.order == OrderMode::PairAdaptiveTail;
+            const int fixedVertex = firstChoice ? 0 : remainingRows - 1;
+            result.stats.order.push_back(mateLayer ? -1 :
+                                         adaptiveChoice ? -2 : fixedVertex);
+            canonicalizer.beginLayer(remainingRows - 1);
+
+            const auto entries = sortedEntries(current);
+            const uint64_t requested = layer == startLayer
+                ? options.tailCoverageParents
+                : options.tailCoverageMiddleParents;
+            const size_t processCount = (size_t)std::min<uint64_t>(
+                requested, entries.size());
+            if (layer == startLayer) {
+                result.stats.tailCoverageSourceParents = processCount;
+            } else {
+                result.stats.tailCoverageMiddleParents = processCount;
+            }
+
+            WeightedLayer next;
+            next.reserve(std::min<size_t>(
+                options.tailCoverageMaxStates,
+                processCount * 16 + 16));
+            for (size_t sample = 0; sample < processCount; ++sample) {
+                const auto* entry = sampledEntry(
+                    entries, sample, processCount);
+                const State& state = entry->first;
+                const Count weight = entry->second;
+                ++result.stats.statesExpanded;
+                if (options.validateStates) validateState(state, layer);
+                const int vertex = mateLayer
+                    ? pendingMateVertex(state, layer, remainingRows)
+                    : adaptiveChoice
+                        ? adaptivePairVertex(state, remainingRows)
+                        : fixedVertex;
+                groupedTransitions(
+                    state, vertex, canonicalizer, result.stats,
+                    [&](const State& target, uint64_t multiplicity) {
+                        if (generatedRecords >=
+                            options.tailCoverageMaxRecords) {
+                            throw std::runtime_error(
+                                "future tail coverage record limit exceeded");
+                        }
+                        ++generatedRecords;
+                        const Count maximum = ~(Count)0;
+                        if (weight > maximum / (Count)multiplicity) {
+                            throw std::overflow_error(
+                                "future tail coverage multiplication overflow");
+                        }
+                        const Count contribution =
+                            weight * (Count)multiplicity;
+                        auto [iterator, inserted] = next.try_emplace(
+                            target, (Count)0);
+                        if (inserted &&
+                            next.size() > options.tailCoverageMaxStates) {
+                            throw std::runtime_error(
+                                "future tail coverage state limit exceeded");
+                        }
+                        if (iterator->second > maximum - contribution) {
+                            throw std::overflow_error(
+                                "future tail coverage addition overflow");
+                        }
+                        iterator->second += contribution;
+                    }, true);
+            }
+            current.swap(next);
+            result.stats.layerStates[layer + 1] = current.size();
+            result.stats.peakStates = std::max<uint64_t>(
+                result.stats.peakStates, current.size());
+            if (layer + 1 < prefixLayers) {
+                result.stats.tailCoverageMiddleStates = current.size();
+            }
+            if (current.empty()) {
+                throw std::runtime_error(
+                    "future tail coverage probe reached an empty layer");
+            }
+        }
+
+        result.stats.tailCoverageGeneratedRecords = generatedRecords;
+        result.stats.tailCoverageFinalStates = current.size();
+        sevenRowPersistentKernelTable_ =
+            loadSevenRowPersistentKernelTable(
+                options.tailKernelTableDirectory, prefixLayers,
+                options.progress);
+
+        const auto finalEntries = sortedEntries(current);
+        const size_t sampleCount = (size_t)std::min<uint64_t>(
+            options.tailCoverageSamples, finalEntries.size());
+        result.stats.tailCoverageSampleStates = sampleCount;
+        std::unordered_set<uint64_t> halfKeys;
+        std::unordered_set<TailCoverageKernelPair,
+                           TailCoverageKernelPairHash> kernelPairs;
+        std::unordered_set<SevenRowColorTailSignature,
+                           SevenRowColorTailSignatureHash> signatures;
+        halfKeys.reserve(sampleCount * 4 + 16);
+        kernelPairs.reserve(sampleCount * 2 + 16);
+        signatures.reserve(sampleCount * 2 + 16);
+
+        for (size_t sample = 0; sample < sampleCount; ++sample) {
+            const State& state = sampledEntry(
+                finalEntries, sample, sampleCount)->first;
+            if (options.validateStates) validateState(state, prefixLayers);
+            const auto candidates = sevenRowTailCandidates(state);
+            int bestHits = -1;
+            SevenRowColorTailSignature best;
+            best.firstKey = std::numeric_limits<uint64_t>::max();
+            best.secondKey = std::numeric_limits<uint64_t>::max();
+            best.relativeColor = std::numeric_limits<uint16_t>::max();
+            best.relativeTransform = std::numeric_limits<uint8_t>::max();
+            TailEvaluation evaluation;
+            for (int cut = 0; cut < 3; ++cut) {
+                const SevenRowColorTailSignature signature =
+                    sevenRowColorSignatureForHalves(
+                        candidates[cut].canonical[0],
+                        candidates[cut].canonical[1], evaluation);
+                const bool firstHit =
+                    sevenRowPersistentKernelTable_->find(
+                        signature.firstKey).has_value();
+                const bool secondHit =
+                    sevenRowPersistentKernelTable_->find(
+                        signature.secondKey).has_value();
+                result.stats.tailCoverageHalfOccurrences += 2;
+                result.stats.tailCoverageHalfHits +=
+                    (uint64_t)firstHit + (uint64_t)secondHit;
+                halfKeys.insert(signature.firstKey);
+                halfKeys.insert(signature.secondKey);
+                const int hits = (int)firstHit + (int)secondHit;
+                if (hits > bestHits ||
+                    (hits == bestHits &&
+                     sevenRowColorTailSignatureLess(signature, best))) {
+                    bestHits = hits;
+                    best = signature;
+                }
+            }
+            result.stats.tailColorCanonicalLookups +=
+                evaluation.colorCanonicalLookups;
+            result.stats.tailColorCanonicalHits +=
+                evaluation.colorCanonicalHits;
+            result.stats.tailColorCanonicalOrbits +=
+                evaluation.colorCanonicalOrbits;
+            result.stats.tailColorCanonicalMappings +=
+                evaluation.colorCanonicalMappings;
+            if (bestHits < 0 || bestHits > 2) {
+                throw std::runtime_error(
+                    "future tail coverage best-hit count is invalid");
+            }
+            ++result.stats.tailCoverageBestHitStates[(size_t)bestHits];
+            kernelPairs.insert({best.firstKey, best.secondKey});
+            signatures.insert(best);
+        }
+
+        result.stats.tailCoverageUniqueHalfKeys = halfKeys.size();
+        for (uint64_t key : halfKeys) {
+            result.stats.tailCoverageUniqueHalfHits +=
+                sevenRowPersistentKernelTable_->find(key).has_value();
+        }
+        result.stats.tailCoveragePairUnique = kernelPairs.size();
+        result.stats.tailCoverageSignatureUnique = signatures.size();
+        result.tailCoverageHalfKeys.assign(
+            halfKeys.begin(), halfKeys.end());
+        std::sort(result.tailCoverageHalfKeys.begin(),
+                  result.tailCoverageHalfKeys.end());
+        result.tailCoverageKernelPairs.reserve(kernelPairs.size());
+        for (const TailCoverageKernelPair& pair : kernelPairs) {
+            result.tailCoverageKernelPairs.push_back(
+                {pair.first, pair.second});
+        }
+        std::sort(result.tailCoverageKernelPairs.begin(),
+                  result.tailCoverageKernelPairs.end());
+        result.tailCoverageSignatures.reserve(signatures.size());
+        for (const SevenRowColorTailSignature& signature : signatures) {
+            result.tailCoverageSignatures.push_back({
+                signature.firstKey,
+                signature.secondKey,
+                (uint64_t)signature.relativeTransform |
+                    ((uint64_t)signature.relativeColor << 8)});
+        }
+        std::sort(result.tailCoverageSignatures.begin(),
+                  result.tailCoverageSignatures.end());
+        if (options.progress) {
+            std::fprintf(stderr,
+                "future tail coverage startLayer=%d prefixStates=%llu sourceParents=%llu middleStates=%llu middleParents=%llu finalStates=%llu samples=%llu generated=%llu halfHits=%llu/%llu uniqueHalfHits=%llu/%llu bestHits=0:%llu,1:%llu,2:%llu pairUnique=%llu signatureUnique=%llu\n",
+                startLayer,
+                (unsigned long long)result.stats.tailCoveragePrefixStates,
+                (unsigned long long)result.stats.tailCoverageSourceParents,
+                (unsigned long long)result.stats.tailCoverageMiddleStates,
+                (unsigned long long)result.stats.tailCoverageMiddleParents,
+                (unsigned long long)result.stats.tailCoverageFinalStates,
+                (unsigned long long)result.stats.tailCoverageSampleStates,
+                (unsigned long long)result.stats.tailCoverageGeneratedRecords,
+                (unsigned long long)result.stats.tailCoverageHalfHits,
+                (unsigned long long)result.stats.tailCoverageHalfOccurrences,
+                (unsigned long long)result.stats.tailCoverageUniqueHalfHits,
+                (unsigned long long)result.stats.tailCoverageUniqueHalfKeys,
+                (unsigned long long)result.stats.tailCoverageBestHitStates[0],
+                (unsigned long long)result.stats.tailCoverageBestHitStates[1],
+                (unsigned long long)result.stats.tailCoverageBestHitStates[2],
+                (unsigned long long)result.stats.tailCoveragePairUnique,
+                (unsigned long long)result.stats.tailCoverageSignatureUnique);
+            std::fflush(stderr);
+        }
+        return result;
+    }
+
     struct ExternalGenerationCheckpoint {
         uint64_t processedParents = 0;
         uint64_t rawRecords = 0;
@@ -6251,6 +6553,18 @@ class Engine {
         const bool useTail = pairOrder && supportedTail;
         const int prefixLayers = useTail
             ? ctx_.m - options.tailRemainingRows : ctx_.m;
+        const bool coverageProbe = options.tailCoverageParents != 0;
+        if (coverageProbe &&
+            (!useTail || options.tailRemainingRows != 7 ||
+             !options.externalDirectory.empty() ||
+             options.tailCoverageMiddleParents == 0 ||
+             options.tailCoverageSamples == 0 ||
+             options.tailCoverageMaxStates == 0 ||
+             options.tailCoverageMaxRecords == 0 ||
+             options.tailKernelTableDirectory.empty())) {
+            throw std::runtime_error(
+                "future tail coverage requires a non-external seven-row pair tail and complete positive bounds");
+        }
         const int defaultExternalLayers =
             options.tailRemainingRows == 7 ? 1 : 2;
         const int externalLayers = options.externalDirectory.empty() ? 0 :
@@ -6260,8 +6574,10 @@ class Engine {
             throw std::runtime_error(
                 "future external layer count exceeds the prefix length");
         }
-        const int inMemoryLayers = useTail && !options.externalDirectory.empty()
-            ? std::max(0, prefixLayers - externalLayers) : prefixLayers;
+        const int inMemoryLayers = coverageProbe
+            ? std::max(0, prefixLayers - 2)
+            : useTail && !options.externalDirectory.empty()
+                ? std::max(0, prefixLayers - externalLayers) : prefixLayers;
         for (int layer = 0; layer < inMemoryLayers; ++layer) {
             const int remainingRows = ctx_.m - layer;
             const bool mateLayer = pairOrder && ((layer & 1) != 0);
@@ -6292,11 +6608,23 @@ class Engine {
                             throw std::overflow_error("future-twin joint multiplication overflow");
                         }
                         const Count contribution = weight * (Count)multiplicity;
-                        Count& destination = next[target];
-                        if (destination > maximum - contribution) {
+                        auto [iterator, inserted] = next.try_emplace(
+                            target, (Count)0);
+                        if (coverageProbe && inserted &&
+                            next.size() > options.tailCoverageMaxStates) {
+                            throw std::runtime_error(
+                                "future tail coverage prefix state limit exceeded");
+                        }
+                        if (coverageProbe &&
+                            result.stats.groupedLeaves >
+                                options.tailCoverageMaxRecords) {
+                            throw std::runtime_error(
+                                "future tail coverage prefix record limit exceeded");
+                        }
+                        if (iterator->second > maximum - contribution) {
                             throw std::overflow_error("future-twin joint addition overflow");
                         }
-                        destination += contribution;
+                        iterator->second += contribution;
                     }, true);
                 if (options.progress &&
                     (layerParents <= 10 ||
@@ -6315,6 +6643,11 @@ class Engine {
                 }
             }
             current.swap(next);
+            if (coverageProbe &&
+                current.size() > options.tailCoverageMaxStates) {
+                throw std::runtime_error(
+                    "future tail coverage prefix state limit exceeded");
+            }
             result.stats.layerStates[layer + 1] = current.size();
             result.stats.peakStates = std::max<uint64_t>(result.stats.peakStates, current.size());
             if (options.progress) {
@@ -6334,6 +6667,12 @@ class Engine {
                 std::fflush(stderr);
             }
             if (current.empty()) throw std::runtime_error("future-twin joint DP reached an empty layer");
+        }
+
+        if (coverageProbe) {
+            return runSevenRowTailCoverageProbe(
+                current, inMemoryLayers, prefixLayers,
+                canonicalizer, options, std::move(result));
         }
 
         if (useTail && inMemoryLayers < prefixLayers) {
@@ -6898,12 +7237,59 @@ public:
                 throw std::runtime_error(
                     "future-twin persistent kernel table rescan differential failed");
             }
+            Options coverageProbe = referenceOptions;
+            coverageProbe.order = OrderMode::PairLastTail;
+            coverageProbe.tailRemainingRows = 7;
+            coverageProbe.useColorCanonicalTail = true;
+            coverageProbe.tailKernelTableDirectory =
+                (temporaryRoot / "kernel-table").string();
+            coverageProbe.tailCoverageParents = 100;
+            coverageProbe.tailCoverageMiddleParents = 100;
+            coverageProbe.tailCoverageSamples = 1000;
+            coverageProbe.tailCoverageMaxStates = 1000;
+            coverageProbe.tailCoverageMaxRecords = 1000;
+            const Result coverage = engine.count(graph, coverageProbe);
+            if (!coverage.probe ||
+                !coverage.stats.tailCoverageProbe ||
+                coverage.stats.tailCoverageFinalStates !=
+                    signatureSource.stats.layerStates[1] ||
+                coverage.stats.tailCoverageSampleStates !=
+                    coverage.stats.tailCoverageFinalStates ||
+                coverage.stats.tailCoverageHalfOccurrences !=
+                    6 * coverage.stats.tailCoverageSampleStates ||
+                coverage.stats.tailCoverageHalfHits !=
+                    coverage.stats.tailCoverageHalfOccurrences ||
+                coverage.stats.tailCoverageUniqueHalfHits !=
+                    coverage.stats.tailCoverageUniqueHalfKeys ||
+                coverage.stats.tailCoverageBestHitStates[0] != 0 ||
+                coverage.stats.tailCoverageBestHitStates[1] != 0 ||
+                coverage.stats.tailCoverageBestHitStates[2] !=
+                    coverage.stats.tailCoverageSampleStates ||
+                coverage.stats.tailCoveragePairUnique == 0 ||
+                coverage.stats.tailCoverageSignatureUnique == 0 ||
+                coverage.tailCoverageHalfKeys.size() !=
+                    coverage.stats.tailCoverageUniqueHalfKeys ||
+                coverage.tailCoverageKernelPairs.size() !=
+                    coverage.stats.tailCoveragePairUnique ||
+                coverage.tailCoverageSignatures.size() !=
+                    coverage.stats.tailCoverageSignatureUnique ||
+                !std::is_sorted(coverage.tailCoverageHalfKeys.begin(),
+                                coverage.tailCoverageHalfKeys.end()) ||
+                !std::is_sorted(
+                    coverage.tailCoverageKernelPairs.begin(),
+                    coverage.tailCoverageKernelPairs.end()) ||
+                !std::is_sorted(
+                    coverage.tailCoverageSignatures.begin(),
+                    coverage.tailCoverageSignatures.end())) {
+                throw std::runtime_error(
+                    "future-twin tail coverage probe differential failed");
+            }
         }
         std::fprintf(stderr,
             "future selftest canonical C=2..6, grouped transitions C=2..4, "
             "three-pair tail C=3..4, seven-row tail C=4..5, "
-            "and external generation/tail/signature/inventory/table resume "
-            "C=4 [OK]\n");
+            "and external generation/tail/signature/inventory/table/coverage "
+            "resume C=4 [OK]\n");
     }
 };
 
