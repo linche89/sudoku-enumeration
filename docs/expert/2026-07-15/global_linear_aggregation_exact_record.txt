@@ -1,0 +1,136 @@
+# Global linear aggregation exact computational record
+
+## Full balanced-histogram dimensions (C=6)
+0 raw=1 orbits=1
+1 raw=1 orbits=1
+2 raw=3355 orbits=24
+3 raw=49755 orbits=132
+4 raw=3355 orbits=24
+5 raw=1 orbits=1
+6 raw=1 orbits=1
+
+## Histogram-orbit DP results
+C=2
+orbit_counts_rows_0_to_C=1,1,1
+layer_totals_rows_0_to_C=1,6,6
+from_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions
+0,1,1,1,1,1,1
+1,1,1,1,1,1,1
+A_C=6
+N_linear_C=2^(C^2)*A_C=96
+
+C=3
+orbit_counts_rows_0_to_C=1,1,1,1
+layer_totals_rows_0_to_C=1,90,900,900
+from_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions
+0,1,1,1,1,1,1
+1,1,1,3,1,1,1
+2,1,1,1,1,1,1
+A_C=900
+N_linear_C=2^(C^2)*A_C=460800
+
+C=4
+orbit_counts_rows_0_to_C=1,1,4,1,1
+layer_totals_rows_0_to_C=1,2520,748440,12640320,12640320
+from_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions
+0,1,1,1,1,1,1
+1,1,4,42,15,15,4
+2,4,1,12,4,1,4
+3,1,1,1,1,1,1
+A_C=12640320
+N_linear_C=2^(C^2)*A_C=828396011520
+
+C=5
+orbit_counts_rows_0_to_C=1,1,7,7,1,1
+layer_totals_rows_0_to_C=1,113400,1559930400,1500992337600,41376005798400,41376005798400
+from_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions
+0,1,1,1,1,1,1
+1,1,7,870,158,158,7
+2,7,7,1751,599,154,42
+3,7,1,54,7,1,7
+4,1,1,1,1,1,1
+A_C=41376005798400
+N_linear_C=2^(C^2)*A_C=1388348372994018508800
+
+C=6
+orbit_counts_rows_0_to_C=1,1,24,132,24,1,1
+layer_totals_rows_0_to_C=1,7484400,6928346502000,513470940732288000,1583587180574163072000,70957164389662881792000,70957164389662881792000
+from_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions
+0,1,1,1,1,1,1
+1,1,24,27990,3355,3355,24
+2,24,132,281066,165678,36374,2352
+3,132,24,90557,57853,2758,2352
+4,24,1,218,24,1,24
+5,1,1,1,1,1,1
+A_C=70957164389662881792000
+N_linear_C=2^(C^2)*A_C=4876139207527966044188061990912000
+
+## Modular rank certificates (p=1000003)
+C=4
+0->1 dims=1x1 nnz=1 rank_mod_1000003=1
+1->2 dims=4x1 nnz=4 rank_mod_1000003=1
+2->3 dims=1x4 nnz=4 rank_mod_1000003=1
+3->4 dims=1x1 nnz=1 rank_mod_1000003=1
+
+C=5
+0->1 dims=1x1 nnz=1 rank_mod_1000003=1
+1->2 dims=7x1 nnz=7 rank_mod_1000003=1
+2->3 dims=7x7 nnz=42 rank_mod_1000003=7
+3->4 dims=1x7 nnz=7 rank_mod_1000003=1
+4->5 dims=1x1 nnz=1 rank_mod_1000003=1
+
+C=6
+0->1 dims=1x1 nnz=1 rank_mod_1000003=1
+1->2 dims=24x1 nnz=24 rank_mod_1000003=1
+2->3 dims=132x24 nnz=2352 rank_mod_1000003=24
+3->4 dims=24x132 nnz=2352 rank_mod_1000003=24
+4->5 dims=1x24 nnz=24 rank_mod_1000003=1
+5->6 dims=1x1 nnz=1 rank_mod_1000003=1
+
+## Independent direct outer-skeleton regression
+C=3 labeled_balanced_skeletons=8000 sum_F3=460800
+
+## Independent count-matrix orbit DP (C=6)
+C=6
+orbit_counts_k_0_to_C=1,1,11,72,997,4608,8513
+from_k,source_orbits,target_orbits,valid_perm_trials,nonzero_orbit_transitions,unique_raw_targets
+0,1,1,720,1,720
+1,1,11,720,11,720
+2,11,72,6141,261,5861
+3,72,997,32901,11184,30281
+4,997,4608,286262,176297,229056
+5,4608,8513,819160,658097,501886
+A_C=70957164389662881792000
+N_linear_C=2^(C^2)*A_C=4876139207527966044188061990912000
+
+## Resource usage for the C=6 histogram-orbit run
+	Command being timed: "/mnt/data/global_linear_histogram_dp 6"
+	User time (seconds): 0.71
+	System time (seconds): 0.00
+	Percent of CPU this job got: 93%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.75
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 14340
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 0
+	Voluntary context switches: 0
+	Involuntary context switches: 0
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+## SHA-256
+9ed26846a6dae6bd6d61a9b8e2ff3676ce4b23ee36a43b6b081f742992ff186b  /mnt/data/global_linear_histogram_dp.cpp
+05ef44496ba1bb1e15ce893e66c468070fd7d3cc825a423e67a935e762fd3df5  /mnt/data/global_linear_histogram_dimensions.cpp
+595909bb1a536e5b3cac2585f19b9c7076a726059d540f9688e26d6fb596944e  /mnt/data/global_linear_histogram_rank.cpp
+d407ebaa4ff2d20ba3e39bfd6f434e94bac25a6ac01161257079c11ca3125f02  /mnt/data/global_linear_aggregation_c6.cpp
+f48dace6403dd192ca8f12f23b4157397198ad89b4b6973d9b19f1f5c956e80e  /mnt/data/direct_skeleton_regression_c3.cpp
