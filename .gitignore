@@ -25,5 +25,7 @@ experiments/**/*.err
 experiments/**/*.log
 experiments/**/*.out
 src/__pycache__/
+**/__pycache__/
+*.py[cod]
 *.err
 /proto/
