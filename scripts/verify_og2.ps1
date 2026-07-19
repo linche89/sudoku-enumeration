@@ -32,6 +32,11 @@ Invoke-Checked "mp_q dual C=4" { & ".\build\mp_q.exe" 4 dual 20 nocheckpoint }
 Invoke-Checked "factorization C=2" { & ".\build\factorization_orbit.exe" 2 pivot rooted4 }
 Invoke-Checked "factorization C=3" { & ".\build\factorization_orbit.exe" 3 pivot rooted4 }
 Invoke-Checked "factorization C=4" { & ".\build\factorization_orbit.exe" 4 pivot rooted4 }
+Invoke-Checked "F4 lookup split differential C=4" {
+    & ".\build\factorization_orbit.exe" 4 f4coveragecheck `
+        f4coveragemaxstates=100000 f4coveragemaxrecords=1000000 `
+        pivot rooted4
+}
 Invoke-Checked "future-twin local differential" { & ".\build\factorization_orbit.exe" 4 futuretest }
 Invoke-Checked "future-twin per-class C=2" { & ".\build\factorization_orbit.exe" 2 futurecheck pivot rooted4 }
 Invoke-Checked "future-twin per-class C=3" { & ".\build\factorization_orbit.exe" 3 futurecheck pivot rooted4 }

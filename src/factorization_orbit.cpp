@@ -36,6 +36,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -2213,6 +2214,79 @@ void enumeratePerfectMatchingsQuiet(
     chosen[bestLeft] = 0;
 }
 
+void enumeratePerfectMatchingsBounded(
+    const std::array<uint16_t, MAX_M>& graph,
+    uint16_t remainingLeft,
+    uint16_t usedRight,
+    std::array<uint16_t, MAX_M>& chosen,
+    std::unordered_map<GraphKey, size_t, GraphKeyHash>& residualIndex,
+    std::vector<Residual>& residuals,
+    uint64_t recordLimit,
+    size_t stateLimit,
+    uint64_t& matchingCount) {
+    if (remainingLeft == 0) {
+        if (matchingCount >= recordLimit) {
+            throw std::runtime_error(
+                "F4 coverage matching-record limit exceeded");
+        }
+        ++matchingCount;
+        std::array<uint16_t, MAX_M> residual{};
+        for (int i = 0; i < M; ++i) {
+            residual[i] = graph[i] ^ chosen[i];
+        }
+        const GraphKey key = weakGraphKey(residual);
+        auto [it, inserted] = residualIndex.emplace(
+            key, residuals.size());
+        if (inserted) {
+            residuals.push_back({residual, 1});
+            if (residuals.size() > stateLimit) {
+                throw std::runtime_error(
+                    "F4 coverage residual-state limit exceeded");
+            }
+        } else {
+            ++residuals[it->second].multiplicity;
+        }
+        return;
+    }
+
+    int bestLeft = -1;
+    uint16_t bestAvailable = 0;
+    int bestCount = M + 1;
+    uint16_t leftBits = remainingLeft;
+    while (leftBits) {
+        const int left = std::countr_zero(leftBits);
+        leftBits &= (uint16_t)(leftBits - 1);
+        const uint16_t available =
+            graph[left] & (uint16_t)~usedRight;
+        const int count = std::popcount(available);
+        if (count < bestCount) {
+            bestCount = count;
+            bestLeft = left;
+            bestAvailable = available;
+            if (count <= 1) break;
+        }
+    }
+    if (bestCount == 0) return;
+
+    uint16_t available = bestAvailable;
+    while (available) {
+        const uint16_t bit = available & (uint16_t)(-available);
+        available ^= bit;
+        chosen[bestLeft] = bit;
+        enumeratePerfectMatchingsBounded(
+            graph,
+            remainingLeft ^ (uint16_t)(1u << bestLeft),
+            usedRight | bit,
+            chosen,
+            residualIndex,
+            residuals,
+            recordLimit,
+            stateLimit,
+            matchingCount);
+    }
+    chosen[bestLeft] = 0;
+}
+
 FactorCount computeDegree3Direct(const std::array<uint16_t, MAX_M>& graph) {
     std::unordered_map<GraphKey, size_t, GraphKeyHash> residualIndex;
     std::vector<Residual> residuals;
@@ -2573,6 +2647,210 @@ uint64_t perfectMatchingCount(const std::array<uint16_t, MAX_M>& graph) {
     return dp[all];
 }
 
+struct F4CoverageResidual {
+    GraphKey key{};
+    Residual residual{};
+};
+
+std::vector<F4CoverageResidual> canonicalizeF4CoverageResiduals(
+    std::vector<Residual> weakResiduals,
+    size_t stateLimit) {
+    if (weakResiduals.empty()) return {};
+    if (weakResiduals.size() > stateLimit) {
+        throw std::runtime_error(
+            "F4 coverage residual-state limit exceeded");
+    }
+    const std::vector<GraphKey> keys =
+        canonicalizeResidualKeys(weakResiduals);
+    std::unordered_map<GraphKey, size_t, GraphKeyHash> index;
+    index.reserve(weakResiduals.size());
+    std::vector<F4CoverageResidual> result;
+    result.reserve(weakResiduals.size());
+    for (size_t i = 0; i < weakResiduals.size(); ++i) {
+        auto [it, inserted] = index.emplace(keys[i], result.size());
+        if (inserted) {
+            result.push_back({keys[i], weakResiduals[i]});
+            if (result.size() > stateLimit) {
+                throw std::runtime_error(
+                    "F4 coverage canonical-state limit exceeded");
+            }
+        } else {
+            result[it->second].residual.multiplicity +=
+                weakResiduals[i].multiplicity;
+        }
+    }
+    std::sort(result.begin(), result.end(),
+              [](const F4CoverageResidual& left,
+                 const F4CoverageResidual& right) {
+                  return left.key < right.key;
+              });
+    return result;
+}
+
+struct F4CoverageResult {
+    bool exactValue = false;
+    FactorCount value = 0;
+    uint64_t twoFactorSubgraphs = 0;
+    uint64_t firstRawRecords = 0;
+    uint64_t firstWeakStates = 0;
+    uint64_t firstCanonicalStates = 0;
+    uint64_t sampledParents = 0;
+    uint64_t secondRawRecords = 0;
+    uint64_t secondWeakStates = 0;
+    uint64_t lookupOccurrences = 0;
+    uint64_t lookupHits = 0;
+    uint64_t uniqueKeys = 0;
+    uint64_t uniqueHits = 0;
+    std::vector<GraphKey> keys;
+};
+
+F4CoverageResult runF4CoverageProbe(
+    const std::array<uint16_t, MAX_M>& input,
+    uint64_t requestedParents,
+    size_t stateLimit,
+    uint64_t recordLimit,
+    bool exactValue) {
+    const int degree = regularGraphDegree(input);
+    if (degree < 4) {
+        throw std::runtime_error(
+            "F4 coverage two-level split requires degree at least four");
+    }
+    const uint64_t fallbackStart = canonFallbacks;
+    std::array<uint16_t, MAX_M> graph = input;
+    std::sort(graph.begin(), graph.begin() + M);
+
+    const PivotEdge firstPivot = leastFrequentRootEdge(graph);
+    if (firstPivot.frequency > recordLimit) {
+        throw std::runtime_error(
+            "F4 coverage first-layer record limit exceeded");
+    }
+    std::unordered_map<GraphKey, size_t, GraphKeyHash> firstIndex;
+    std::vector<Residual> firstWeak;
+    firstIndex.reserve(std::min<size_t>(stateLimit, 65536));
+    firstWeak.reserve(std::min<size_t>(stateLimit, 65536));
+    std::array<uint16_t, MAX_M> chosen{};
+    chosen[0] = firstPivot.rightBit;
+    uint64_t firstMatchingCount = 0;
+    enumeratePerfectMatchingsBounded(
+        graph,
+        (uint16_t)(FULL ^ 1u),
+        firstPivot.rightBit,
+        chosen,
+        firstIndex,
+        firstWeak,
+        firstPivot.frequency,
+        stateLimit,
+        firstMatchingCount);
+    if (firstMatchingCount != firstPivot.frequency) {
+        throw std::runtime_error(
+            "F4 coverage first-layer pivot frequency mismatch");
+    }
+
+    F4CoverageResult result;
+    result.exactValue = exactValue;
+    if (!exactValue) {
+        result.twoFactorSubgraphs =
+            countRootedTwoFactorPairs(graph).total;
+    }
+    result.firstRawRecords = firstMatchingCount;
+    result.firstWeakStates = firstWeak.size();
+    std::vector<F4CoverageResidual> parents =
+        canonicalizeF4CoverageResiduals(
+            std::move(firstWeak), stateLimit);
+    result.firstCanonicalStates = parents.size();
+    const size_t parentCount = exactValue
+        ? parents.size()
+        : (size_t)std::min<uint64_t>(requestedParents, parents.size());
+    if (parentCount == 0) {
+        throw std::runtime_error(
+            "F4 coverage probe selected no parents");
+    }
+    result.sampledParents = parentCount;
+
+    std::unordered_set<GraphKey, GraphKeyHash> uniqueKeys;
+    std::unordered_set<GraphKey, GraphKeyHash> hitKeys;
+    uniqueKeys.reserve(std::min<size_t>(stateLimit, parentCount * 4096));
+    hitKeys.reserve(std::min<size_t>(stateLimit, parentCount * 4096));
+    FactorCount splitSum = 0;
+    uint64_t generatedRecords = firstMatchingCount;
+
+    for (size_t sample = 0; sample < parentCount; ++sample) {
+        const size_t parentIndex = exactValue
+            ? sample
+            : (size_t)((FactorCount)sample * parents.size() /
+                       parentCount);
+        const F4CoverageResidual& parent = parents[parentIndex];
+        const PivotEdge secondPivot =
+            leastFrequentRootEdge(parent.residual.graph);
+        if (secondPivot.frequency > recordLimit - generatedRecords) {
+            throw std::runtime_error(
+                "F4 coverage second-layer record limit exceeded");
+        }
+
+        std::unordered_map<GraphKey, size_t, GraphKeyHash> secondIndex;
+        std::vector<Residual> secondWeak;
+        secondIndex.reserve(std::min<size_t>(stateLimit, 8192));
+        secondWeak.reserve(std::min<size_t>(stateLimit, 8192));
+        chosen.fill(0);
+        chosen[0] = secondPivot.rightBit;
+        uint64_t secondMatchingCount = 0;
+        enumeratePerfectMatchingsBounded(
+            parent.residual.graph,
+            (uint16_t)(FULL ^ 1u),
+            secondPivot.rightBit,
+            chosen,
+            secondIndex,
+            secondWeak,
+            secondPivot.frequency,
+            stateLimit,
+            secondMatchingCount);
+        if (secondMatchingCount != secondPivot.frequency) {
+            throw std::runtime_error(
+                "F4 coverage second-layer pivot frequency mismatch");
+        }
+        generatedRecords += secondMatchingCount;
+        result.secondRawRecords += secondMatchingCount;
+        result.secondWeakStates += secondWeak.size();
+        std::vector<F4CoverageResidual> children =
+            canonicalizeF4CoverageResiduals(
+                std::move(secondWeak), stateLimit);
+        result.lookupOccurrences += children.size();
+
+        FactorCount parentSum = 0;
+        for (const F4CoverageResidual& child : children) {
+            const bool hit = graphMemo.find(child.key) != graphMemo.end();
+            result.lookupHits += hit;
+            if (uniqueKeys.insert(child.key).second &&
+                uniqueKeys.size() > stateLimit) {
+                throw std::runtime_error(
+                    "F4 coverage unique-key limit exceeded");
+            }
+            if (hit) hitKeys.insert(child.key);
+            if (exactValue) {
+                parentSum +=
+                    (FactorCount)child.residual.multiplicity *
+                    countFactorizations(child.residual.graph, degree - 2);
+            }
+        }
+        if (exactValue) {
+            splitSum +=
+                (FactorCount)parent.residual.multiplicity *
+                (FactorCount)(degree - 1) * parentSum;
+        }
+    }
+
+    result.uniqueKeys = uniqueKeys.size();
+    result.uniqueHits = hitKeys.size();
+    result.keys.assign(uniqueKeys.begin(), uniqueKeys.end());
+    std::sort(result.keys.begin(), result.keys.end());
+    if (exactValue) result.value = (FactorCount)degree * splitSum;
+    if (canonFallbacks != fallbackStart) {
+        throw std::runtime_error(
+            "F4 coverage requires strong canonical keys; increase canonbudget");
+    }
+    return result;
+}
+
 int graphComponentCount(const std::array<uint16_t, MAX_M>& graph) {
     std::array<int, 2 * MAX_M> parent{};
     for (int i = 0; i < 2 * M; ++i) parent[i] = i;
@@ -2658,6 +2936,10 @@ int main(int argc, char** argv) {
     uint64_t futureTwinTailCoverageMaxRecords = 0;
     bool futureTwinTailColorCanonical = false;
     bool futureTwinForceTailRescan = false;
+    bool f4CoverageCheck = false;
+    uint64_t f4CoverageParents = 0;
+    size_t f4CoverageMaxStates = 0;
+    uint64_t f4CoverageMaxRecords = 0;
     int limit = -1;
     int startClass = 0;
     for (int i = 2; i < argc; ++i) {
@@ -2798,6 +3080,24 @@ int main(int argc, char** argv) {
         else if (arg == "futuretailforcerescan") {
             futureTwinForceTailRescan = true;
         }
+        else if (arg == "f4coveragecheck") {
+            f4CoverageCheck = true;
+        }
+        else if (arg.rfind("f4coverageparents=", 0) == 0) {
+            f4CoverageParents = std::strtoull(
+                arg.c_str() + std::string(
+                    "f4coverageparents=").size(), nullptr, 10);
+        }
+        else if (arg.rfind("f4coveragemaxstates=", 0) == 0) {
+            f4CoverageMaxStates = (size_t)std::strtoull(
+                arg.c_str() + std::string(
+                    "f4coveragemaxstates=").size(), nullptr, 10);
+        }
+        else if (arg.rfind("f4coveragemaxrecords=", 0) == 0) {
+            f4CoverageMaxRecords = std::strtoull(
+                arg.c_str() + std::string(
+                    "f4coveragemaxrecords=").size(), nullptr, 10);
+        }
         else if (arg == "progress") verboseProbeProgress = true;
         else if (arg == "d3iso") useDegree3IsoBatch = true;
         else if (arg == "d3pairs") {
@@ -2860,9 +3160,49 @@ int main(int argc, char** argv) {
             futureTwinTailCoverageSamples != 0 ||
             futureTwinTailCoverageMaxStates != 0 ||
             futureTwinTailCoverageMaxRecords != 0;
+        const bool f4CoverageMode =
+            f4CoverageCheck ||
+            f4CoverageParents != 0 ||
+            f4CoverageMaxStates != 0 ||
+            f4CoverageMaxRecords != 0;
+        const bool f4CoverageProbe =
+            f4CoverageMode && !f4CoverageCheck;
         if (futureTwinSelfTest) {
             future_twin::Engine::runSelfTests();
             return 0;
+        }
+        if (f4CoverageCheck &&
+            (C < 4 || C > 5 || useFutureTwin || outerOnly || inspectOnly ||
+             f4CoverageParents != 0 || f4CoverageMaxStates == 0 ||
+             f4CoverageMaxRecords == 0 ||
+             f4CoverageMaxStates > 2000000 ||
+             f4CoverageMaxRecords > 100000000 ||
+             !graphCheckpointPath.empty())) {
+            throw std::runtime_error(
+                "f4coveragecheck requires C=4 or C=5, no future/outer/inspect "
+                "mode or graph checkpoint, zero f4coverageparents, and "
+                "positive bounds no larger than 2000000 states and "
+                "100000000 records");
+        }
+        if (f4CoverageProbe &&
+            (C != 6 || useFutureTwin || outerOnly || inspectOnly ||
+             !graphCheckpointReadOnly || graphCheckpointPath.empty() ||
+             !std::filesystem::exists(graphCheckpointPath) ||
+             f4CoverageParents == 0 || f4CoverageMaxStates == 0 ||
+             f4CoverageMaxRecords == 0 || limit <= 0 || limit > 64 ||
+             f4CoverageParents > 1000 ||
+             f4CoverageMaxStates > 2000000 ||
+             f4CoverageMaxRecords > 100000000)) {
+            throw std::runtime_error(
+                "F4 coverage probe requires C=6, checkpointreadonly with an "
+                "existing graph checkpoint, positive limit and all three "
+                "positive f4coverage bounds; future/outer/inspect modes are "
+                "not allowed; hard maxima are 64 classes, 1000 parents, "
+                "2000000 states, and 100000000 records");
+        }
+        if (f4CoverageMode && futureTwinTailCoverage) {
+            throw std::runtime_error(
+                "F4 coverage and future tail coverage are separate probes");
         }
         if (useFutureTwin && !graphCheckpointPath.empty()) {
             throw std::runtime_error(
@@ -3067,6 +3407,22 @@ int main(int argc, char** argv) {
             futureTailCoverageKernelPairUnion;
         std::vector<std::array<uint64_t, 3>>
             futureTailCoverageSignatureUnion;
+        uint64_t f4CoverageProbes = 0;
+        uint64_t f4CoverageTwoFactors = 0;
+        uint64_t f4CoverageFirstRaw = 0;
+        uint64_t f4CoverageFirstWeak = 0;
+        uint64_t f4CoverageFirstCanonical = 0;
+        uint64_t f4CoverageSampledParents = 0;
+        uint64_t f4CoverageSecondRaw = 0;
+        uint64_t f4CoverageSecondWeak = 0;
+        uint64_t f4CoverageLookupOccurrences = 0;
+        uint64_t f4CoverageLookupHits = 0;
+        uint64_t f4CoverageUniqueKeySum = 0;
+        uint64_t f4CoverageUniqueHitSum = 0;
+        std::unordered_set<GraphKey, GraphKeyHash> f4CoverageKeyUnion;
+        if (f4CoverageMode) {
+            f4CoverageKeyUnion.reserve(f4CoverageMaxStates);
+        }
         unsigned __int128 answer = 0;
         startClass = std::clamp(startClass, 0, (int)classes.size());
         const int endClass = limit < 0 ? (int)classes.size()
@@ -3077,7 +3433,63 @@ int main(int argc, char** argv) {
             OuterClass& oc = classes[i];
             const auto graph = graphFromHistogram(oc.representative);
             const auto classStart = std::chrono::steady_clock::now();
-            if (useFutureTwin) {
+            if (f4CoverageMode) {
+                const F4CoverageResult coverage = runF4CoverageProbe(
+                    graph,
+                    f4CoverageParents,
+                    f4CoverageMaxStates,
+                    f4CoverageMaxRecords,
+                    f4CoverageCheck);
+                ++f4CoverageProbes;
+                f4CoverageTwoFactors += coverage.twoFactorSubgraphs;
+                f4CoverageFirstRaw += coverage.firstRawRecords;
+                f4CoverageFirstWeak += coverage.firstWeakStates;
+                f4CoverageFirstCanonical +=
+                    coverage.firstCanonicalStates;
+                f4CoverageSampledParents += coverage.sampledParents;
+                f4CoverageSecondRaw += coverage.secondRawRecords;
+                f4CoverageSecondWeak += coverage.secondWeakStates;
+                f4CoverageLookupOccurrences +=
+                    coverage.lookupOccurrences;
+                f4CoverageLookupHits += coverage.lookupHits;
+                f4CoverageUniqueKeySum += coverage.uniqueKeys;
+                f4CoverageUniqueHitSum += coverage.uniqueHits;
+                for (const GraphKey& key : coverage.keys) {
+                    f4CoverageKeyUnion.insert(key);
+                    if (f4CoverageKeyUnion.size() >
+                        f4CoverageMaxStates) {
+                        throw std::runtime_error(
+                            "F4 coverage cross-class union limit exceeded");
+                    }
+                }
+                if (f4CoverageCheck) {
+                    const FactorCount reference =
+                        countFactorizations(graph, C);
+                    if (coverage.value != reference) {
+                        throw std::runtime_error(
+                            "F4 coverage two-level differential failed at class " +
+                            std::to_string(i + 1));
+                    }
+                    oc.factorizationCount = coverage.value;
+                } else {
+                    oc.factorizationCount = 0;
+                }
+                std::fprintf(stderr,
+                    "F4 coverage class=%d twoFactors=%llu firstRaw=%llu firstWeak=%llu firstCanonical=%llu parents=%llu secondRaw=%llu secondWeak=%llu lookupHits=%llu/%llu uniqueHits=%llu/%llu\n",
+                    i + 1,
+                    (unsigned long long)coverage.twoFactorSubgraphs,
+                    (unsigned long long)coverage.firstRawRecords,
+                    (unsigned long long)coverage.firstWeakStates,
+                    (unsigned long long)coverage.firstCanonicalStates,
+                    (unsigned long long)coverage.sampledParents,
+                    (unsigned long long)coverage.secondRawRecords,
+                    (unsigned long long)coverage.secondWeakStates,
+                    (unsigned long long)coverage.lookupHits,
+                    (unsigned long long)coverage.lookupOccurrences,
+                    (unsigned long long)coverage.uniqueHits,
+                    (unsigned long long)coverage.uniqueKeys);
+                std::fflush(stderr);
+            } else if (useFutureTwin) {
                 future_twin::Options options;
                 options.order = futureTwinOrder;
                 options.canonicalCacheCap = futureTwinCanonCacheCap;
@@ -3347,8 +3759,9 @@ int main(int argc, char** argv) {
                 std::chrono::steady_clock::now() - countStart).count();
             const int completed = i - startClass + 1;
             const double eta = elapsed * (endClass - i - 1) / completed;
-            const std::string factorizationString = futureTwinTailCoverage
-                ? "PROBE" : u128ToString(oc.factorizationCount);
+            const std::string factorizationString =
+                (futureTwinTailCoverage || f4CoverageProbe)
+                    ? "PROBE" : u128ToString(oc.factorizationCount);
             std::fprintf(stderr,
                          "class %d/%zu sample=%d/%d orbit=%llu mult=%llu F=%s class=%.3fs elapsed=%.3fs ETA=%.3fs "
                          "memo=%zu hit=%llu miss=%llu PM=%llu canonCache=%zu evict=%llu canon=%llu fallback=%llu nodes=%llu\n",
@@ -3374,6 +3787,10 @@ int main(int argc, char** argv) {
         if (futureTwinTailCoverage) {
             std::printf(
                 "C=%d tail coverage probe start=%d classes=%d/%zu (no F/N accumulation)\n",
+                C, startClass, totalClasses, classes.size());
+        } else if (f4CoverageProbe) {
+            std::printf(
+                "C=%d F4 coverage probe start=%d classes=%d/%zu (no F/N accumulation)\n",
                 C, startClass, totalClasses, classes.size());
         } else if (C <= 5) {
             std::printf("C=%d classes=%d/%zu N=%s\n", C, totalClasses, classes.size(),
@@ -3414,6 +3831,28 @@ int main(int argc, char** argv) {
                     (unsigned long long)degree3IsoUnknown,
                     (unsigned long long)degree3IsoNodes,
                     (unsigned long long)degree3IsoKnownKeyMisses);
+        if (f4CoverageProbes != 0) {
+            uint64_t unionHits = 0;
+            for (const GraphKey& key : f4CoverageKeyUnion) {
+                unionHits += graphMemo.find(key) != graphMemo.end();
+            }
+            std::printf(
+                "f4Coverage probes=%llu twoFactors=%llu firstRaw=%llu firstWeak=%llu firstCanonical=%llu parents=%llu secondRaw=%llu secondWeak=%llu lookupHits=%llu/%llu uniqueHitSum=%llu/%llu keyUnionHits=%llu/%llu\n",
+                (unsigned long long)f4CoverageProbes,
+                (unsigned long long)f4CoverageTwoFactors,
+                (unsigned long long)f4CoverageFirstRaw,
+                (unsigned long long)f4CoverageFirstWeak,
+                (unsigned long long)f4CoverageFirstCanonical,
+                (unsigned long long)f4CoverageSampledParents,
+                (unsigned long long)f4CoverageSecondRaw,
+                (unsigned long long)f4CoverageSecondWeak,
+                (unsigned long long)f4CoverageLookupHits,
+                (unsigned long long)f4CoverageLookupOccurrences,
+                (unsigned long long)f4CoverageUniqueHitSum,
+                (unsigned long long)f4CoverageUniqueKeySum,
+                (unsigned long long)unionHits,
+                (unsigned long long)f4CoverageKeyUnion.size());
+        }
         if (useFutureTwin) {
             std::printf(
                 "futureStats order=%s checks=%llu peakStates=%llu expanded=%llu leaves=%llu canon=%llu cacheHits=%llu colorPerms=%llu searchNodes=%llu fallbacks=%llu maxSearch=%llu tailStates=%llu tailZero=%llu tailMeanSupport=%.3f tailMaxSupport=%llu tailAssignments=%llu tailMaxValue=%llu tailKernelHits=%llu/%llu tailKernelEvictions=%llu tailColorHits=%llu/%llu tailColorOrbits=%llu tailColorMappings=%llu tailTime=%.3fs externalRaw=%llu externalReduced=%llu externalRuns=%llu externalBytes=%llu externalReusedLayers=%llu externalReusedRecords=%llu externalGenResumedParents=%llu externalTailResumed=%llu externalTime=%.3fs\n",
