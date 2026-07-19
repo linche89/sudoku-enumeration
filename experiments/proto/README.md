@@ -8,6 +8,12 @@ shortcuts, profiling results, or validation of helper identities.
 
 Highlights:
 
+- `connectivity_operator.cpp` - exact Windows decision prototype for the
+  symbol-synchronous connectivity recurrence and its proposed
+  double-permanent subset transition.  Direct/subset raw coefficients agree
+  through C=4; bounded C=5 probes prove the labelled subset frontier is
+  injective and non-compressive.  It is hard-limited to C<=5; see
+  `../../docs/methods/connectivity-operator.md`.
 - `joint_histogram.cpp` - exact box-order joint used-color histogram for the
   squared objective.  It differentially reproduces every raw transition and
   the sequential/midpoint totals through C=4.  Its bounded C=5 modes close the

@@ -161,9 +161,19 @@ and contribute an exact factor two.  Local Windows builds reproduced
 invariance, and the optimized two-symbol initializer key by key.  The C=5
 probe has state counts `1, 1, 93, 83776` after only three of ten symbols.  A
 direct next step can inspect 1,206,374,400 permutation pairs, so connectivity
-compression alone does not pass the C=5 gate and is not yet a C=6 route.  The
-proposed operator-valued double-permanent subset DP has not been implemented
-or measured.
+compression alone does not pass the C=5 gate and is not yet a C=6 route.
+
+The proposed operator-valued double-permanent subset DP has now been
+implemented as a separate Windows decision prototype.  Its direct and subset
+transitions agree per source and per labelled raw target through complete
+C=2..4.  At the C=5 third-symbol transition it has 857,244 legal assignments,
+857,244 raw targets, and zero merged subset prefixes.  Three deterministic
+100-source samples of the next transition again have zero prefix merging;
+1,434,260 canonical targets remain from 1,442,763 raw targets, or 99.410645%.
+This is structural: comparing a partial target's degrees with its fixed source
+recovers the chosen color pair in every processed band.  The naive subset DP
+therefore changes enumeration order without compressing the permutation
+prefixes and fails its C=5 decision gate.
 
 A box-order joint-histogram prototype now computes the same squared objective
 globally without enumerating outer classes.  Its state records the number of
@@ -274,6 +284,10 @@ gates, bounded C=5 frontier, and current boundary are recorded in
 `docs/reports/og2/joint-histogram-c5-frontier-20260719.md`.  The exact
 target-labelled operator and its negative C=5 scale gate are recorded in
 `docs/reports/og2/joint-histogram-operator-frontier-20260719.md`.
+The exact connectivity transition, subset-prefix injectivity result, complete
+C=2..4 differential gates, and bounded C=5 measurements are recorded in
+`docs/methods/connectivity-operator.md` and
+`docs/reports/og2/connectivity-double-permanent-20260719.md`.
 
 ## Route portfolio
 
@@ -292,13 +306,13 @@ impossible.
 | rejected as primary | whole-tail scalar memoization within G2 | 100,000/100,000 sampled complete G2 signatures are distinct; cross-class lower-level reuse is still open |
 | proven component only | factorization/orbit and future-twin per-class engines | Fast C=5 and exact G1/G2 values, but no affordable global outer sum |
 | proven component only | external pair-tail and half-kernel table | Closes G1/G2 and speeds the G2 tail 4.41x, but leaves every prefix separate |
-| proven component only | connectivity/path quotient | Exact through C=4; already 83,776 states at C=5 symbol 3 |
+| proven component only | connectivity/path quotient | Exact through C=4; already 83,776 states at C=5 symbol 3, and the naive subset operator supplies no prefix merging |
 | proven component only | streaming/checkpoint infrastructure | Controls RAM and restart risk, not total arithmetic |
 | exact through C=5; naive C=6 join fails scale gate | reverse 4+2 row-block gluing | Exact C=6 inventory is 772 two-row orbits / 298,378 pairs; trivial stabilizers force at least 1.761B double cosets, and a generic 100k-leaf prefix is 99.4% distinct after anchored canonicalization; only a bulk/external redesign remains open |
 | exact through C=4; bounded C=5 layer-2 decision | box-order joint-histogram pair DP | C=5 layer 1 has 7 states and canonical targets compress strongly, but both the 652M-leaf kernel and the labelled residual-operator lift fail scale |
 | rejected implementation | target-labelled residual operator | Exact per raw target through C=4; six C=5 sources exceed 10M states and the completed source is 97.0359% unique |
-| next global decision experiment | symbol-synchronous operator-valued double-permanent subset DP | The connectivity source layer and direct permutation-pair kernel are exact through C=4, but the implicit one-symbol operator is unimplemented |
-| open decision experiment | later-class table coverage and kernel-pair batching | Complete data exist only for G1/G2 |
+| rejected implementation | naive symbol-synchronous double-permanent subset DP | Exact per raw target through C=4; its labelled partial state uniquely determines every assignment prefix, with zero merges in bounded C=5 probes |
+| next bounded engineering experiment | later-class table coverage and kernel-pair batching | Complete data exist only for G1/G2; a read-only or transaction-bounded sampling path must be established before measuring later classes |
 | open, lower-priority decision | exact rank of the reduced band kernel | Distinct from the rejected 3+3 ranks; the proposed C=5 modular-rank experiment was never completed |
 | open theory route | balanced-switch/coherent-configuration transform | The naive Johnson version is inadequate; no compact algebra or fast exact transform is known |
 | open high-upside route | cross-class symbolic prefix/global contraction | Could remove class-local frontiers; no bounded exact implementation yet |
@@ -311,23 +325,29 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-The box-order target-labelled operator experiment is complete and negative.
-The next global decision experiment is the separate symbol-synchronous
-operator-valued double-permanent subset DP proposed for the connectivity
-recurrence.  First retain a local decision prototype for the already verified
-connectivity state and direct permutation-pair transition.  Then implement the
-implicit one-symbol operator and require per-source/per-target agreement at
-C=3 and C=4 before measuring bounded C=5 states.  Its internal frontier and
-completed target support, not the formal subset count alone, decide whether it
-passes.
+The symbol-synchronous double-permanent subset experiment is complete and
+negative.  The retained prototype passes direct/subset coefficient gates
+through C=4, but its partial target degree vector uniquely recovers every
+processed-band choice.  It has no internal DP compression to refine further
+in the current coordinates.  There is now no implemented global C=6 route
+that has passed its required scale gate.
 
 The mathematical box interfaces are known, but the affordable implementation
 of every pass is not.  A contraction-order planner may choose among verified
 exact kernels and boundary representations using measured time, memory, and
 record costs.  It cannot drop combinatorial paths or manufacture a missing
-sufficient quotient.  No complete connectivity C=5 rerun through a new
-operator, complete joint-histogram C=5 run, or C=6 extension is authorized
-before the double-permanent C=3..5 decision gate.
+sufficient quotient.  No complete connectivity C=5 rerun, complete
+joint-histogram C=5 run, or C=6 extension of either decision prototype is
+authorized.
+
+The next bounded engineering objective is the existing per-class sharing
+track: establish a safe later-class sample path, then measure exact coverage
+against the G1/G2 half-kernel table and repetition of kernel-key pairs and
+`(half key, relative row, relative color)` transforms.  The diagnostic must
+use deterministic later outer-class indices, positive work limits, explicit
+time/RSS bounds, and read-only existing state or closed transactional output.
+Its first result is coverage and repetition evidence, not a new F6 value or a
+projection of the complete 63,199-class cost.
 
 Reverse gluing stays open as a separate historical-engineering question: find
 a bulk four-row generator/lookup with delayed external reduction and a
@@ -335,12 +355,9 @@ canonical key cheaper than a fresh 46,080-image scan.  Pettersen's “more than
 900 million” lookup statement is qualitatively consistent with the new
 frontier data but still lacks a locally reproducible convention or dataset.
 
-In parallel, the per-class track should remain bounded: probe later-class
-coverage against the G1/G2 table and measure repetition of kernel-key pairs and
-`(half key, relative row, relative color)` transforms.  The final layer must
-also be streamed or shared across outer graphs; a 908-MiB leaf table does not
-remove a 9.08-GB per-class frontier.  The present evidence does not justify a
-full-run projection.
+The final layer must also be streamed or shared across outer graphs; a
+908-MiB leaf table does not remove a 9.08-GB per-class frontier.  The present
+evidence does not justify a full-run projection.
 
 No full 63,199-class C=6 run is authorized.
 

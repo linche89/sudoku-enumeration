@@ -136,15 +136,22 @@ five-million-leaf prefix reduced to 38,373 canonical targets, and one complete
 6,516,556-leaf source reduced to 20,318 targets.  This keeps the boundary
 representation open but rejects the naive leaf-by-leaf transition as a C=6
 kernel.  The scalar memo omits target identity and cycle weight; its
-operator-valued lift has not been implemented.
+target- and cycle-aware lift is exact through C=4 but also fails its C=5 scale
+gate.  Six of seven C=5 source transitions exceed ten million lifted states;
+the remaining source reaches 6,323,400 raw states from 6,516,556 leaves.
 
 A related backup proposal applies each symbol-synchronous transition as an
-operator-valued double permanent with a two-subset internal DP.  No
-implementation or internal-frontier data exist for the current 83,776-state
-C=5 connectivity layer.  Both proposals now ask the same engineering
-question in different boundary coordinates: whether the exact local operator
-can be applied with a small internal frontier rather than by enumerating all
-completed placements.
+operator-valued double permanent with a two-subset internal DP.  That proposal
+has now been implemented and differentially checked per raw target through
+C=4.  It is exact but has no internal compression.  For a fixed source, the
+partial target degree increments in each processed band identify that band's
+chosen left and right colors, so the partial target recovers the complete
+assignment prefix.  At the C=5 third symbol there are 857,244 legal
+assignments, 857,244 raw targets, and zero prefix merges.  Three deterministic
+100-source samples of the fourth-symbol transition again have zero merges;
+1,434,260 canonical targets remain from 1,442,763 raw targets.  Thus both
+straightforward operator lifts reach a near-injective labelled frontier before
+the useful full-group quotient.
 
 ## Audited future-twin route
 
@@ -261,19 +268,20 @@ all implicit full-rank contractions.
 
 ## Required next result
 
-The next global decision result should lift the measured box-order scalar
-residual DP to an operator-valued frontier retaining target and exact cycle
-information.  It must differentially match the current contingency kernel per
-source and target at C=3/C=4, then report internal-frontier and completed-
-support data for all seven C=5 layer-1 sources.  Near-injective operator growth
-rejects the kernel; a controlled frontier justifies closing C=5 layer 2 and
-measuring layer 3.  It must reproduce complete `N(5)` before any C=6 use.
+Both proposed local operator lifts have now been measured and rejected in
+their naive labelled coordinates.  No implemented global C=6 route currently
+passes its scale gate.  A planner may still compare verified contraction
+edges, but shortest-path optimization cannot replace the missing sufficient
+state or turn an injective enumeration into a compressive DP.
 
-The symbol-synchronous double-permanent proposal remains a separate fallback
-measurement on the existing 83,776-state C=5 connectivity layer.  A planner
-may compare the two exact boundary coordinates and contraction orders only
-after both edge costs are measured; shortest-path optimization cannot replace
-the missing sufficient state.
+The next bounded engineering result should come from the retained per-class
+sharing track.  It must first establish a safe deterministic later-class
+sample path, then measure exact G1/G2-table hit coverage, new half keys,
+kernel-key-pair repetition, and repetition of `(half key, relative D8,
+relative color)` transforms.  Runs require positive work limits, explicit
+time/RSS bounds, and read-only existing state or closed transactional output.
+The result is a coverage and batching decision, not a new F6 value or a
+complete-run extrapolation.
 
 In parallel as a lower-level engineering question, reverse gluing can be
 reopened only with a concrete bulk four-row generator or lookup, delayed
@@ -281,21 +289,18 @@ external reduction, and a canonical key that avoids a fresh full group scan.
 Pettersen's historical “more than 900 million” statement remains a rough
 comparison point, not an acceptance oracle.
 
-The per-class track should independently measure exact G1/G2-table coverage on
-a bounded later-class prefix/sample and repetition of kernel-key pairs and
-`(half key, relative D8, relative color)` transformations.  Those data decide
-whether transformed-target caching or batched exact inner products can reduce
-the remaining contraction.  A stronger exact quotient, streamed final layer,
-or global prefix contraction is still needed to avoid one 9-GB-class job per
-orbit.  G1 and G2 alone do not determine the class-cost distribution, and they
-do not justify a full-run projection.
+Those later-class data decide whether transformed-target caching or batched
+exact inner products can reduce the remaining contraction.  A stronger exact
+quotient, streamed final layer, or global prefix contraction is still needed
+to avoid one 9-GB-class job per orbit.  G1 and G2 alone do not determine the
+class-cost distribution, and they do not justify a full-run projection.
 
 The 3+3 route should be reopened only if a new proposal explains how to build
 or apply the full-rank block operator without materializing the 63,199 outer
 coordinates or the larger midpoint algebra.
 
 Two older Problem-B questions remain open but are lower priority than the
-reverse-gluing probe.  The exact C=5 modular rank of the reduced band
+later-class sharing probe.  The exact C=5 modular rank of the reduced band
 kernel was never computed; this is a different operator from the rejected
 3+3 channel maps.  Also, the naive per-symbol Johnson commutation proposal is
 inadequate, but a balanced-switch or coherent-configuration algebra has not
@@ -317,3 +322,8 @@ The verified reverse-gluing formula and gates are in
 `../reports/og2/reverse-gluing-c4-c5-20260718.md`.  The exact C=6 two-row
 inventory and bounded pair samples are in
 `../reports/og2/reverse-gluing-c6-frontier-probe-20260718.md`.
+The box-order operator frontier is in
+`../reports/og2/joint-histogram-operator-frontier-20260719.md`.
+The connectivity subset-operator proof and measurements are in
+`../methods/connectivity-operator.md` and
+`../reports/og2/connectivity-double-permanent-20260719.md`.

@@ -10,6 +10,9 @@
 
 - `methods/factorization-orbit.md` — current factorization/orbit algorithm.
 - `methods/future-twin.md` — optional exact future-twin recurrence and gates.
+- `methods/connectivity-operator.md` — exact symbol-synchronous connectivity
+  recurrence and the failed C=5 compression gate for its naive
+  double-permanent subset DP.
 - `methods/joint-histogram.md` — exact box-order paired-histogram contraction
   through C=4, bounded C=5 frontier data, and the failed scale gate for its
   target-labelled residual operator.
@@ -26,6 +29,7 @@
 
 ## Dated evidence
 
+- `reports/og2/connectivity-double-permanent-20260719.md`
 - `reports/og2/joint-histogram-operator-frontier-20260719.md`
 - `reports/og2/joint-histogram-c5-frontier-20260719.md`
 - `reports/og2/joint-histogram-c2-c4-20260719.md`

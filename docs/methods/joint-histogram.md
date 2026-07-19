@@ -134,8 +134,11 @@ processed source-type prefix, so simply canonicalizing partial targets is not
 valid.  No such sufficient quotient is currently established.
 
 This result is separate from the symbol-synchronous operator-valued
-double-permanent subset DP.  That proposal acts on the connectivity
-recurrence's one-symbol transition and remains unimplemented.
+double-permanent subset DP.  That proposal was subsequently implemented on
+the connectivity recurrence and also failed its C=5 compression gate: the
+partial raw degree state uniquely determines every processed-band choice, so
+its subset frontier has no prefix merging.  See
+`connectivity-operator.md`.
 
 The mathematical box-order interfaces are known, but the affordable kernels
 for all passes are not.  No C=6 run, outer-class loop, or checkpoint access is

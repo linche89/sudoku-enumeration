@@ -174,6 +174,61 @@ accept C=6.  See
 `../methods/joint-histogram.md` and
 `../reports/og2/joint-histogram-operator-frontier-20260719.md`.
 
+## Connectivity subset-operator decision prototype
+
+This independent Windows prototype is also outside the standard build:
+
+```powershell
+g++ -O3 -mpopcnt -std=c++20 -Wall -Wextra -fopenmp `
+  experiments\proto\connectivity_operator.cpp `
+  -o build\connectivity_operator.exe
+
+.\build\connectivity_operator.exe 2 differential
+.\build\connectivity_operator.exe 3 differential
+.\build\connectivity_operator.exe 4 differential
+```
+
+`differential` compares the direct permutation-pair transition with the
+two-subset transition per source and per labelled raw target.  The commands
+must reproduce the ordinary C=2..4 totals and the connectivity layers listed
+in `../methods/connectivity-operator.md`.  The independent optimized C=5
+two-symbol initializer check is:
+
+```powershell
+& .\scripts\watch_rss.ps1 `
+  -Exe .\build\connectivity_operator.exe `
+  -Arguments @('5','stop=2','subset','initcheck') `
+  -LimitGB 4 -MaxMinutes 2 -IntervalSeconds 1
+```
+
+The bounded third-symbol gate is cheap:
+
+```powershell
+.\build\connectivity_operator.exe 5 stop=3 differential
+```
+
+Expected states are `1,1,93,83776`; the transition has 857,244 valid/raw
+targets and zero subset-prefix merges.  Any fourth-symbol C=5 measurement
+requires a positive `sourceprobe`, explicit `maxoperatorstates` and
+`maxoperatorrecords`, and an external time/RSS guard.  For example:
+
+```powershell
+& .\scripts\watch_rss.ps1 `
+  -Exe .\build\connectivity_operator.exe `
+  -Arguments @('5','stop=4','differential',`
+               'sourcestart=40000','sourceprobe=100',`
+               'maxoperatorstates=20000',`
+               'maxoperatorrecords=100000') `
+  -LimitGB 4 -MaxMinutes 2 -IntervalSeconds 1
+```
+
+This is an exact selected-source probe, not a closed layer.  The subset state
+provably identifies every processed-band choice, so increasing the bounds
+does not create DP merging.  Do not extend the prototype to C=6 or start a
+complete C=5 fourth-symbol transition.  See
+`../methods/connectivity-operator.md` and
+`../reports/og2/connectivity-double-permanent-20260719.md`.
+
 ## Read-only C=6 gate
 
 ```powershell
