@@ -357,12 +357,13 @@ generation during a read-only tail rescan:
   futureexternallayers=2 checkpointreadonly
 ```
 
-`futuretailkerneltable=` requires `futureexternal`, `checkpointreadonly`,
-`futuretailrows=7`, and `futuretailcolorcanon`.  The loader audits
-`COMMITTED.manifest`, the exact file length, internal checksum, sorted keys,
-contiguous offsets, and every kernel's signature order before exposing the
-table to workers.  A single loaded payload is shared read-only across all
-workers.
+Production `futuretailkerneltable=` use requires `futureexternal`,
+`checkpointreadonly`, `futuretailrows=7`, and `futuretailcolorcanon`.  The
+bounded coverage diagnostic in the next section is the only non-external
+exception.  The loader audits `COMMITTED.manifest`, the exact file length,
+internal checksum, sorted keys, contiguous offsets, and every kernel's
+signature order before exposing the table to workers.  A single loaded
+payload is shared read-only across all workers.
 
 Verified G2 bounds are:
 
@@ -389,6 +390,41 @@ positive-limit command.  The table directory must be new or contain an exactly
 matching committed table.  Do not overwrite an uncommitted directory; inspect
 and distill it first.
 
+## Read-only later-class coverage probe
+
+This mode measures table coverage and cross-class repetition without
+evaluating a tail or accumulating `F`/`N`.  All five work bounds and a
+positive `limit=` are mandatory:
+
+```powershell
+& .\scripts\watch_rss.ps1 `
+  -Exe .\build\factorization_orbit.exe `
+  -Arguments @(
+    '6','start=10000','limit=10','future',
+    'futureorder=pair-adaptive-tail','futuretailrows=7',
+    'futuretailcolorcanon','checkpointreadonly',
+    'futuretailkerneltable=data\logs\future-tail-kernel-table-c6-g1-g2-20260715',
+    'futuretailcoverageparents=5','futuretailcoveragemidparents=50',
+    'futuretailcoveragesamples=500',
+    'futuretailcoveragemaxstates=500000',
+    'futuretailcoveragemaxrecords=5000000') `
+  -LimitGB 4 -MaxMinutes 3 -IntervalSeconds 1 `
+  -LogPath data\logs\future-tail-coverage.rss.csv `
+  -StdoutPath data\logs\future-tail-coverage.out `
+  -StderrPath data\logs\future-tail-coverage.err
+```
+
+The mode rejects external writes, scans, inventories, forced rescans, and
+factorization checks.  It sorts each exact source layer before evenly spaced
+sampling, so repeated commands have deterministic counters.  Output must say
+`F=PROBE` and `no F/N accumulation`.
+
+The verified ten-class command above found no cross-class reuse among 4,962
+selected kernel pairs or 5,000 relative-transform signatures.  It is retained
+for audit and future-table comparisons, not as a path to a full class sweep.
+See
+`../reports/og2/future-tail-later-class-coverage-20260719.md`.
+
 ## Writable C=6 experiments
 
 Before a writable run:
@@ -402,7 +438,10 @@ Before a writable run:
 
 Do not start a full 63,199-class run.  G2 is now closed, but its 221-million
 state frontier and 13.7-minute table-backed tail demonstrate that independent
-class-local closure does not yet scale to the full outer family.  The next
-bounded target is a later-class prefix/sample coverage measurement against the
-existing table plus kernel-pair batching diagnostics, not another
-unconstrained class sweep.
+class-local closure does not yet scale to the full outer family.  The
+later-class coverage decision is complete and negative for the fixed G1/G2
+table and naive kernel-pair batching.  Reopening reverse gluing requires an
+exact bulk lookup design that avoids, rather than merely streams, its known
+1.761-billion trivial-stabilizer pair placements.  No C=6 four-row layer may
+be launched before that design passes complete C=4/C=5 differential gates and
+a separately bounded C=6 prefix test.

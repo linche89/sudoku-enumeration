@@ -236,9 +236,28 @@ G1 kernel evictions = 0
 Both committed factorization counts were reproduced.  This resolves the
 private kernel-generation and eviction question for G1/G2, but not the exact
 inner product for each complete signature: G2 still performs 1,328,630,760
-color refinements and 442,876,920 kernel contractions.  A bounded later-class
-coverage probe and batched or transformed-target kernel contraction are now
-the next exact engineering questions.
+color refinements and 442,876,920 kernel contractions.
+
+The later-class coverage decision is now complete.  A deterministic read-only
+probe passed C=4 table self-coverage and independently reproduced the complete
+2,295-state C=5 class-300 boundary.  At C=6, however, 1,000-state samples
+ranged from full G1/G2-table coverage at class 3 to zero at class 31,600.  In
+classes 10,001--10,010, 5,000 sampled states produced:
+
+```text
+half hits                         = 5234 / 30000
+per-class unique half-key sum     = 24621
+cross-class half-key union        = 23452
+per-class/cross-class pair count  = 4962 / 4962
+per-class/cross-class signatures  = 5000 / 5000
+```
+
+Thus the fixed G1/G2 table does not give broad later-class coverage, and
+neither selected kernel pairs nor full relative-transform signatures supplied
+cross-class batching in this block.  This rejects that particular reuse
+mechanism, not the half-kernel quotient itself.  A larger dynamic table would
+mostly acquire new later-class keys and would still leave the class-local
+prefix untouched.
 
 ## Audited 3+3 result
 
@@ -268,43 +287,44 @@ all implicit full-rank contractions.
 
 ## Required next result
 
-Both proposed local operator lifts have now been measured and rejected in
-their naive labelled coordinates.  No implemented global C=6 route currently
-passes its scale gate.  A planner may still compare verified contraction
-edges, but shortest-path optimization cannot replace the missing sufficient
-state or turn an injective enumeration into a compressive DP.
+Both proposed local operator lifts and the fixed-table later-class reuse
+proposal have now been measured and rejected in their tested coordinates.  No
+implemented global C=6 route currently passes its scale gate.  A planner may
+still compare verified contraction edges, but shortest-path optimization
+cannot replace a missing sufficient state or turn an injective enumeration
+into a compressive DP.
 
-The next bounded engineering result should come from the retained per-class
-sharing track.  It must first establish a safe deterministic later-class
-sample path, then measure exact G1/G2-table hit coverage, new half keys,
-kernel-key-pair repetition, and repetition of `(half key, relative D8,
-relative color)` transforms.  Runs require positive work limits, explicit
-time/RSS bounds, and read-only existing state or closed transactional output.
-The result is a coverage and batching decision, not a new F6 value or a
-complete-run extrapolation.
+The next primary result must be an exact bulk reverse-gluing construction that
+changes the decisive work factor.  It must generate or look up globally unique
+four-row configurations without enumerating the known 1.761-billion
+trivial-stabilizer pair placements.  Merely sending that same nearly injective
+placement list through an external sort controls RAM but does not pass the
+gate.  Before any C=6 data file is authorized, an independent implementation
+must reproduce every C=4/C=5 `(coordinate orbit, labelled multiplicity, F)`
+triple.  Only then may a positive-limit, time/RSS/record-bounded C=6 prefix
+measure external bytes, duplicate ratio, and throughput.
 
-In parallel as a lower-level engineering question, reverse gluing can be
-reopened only with a concrete bulk four-row generator or lookup, delayed
-external reduction, and a canonical key that avoids a fresh full group scan.
-Pettersen's historical “more than 900 million” statement remains a rough
-comparison point, not an acceptance oracle.
+Pettersen's historical “more than 900 million” statement keeps the bulk route
+plausible, but remains a rough comparison point rather than an acceptance
+oracle.  If no exact construction removes the pair-placement factor, this
+route has no qualified next implementation step.
 
-Those later-class data decide whether transformed-target caching or batched
-exact inner products can reduce the remaining contraction.  A stronger exact
-quotient, streamed final layer, or global prefix contraction is still needed
-to avoid one 9-GB-class job per orbit.  G1 and G2 alone do not determine the
-class-cost distribution, and they do not justify a full-run projection.
+A cross-class symbolic prefix or global contraction remains the high-upside
+theory alternative.  A stronger exact quotient or streamed shared final layer
+is still needed to avoid one 9-GB-class job per orbit.  G1 and G2 do not
+justify a full-run projection.
 
 The 3+3 route should be reopened only if a new proposal explains how to build
 or apply the full-rank block operator without materializing the 63,199 outer
 coordinates or the larger midpoint algebra.
 
-Two older Problem-B questions remain open but are lower priority than the
-later-class sharing probe.  The exact C=5 modular rank of the reduced band
-kernel was never computed; this is a different operator from the rejected
-3+3 channel maps.  Also, the naive per-symbol Johnson commutation proposal is
-inadequate, but a balanced-switch or coherent-configuration algebra has not
-been constructed or ruled out.  Neither currently supplies an algorithm.
+Two older Problem-B questions remain open.  The exact C=5 modular rank of the
+reduced band kernel was never computed; this is a different operator from the
+rejected 3+3 channel maps and is a cheap secondary falsification experiment if
+the bulk lookup derivation stalls.  Also, the naive per-symbol Johnson
+commutation proposal is inadequate, but a balanced-switch or
+coherent-configuration algebra has not been constructed or ruled out.  Neither
+currently supplies an algorithm.
 
 Raw source material is preserved under `../expert/2026-07-12/`,
 `../expert/2026-07-13/`, `../expert/2026-07-14/`,
@@ -314,8 +334,10 @@ Raw source material is preserved under `../expert/2026-07-12/`,
 implementation and full-rescan evidence are in
 `../reports/og2/future-tail-color-symmetry-c6-20260715.md`.  Complete
 inventory, overlap, shared-table, and forced G1/G2 evidence are in
-`../reports/og2/future-tail-kernel-table-c6-20260715.md`.  The linear-sum scope
-correction, symbol-connectivity audit, and current route portfolio are in
+`../reports/og2/future-tail-kernel-table-c6-20260715.md`.  The deterministic
+later-class coverage and batching decision is in
+`../reports/og2/future-tail-later-class-coverage-20260719.md`.  The linear-sum
+scope correction, symbol-connectivity audit, and current route portfolio are in
 `../reports/og2/c6-route-portfolio-20260717.md`.
 The verified reverse-gluing formula and gates are in
 `../methods/reverse-gluing.md` and

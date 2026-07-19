@@ -119,9 +119,17 @@ local assignments, and made no kernel evictions.  The same table forced G1 in
 
 This removes the G1/G2 private-kernel generation, eviction, and tail-RAM
 walls.  It does not remove the remaining scaling wall: one class-local job
-still needs a 9.08 GB frontier and hundreds of millions of tail states, a G2
-tail still takes 13.7 minutes, and table coverage and frontier cost are unknown
-for the other 63,197 classes.  No full C=6 count is currently in progress.
+still needs a 9.08 GB frontier and hundreds of millions of tail states, and a
+G2 tail still takes 13.7 minutes.
+
+A deterministic read-only coverage probe has now tested the same table on
+later C=6 classes.  One-thousand-state samples ranged from complete coverage
+at class 3 to zero at class 31,600.  In ten consecutive classes
+10,001--10,010, only 5,234/30,000 half-key occurrences hit; the 4,962 selected
+kernel pairs and all 5,000 relative-transform signatures had zero cross-class
+reuse.  The fixed G1/G2 table therefore does not generalize into a broad
+later-class table or batching solution.  No full C=6 count is currently in
+progress.
 
 ## Audited route decision
 
@@ -135,9 +143,11 @@ gate, and the cold G1 value have all been verified.  Paired row processing, an
 exact seven-row tail, external sort/reduce, and parent-boundary transactions
 now close G1 and G2 within bounded memory.  They do not provide the cross-class
 prefix reuse or global contraction needed for the complete outer sum.  The
-shared half-kernel table does provide exact cross-class reuse at the leaf
-kernel level, but it leaves each outer graph's prefix and kernel-pair
-contractions separate.
+shared half-kernel table provides exact reuse between G1 and G2 at the
+leaf-kernel level, but it leaves each outer graph's prefix and kernel-pair
+contractions separate.  Later-class probes show that this reuse is not broad:
+coverage can fall to zero, and a ten-class block had no repeated selected
+kernel pair or complete relative-transform signature across classes.
 
 The proposed natural 3+3 low-rank route did not pass its required small-C
 decision gate.  The exact symmetry-block endpoint exists, but reproduced
@@ -272,6 +282,9 @@ G1/G2 table rescans are recorded in
 scope correction, connectivity reproduction, differential checks, C=5 wall,
 and current route portfolio are recorded in
 `docs/reports/og2/c6-route-portfolio-20260717.md`.
+The deterministic later-class table-coverage probe, cross-class unions, and
+negative batching decision are recorded in
+`docs/reports/og2/future-tail-later-class-coverage-20260719.md`.
 The reverse-gluing derivation, exact C=4/C=5 gates, interval-file evidence,
 and C=6 decision boundary are recorded in `docs/methods/reverse-gluing.md` and
 `docs/reports/og2/reverse-gluing-c4-c5-20260718.md`.  The exact C=6 two-row
@@ -305,14 +318,14 @@ impossible.
 | rejected as primary | naive independent 63,199-class sweep | G2 needs a 9.08-GB frontier and 824.440-s tail |
 | rejected as primary | whole-tail scalar memoization within G2 | 100,000/100,000 sampled complete G2 signatures are distinct; cross-class lower-level reuse is still open |
 | proven component only | factorization/orbit and future-twin per-class engines | Fast C=5 and exact G1/G2 values, but no affordable global outer sum |
-| proven component only | external pair-tail and half-kernel table | Closes G1/G2 and speeds the G2 tail 4.41x, but leaves every prefix separate |
+| proven component only | external pair-tail and half-kernel table | Closes G1/G2 and speeds the G2 tail 4.41x, but leaves every prefix separate; later-class coverage can fall to zero |
 | proven component only | connectivity/path quotient | Exact through C=4; already 83,776 states at C=5 symbol 3, and the naive subset operator supplies no prefix merging |
 | proven component only | streaming/checkpoint infrastructure | Controls RAM and restart risk, not total arithmetic |
 | exact through C=5; naive C=6 join fails scale gate | reverse 4+2 row-block gluing | Exact C=6 inventory is 772 two-row orbits / 298,378 pairs; trivial stabilizers force at least 1.761B double cosets, and a generic 100k-leaf prefix is 99.4% distinct after anchored canonicalization; only a bulk/external redesign remains open |
 | exact through C=4; bounded C=5 layer-2 decision | box-order joint-histogram pair DP | C=5 layer 1 has 7 states and canonical targets compress strongly, but both the 652M-leaf kernel and the labelled residual-operator lift fail scale |
 | rejected implementation | target-labelled residual operator | Exact per raw target through C=4; six C=5 sources exceed 10M states and the completed source is 97.0359% unique |
 | rejected implementation | naive symbol-synchronous double-permanent subset DP | Exact per raw target through C=4; its labelled partial state uniquely determines every assignment prefix, with zero merges in bounded C=5 probes |
-| next bounded engineering experiment | later-class table coverage and kernel-pair batching | Complete data exist only for G1/G2; a read-only or transaction-bounded sampling path must be established before measuring later classes |
+| rejected as broad reuse | fixed G1/G2 table coverage and naive kernel-pair batching | In classes 10,001--10,010 only 5,234/30,000 half occurrences hit, with zero cross-class reuse among 4,962 selected pairs and 5,000 full signatures |
 | open, lower-priority decision | exact rank of the reduced band kernel | Distinct from the rejected 3+3 ranks; the proposed C=5 modular-rank experiment was never completed |
 | open theory route | balanced-switch/coherent-configuration transform | The naive Johnson version is inadequate; no compact algebra or fast exact transform is known |
 | open high-upside route | cross-class symbolic prefix/global contraction | Could remove class-local frontiers; no bounded exact implementation yet |
@@ -325,39 +338,45 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-The symbol-synchronous double-permanent subset experiment is complete and
-negative.  The retained prototype passes direct/subset coefficient gates
-through C=4, but its partial target degree vector uniquely recovers every
-processed-band choice.  It has no internal DP compression to refine further
-in the current coordinates.  There is now no implemented global C=6 route
-that has passed its required scale gate.
+The later-class half-kernel coverage experiment is complete and negative for
+the tested mechanism.  The retained read-only diagnostic passes C=4 table
+self-coverage and a complete 2,295-state C=5 class-300 differential.  Across
+later C=6 classes, however, fixed G1/G2-table coverage can fall to zero, while
+selected kernel pairs and full relative-transform signatures are essentially
+unique.  Extending that fixed table or naively batching those pairs is not the
+missing global contraction.
 
-The mathematical box interfaces are known, but the affordable implementation
-of every pass is not.  A contraction-order planner may choose among verified
-exact kernels and boundary representations using measured time, memory, and
-record costs.  It cannot drop combinatorial paths or manufacture a missing
-sufficient quotient.  No complete connectivity C=5 rerun, complete
-joint-histogram C=5 run, or C=6 extension of either decision prototype is
-authorized.
+There is still no implemented global C=6 route that has passed its scale
+gate.  The mathematical box interfaces are known, but the affordable
+implementation of every pass is not.  A contraction-order planner can choose
+among verified edges; it cannot manufacture a missing sufficient quotient or
+turn a nearly injective edge into a compressive DP.
 
-The next bounded engineering objective is the existing per-class sharing
-track: establish a safe later-class sample path, then measure exact coverage
-against the G1/G2 half-kernel table and repetition of kernel-key pairs and
-`(half key, relative row, relative color)` transforms.  The diagnostic must
-use deterministic later outer-class indices, positive work limits, explicit
-time/RSS bounds, and read-only existing state or closed transactional output.
-Its first result is coverage and repetition evidence, not a new F6 value or a
-projection of the complete 63,199-class cost.
+The next primary research gate is a substantially different bulk
+reverse-gluing lookup, because reverse gluing has complete C=2..5 correctness
+and historical C=6 precedent.  Before any large C=6 file is generated, the
+new design must:
 
-Reverse gluing stays open as a separate historical-engineering question: find
-a bulk four-row generator/lookup with delayed external reduction and a
-canonical key cheaper than a fresh 46,080-image scan.  Pettersen's “more than
-900 million” lookup statement is qualitatively consistent with the new
-frontier data but still lacks a locally reproducible convention or dataset.
+1. derive an exact construction whose work is tied to globally unique
+   four-row configurations or reusable lookup entries, rather than enumerating
+   the known 1.761-billion trivial-stabilizer pair placements;
+2. reproduce every C=4 and C=5
+   `(coordinate orbit, labelled multiplicity, F)` triple through an
+   implementation independent of the retained pairwise interval kernel; and
+3. only after that work-factor gate passes, run a positive-limit C=6 external
+   prefix with explicit record, state, time, and RSS limits.
 
-The final layer must also be streamed or shared across outer graphs; a
-908-MiB leaf table does not remove a 9.08-GB per-class frontier.  The present
-evidence does not justify a full-run projection.
+Merely streaming the same nearly injective placement list is not progress on
+the decisive cost.  Pettersen's “more than 900 million” lookup statement is a
+rough historical comparison point, not authorization to launch such a table
+or an acceptance oracle.
+
+The cross-class symbolic-prefix/global-contraction route remains the
+high-upside theory alternative.  The exact C=5 modular rank of the distinct
+reduced band kernel remains a cheap secondary falsification experiment if the
+bulk lookup derivation stalls.  Neither currently supplies an implementation.
+The final layer must still be streamed or shared across outer graphs; a
+908-MiB leaf table does not remove a 9.08-GB per-class frontier.
 
 No full 63,199-class C=6 run is authorized.
 

@@ -77,10 +77,12 @@ the sufficient raw and color-canonical tail signatures by exact
 reconstruction.  The color refinement is checked against brute `D8 x S_C`
 enumeration.  The test also covers external sort/reduce, intentional
 parent-boundary interruption, generation restart, partial tail restart, and
-completed read-only restart.  `futurecheck` compares every outer class with
-the current exact engine, rather than comparing only the final weighted sum.
-The forced budget-one test makes the weak-key path active and verifies that it
-remains exact.
+completed read-only restart.  It additionally constructs a complete C=4
+coverage-probe boundary and requires exact state-count and table-self-coverage
+agreement.  `futurecheck` compares every outer class with the current exact
+engine, rather than comparing only the final weighted sum.  The forced
+budget-one test makes the weak-key path active and verifies that it remains
+exact.
 
 ## External exact layers and checkpoints
 
@@ -160,12 +162,52 @@ of the two kernels and applies the inverse row and color transforms when the
 sides are swapped.  A missing table key falls back to the exact existing
 generator and bounded private cache.
 
-External table use requires `futureexternal`, `checkpointreadonly`,
-`futuretailrows=7`, and `futuretailcolorcanon`.  The complete G1/G2 table has
-113,406 keys, 118,697,748 records, and a 952,303,792-byte file.  Complete
-forced G1 and G2 rescans hit every selected kernel and reproduce both exact
-factorization counts.  Format, overlap, checksums, and timings are recorded in
+Production external table use requires `futureexternal`,
+`checkpointreadonly`, `futuretailrows=7`, and `futuretailcolorcanon`.  The
+bounded coverage diagnostic below is the only non-external exception and
+remains read-only.  The complete G1/G2 table has 113,406 keys, 118,697,748
+records, and a 952,303,792-byte file.  Complete forced G1 and G2 rescans hit
+every selected kernel and reproduce both exact factorization counts.  Format,
+overlap, checksums, and timings are recorded in
 `../reports/og2/future-tail-kernel-table-c6-20260715.md`.
+
+## Bounded later-class coverage diagnostic
+
+Five positive options enable a deterministic read-only decision probe:
+
+```text
+futuretailcoverageparents=
+futuretailcoveragemidparents=
+futuretailcoveragesamples=
+futuretailcoveragemaxstates=
+futuretailcoveragemaxrecords=
+```
+
+The probe requires C>=4, a positive `limit=`, a pair-tail order,
+`futuretailrows=7`, `futuretailcolorcanon`, `checkpointreadonly`, and an
+existing `futuretailkerneltable=`.  It rejects external generation, scans,
+inventories, forced rescans, and factorization checks.  Hard CLI maxima are 64
+classes, 1,000 first-stage parents, 10,000 second-stage parents, 100,000 final
+samples, 2,000,000 states, and 100,000,000 generated records.
+
+The exact prefix stops two transitions before the seven-row boundary.  Sorted
+states are sampled at even deterministic indices and expanded through those
+two transitions under both hard bounds.  For each final sample, all three
+cuts and six color-canonical half keys are tested against the table.  The
+output reports occurrence coverage, unique-key coverage, the best available
+0/1/2-hit cut, exact kernel-pair unions, and exact unions including relative
+D8 and color transforms.  Coverage mode prints `F=PROBE` and performs no
+factorization or Sudoku-total accumulation.
+
+A complete C=5 class-300 boundary independently matched its committed 2,295
+records and had 6,000/6,000 table hits.  Later C=6 coverage is not stable:
+1,000-state probes ranged from 6,000/6,000 half hits at class 3 to 0/6,000 at
+class 31,600.  In a ten-class block at classes 10,001--10,010, 5,000 samples
+had 5,234/30,000 half hits, no kernel-pair reuse across classes, and no full
+relative-signature reuse.  The fixed G1/G2 table and naive pair batching are
+therefore rejected as a broad later-class mechanism.  The exact probe design,
+commands, distributed samples, and decision scope are recorded in
+`../reports/og2/future-tail-later-class-coverage-20260719.md`.
 
 ## C=6 use
 
