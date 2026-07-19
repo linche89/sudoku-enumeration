@@ -102,6 +102,62 @@ the program refuses an unbounded C=6 join.  See `../methods/reverse-gluing.md`,
 `../reports/og2/reverse-gluing-c4-c5-20260718.md`, and
 `../reports/og2/reverse-gluing-c6-frontier-probe-20260718.md`.
 
+## Joint-histogram decision prototype
+
+This prototype is also outside the standard build:
+
+```powershell
+g++ -O3 -mpopcnt -std=c++20 -Wall -Wextra `
+  experiments\proto\joint_histogram.cpp -o build\joint_histogram.exe
+
+.\build\joint_histogram.exe 2
+.\build\joint_histogram.exe 3
+.\build\joint_histogram.exe 4
+.\build\joint_histogram.exe 4 noswap
+```
+
+These commands must reproduce the ordinary C=2..4 totals.  The C=4 middle
+layer has 141 states with copy swap and 232 without it.  The default small-C
+run compares the occupied-anchor canonicalizer with a complete group scan on
+every distinct raw target.
+
+C=5 is a bounded frontier mode, not a complete counting command.  A cheap
+exact first-layer check is:
+
+```powershell
+.\build\joint_histogram.exe 5 stop=1 maxstates=1000000 `
+  maxleaves=10000000 canoncheck=100
+```
+
+Expected results are seven states, 6,210 leaves, and layer total
+52,254,720,000.  The complete layer-2 allocation cost can be counted without
+materializing targets:
+
+```powershell
+.\build\joint_histogram.exe 5 stop=2 countleaves canoncheck=0
+```
+
+Expected values are 652,001,548 leaves represented by 49,890 scalar memo
+states, with at most 8,296 memo states for one source.  `countleaves` drops
+target and cycle information and therefore does not compute a layer value.
+
+Any materialized C=5 layer-2 probe must use `rawbatch=`, a positive
+`sourceprobe=` or `leafprobe=`, `maxstates=`, `maxleaves=`, and an external
+time/RSS guard.  For example:
+
+```powershell
+.\build\joint_histogram.exe 5 stop=2 sourcestart=2 sourceprobe=1 `
+  rawbatch=100000 maxstates=1000000 maxleaves=7000000 canoncheck=100
+```
+
+This closes one selected source transition, not the layer.  The expected
+support is 20,318 canonical targets from 6,516,556 exact leaves.  Prefix and
+source-probe output is explicitly partial.  Do not run an unbounded complete
+C=5 transition, and do not change the prototype to accept C=6 before the
+operator-valued C=3..5 decision gate.  See
+`../methods/joint-histogram.md` and
+`../reports/og2/joint-histogram-c5-frontier-20260719.md`.
+
 ## Read-only C=6 gate
 
 ```powershell

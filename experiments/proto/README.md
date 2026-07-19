@@ -10,8 +10,10 @@ Highlights:
 
 - `joint_histogram.cpp` - exact box-order joint used-color histogram for the
   squared objective.  It differentially reproduces every raw transition and
-  the sequential/midpoint totals through C=4.  It intentionally refuses C>4;
-  see `../../docs/methods/joint-histogram.md`.
+  the sequential/midpoint totals through C=4.  Its bounded C=5 modes close the
+  seven-state first layer, stream deterministic layer-2 prefixes, and count
+  the exact 652,001,548-leaf allocation inventory with a scalar cost DP.  It
+  cannot launch C=6; see `../../docs/methods/joint-histogram.md`.
 - `reverse_glue.cpp` - exact reverse row-block gluing decision engine.  It
   differentially closes C=2..4, reproduces all 355 C=5 classes through
   `2+2 -> 4` and `4+1 -> 5`, and supports closed pair-interval files.  Its

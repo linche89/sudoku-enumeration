@@ -175,8 +175,23 @@ sequentially and through complementary midpoint contraction.  An independent
 labelled-symbol kernel agrees with every raw transition coefficient through
 C=4.  The orbit layers are `1,2,1`, `1,3,3,1`, and `1,5,141,5,1`; disabling
 copy swap changes the C=4 middle layer to 232 while preserving the result.
-The current prototype intentionally refuses C>4, so C=5 growth remains the
-next bounded decision rather than an established C=6 route.
+
+The bounded C=5 extension now closes the first layer with seven states, 6,210
+contingency leaves, and exact layer total 52,254,720,000.  An occupied-anchor
+sparse canonicalizer agrees with complete group scans through C=4 and on
+bounded C=5 samples.  Streaming raw reduction removes the resident-map wall:
+a five-million-leaf layer-2 prefix used about 0.038 GiB observed RSS and
+reduced 4,227,388 batched raw entries to 38,373 canonical targets.  One
+complete selected source reduced 6,516,556 leaves to 20,318 targets in
+189.839 seconds.
+
+The complete scalar allocation inventory is much larger: all seven layer-1
+sources have exactly 652,001,548 layer-2 contingency leaves.  A residual-
+degree cost DP represents their leaf counts with only 49,890 memo states and
+finishes in about 0.028 seconds, but it deliberately drops target identity and
+cycle weight.  Thus the C=5 state quotient remains open while the naive
+leaf-by-leaf layer-2 kernel fails the scale decision.  The next question is an
+operator-valued lift of that small memo, not a full C=5 or C=6 run.
 
 Reverse row-block gluing has now passed the decision gate that the other open
 global proposals have not.  The exact orbit formula needs stabilizer orders
@@ -249,8 +264,10 @@ and C=6 decision boundary are recorded in `docs/methods/reverse-gluing.md` and
 inventory and bounded four-row samples are recorded in
 `docs/reports/og2/reverse-gluing-c6-frontier-probe-20260718.md`.
 The exact joint-histogram recurrence, orbit normalization, C=2..4 differential
-gates, and current boundary are recorded in `docs/methods/joint-histogram.md`
-and `docs/reports/og2/joint-histogram-c2-c4-20260719.md`.
+gates, bounded C=5 frontier, and current boundary are recorded in
+`docs/methods/joint-histogram.md`,
+`docs/reports/og2/joint-histogram-c2-c4-20260719.md`, and
+`docs/reports/og2/joint-histogram-c5-frontier-20260719.md`.
 
 ## Route portfolio
 
@@ -272,8 +289,8 @@ impossible.
 | proven component only | connectivity/path quotient | Exact through C=4; already 83,776 states at C=5 symbol 3 |
 | proven component only | streaming/checkpoint infrastructure | Controls RAM and restart risk, not total arithmetic |
 | exact through C=5; naive C=6 join fails scale gate | reverse 4+2 row-block gluing | Exact C=6 inventory is 772 two-row orbits / 298,378 pairs; trivial stabilizers force at least 1.761B double cosets, and a generic 100k-leaf prefix is 99.4% distinct after anchored canonicalization; only a bulk/external redesign remains open |
-| exact through C=4; next bounded decision | box-order joint-histogram pair DP | Exact raw-transition differential, midpoint, and known-total gates; C=4 middle layer is 141 states, but C=5 is unimplemented |
-| queued global decision experiment | operator-valued double-permanent subset DP | Exact proposal; no implementation or C=5 frontier measurement |
+| exact through C=4; bounded C=5 layer-2 decision | box-order joint-histogram pair DP | C=5 layer 1 has 7 states; a 5M-leaf prefix has 38,373 targets, but the full layer has 652,001,548 allocation leaves and the naive kernel fails scale |
+| next global decision experiment | operator-valued residual/double-permanent DP | Scalar residual DP compresses the same C=5 layer to 49,890 cost states, but the target- and cycle-aware frontier is unimplemented |
 | open decision experiment | later-class table coverage and kernel-pair batching | Complete data exist only for G1/G2 |
 | open, lower-priority decision | exact rank of the reduced band kernel | Distinct from the rejected 3+3 ranks; the proposed C=5 modular-rank experiment was never completed |
 | open theory route | balanced-switch/coherent-configuration transform | The naive Johnson version is inadequate; no compact algebra or fast exact transform is known |
@@ -287,14 +304,21 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-The box-order joint-histogram route has passed its complete C=2..4 gate with a
-141-state C=4 midpoint.  The next global decision experiment is a bounded C=5
-extension: enlarge the joint key and color canonicalizer, retain all C=2..4
-differential gates, then report C=5 state counts, raw-target counts, transition
-support, time, and memory one layer at a time.  A full N(5) run is justified
-only if those bounded layers remain controlled.  If this route fails its C=5
-scale gate, the operator-valued double-permanent subset DP remains the next
-fallback.  Neither route authorizes a C=6 run before a complete C=5 exact gate.
+The box-order joint-histogram route has passed its complete C=2..4 gate and
+the bounded C=5 first-layer and layer-2 cost gates.  Its next global decision
+experiment is an operator-valued lift of the residual-degree DP: retain target
+histogram and exact cycle information, match the current contingency kernel
+per source and target at C=3/C=4, then measure all seven C=5 layer-1 sources.
+The critical number is the operator frontier, not the 49,890 scalar cost
+states.  Near-injective growth rejects this kernel; a controlled frontier
+would justify closing the C=5 layer and only then measuring layer 3.
+
+The mathematical box interfaces are known, but the affordable implementation
+of every pass is not.  A contraction-order planner may choose among verified
+exact kernels and boundary representations using measured time, memory, and
+record costs.  It cannot drop combinatorial paths or manufacture a missing
+sufficient quotient.  No complete C=5 joint-histogram run or C=6 extension is
+authorized before the operator-valued C=3..5 gate.
 
 Reverse gluing stays open as a separate historical-engineering question: find
 a bulk four-row generator/lookup with delayed external reduction and a

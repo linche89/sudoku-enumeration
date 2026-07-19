@@ -127,12 +127,24 @@ the C=6 scale gate.  Reverse gluing is not mathematically rejected, but it now
 requires a historical-style bulk lookup/external-reduction design rather than
 the proposed cheap pairwise implementation.
 
-A separate backup proposal is to apply each one-symbol transition as an
+A box-order joint-histogram route now gives a second exact global square
+formulation.  It closes C=2..4 with orbit layers `1,2,1`, `1,3,3,1`, and
+`1,5,141,5,1`.  Its bounded C=5 first layer has seven states.  The complete
+next-pass allocation inventory has 652,001,548 contingency leaves, while a
+scalar residual-degree DP counts them using only 49,890 memo states.  A
+five-million-leaf prefix reduced to 38,373 canonical targets, and one complete
+6,516,556-leaf source reduced to 20,318 targets.  This keeps the boundary
+representation open but rejects the naive leaf-by-leaf transition as a C=6
+kernel.  The scalar memo omits target identity and cycle weight; its
+operator-valued lift has not been implemented.
+
+A related backup proposal applies each symbol-synchronous transition as an
 operator-valued double permanent with a two-subset internal DP.  No
-implementation or internal-frontier data were supplied.  Its C=5 frontier is
-now a bounded decision experiment: it must beat the 14,400 completed
-permutation pairs per source and reproduce the full C=5 square before C=6 is
-considered.
+implementation or internal-frontier data exist for the current 83,776-state
+C=5 connectivity layer.  Both proposals now ask the same engineering
+question in different boundary coordinates: whether the exact local operator
+can be applied with a small internal frontier rather than by enumerating all
+completed placements.
 
 ## Audited future-twin route
 
@@ -249,12 +261,19 @@ all implicit full-rank contractions.
 
 ## Required next result
 
-The next global decision result should be the operator-valued double-permanent
-subset DP.  The reverse-gluing probe met its stop condition: its cheap pairwise
-implementation has an uncontrollable C=6 four-row output/canonicalization
-scale.  The double-permanent prototype must differentially match direct
-C=3/C=4 transitions, measure the existing 83,776-state C=5 layer, and
-reproduce complete `N(5)` before any C=6 use.
+The next global decision result should lift the measured box-order scalar
+residual DP to an operator-valued frontier retaining target and exact cycle
+information.  It must differentially match the current contingency kernel per
+source and target at C=3/C=4, then report internal-frontier and completed-
+support data for all seven C=5 layer-1 sources.  Near-injective operator growth
+rejects the kernel; a controlled frontier justifies closing C=5 layer 2 and
+measuring layer 3.  It must reproduce complete `N(5)` before any C=6 use.
+
+The symbol-synchronous double-permanent proposal remains a separate fallback
+measurement on the existing 83,776-state C=5 connectivity layer.  A planner
+may compare the two exact boundary coordinates and contraction orders only
+after both edge costs are measured; shortest-path optimization cannot replace
+the missing sufficient state.
 
 In parallel as a lower-level engineering question, reverse gluing can be
 reopened only with a concrete bulk four-row generator or lookup, delayed

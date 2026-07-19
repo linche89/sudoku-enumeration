@@ -11,7 +11,7 @@
 - `methods/factorization-orbit.md` — current factorization/orbit algorithm.
 - `methods/future-twin.md` — optional exact future-twin recurrence and gates.
 - `methods/joint-histogram.md` — exact box-order paired-histogram contraction
-  through C=4 and its bounded C=5 decision boundary.
+  through C=4, bounded C=5 frontier data, and its operator-DP boundary.
 - `methods/reverse-gluing.md` — reverse row-block gluing, exact orbit
   normalization, complete C=2..5 gates, exact C=6 two-row inventory, and the
   failed scale gate for immediate pairwise canonicalization.
@@ -25,6 +25,7 @@
 
 ## Dated evidence
 
+- `reports/og2/joint-histogram-c5-frontier-20260719.md`
 - `reports/og2/joint-histogram-c2-c4-20260719.md`
 - `reports/og2/reverse-gluing-c6-frontier-probe-20260718.md`
 - `reports/og2/reverse-gluing-c4-c5-20260718.md`
