@@ -36,6 +36,44 @@ histogram differential tests.
 
 Expected values are listed in `../../STATUS.md`. Any mismatch is a hard stop.
 
+## F4-lookup coverage diagnostic
+
+The exact two-level split is part of the short C=4 gate.  It may also be run
+directly:
+
+```powershell
+.\build\factorization_orbit.exe 4 f4coveragecheck `
+  f4coveragemaxstates=100000 f4coveragemaxrecords=1000000 `
+  pivot rooted4
+```
+
+The C=6 mode is read-only and diagnostic.  It requires an existing graph
+checkpoint, `checkpointreadonly`, a positive class limit, and explicit parent,
+state, and record limits.  For example:
+
+```powershell
+& .\scripts\watch_rss.ps1 `
+  -Exe .\build\factorization_orbit.exe `
+  -Arguments @(
+    '6','start=10000','limit=1',
+    'f4coverageparents=20',
+    'f4coveragemaxstates=1000000',
+    'f4coveragemaxrecords=5000000',
+    'canonbudget=10000000',
+    'checkpoint=data\checkpoints\factorization_orbit_c6_graphmemo.bin',
+    'checkpointreadonly') `
+  -LimitGB 4 -MaxMinutes 3 -IntervalSeconds 1 `
+  -LogPath data\logs\f4-coverage.rss.csv `
+  -StdoutPath data\logs\f4-coverage.out `
+  -StderrPath data\logs\f4-coverage.err
+```
+
+It refuses more than 64 classes, 1,000 sampled parents per class, 2,000,000
+states, or 100,000,000 records.  It reports `F=PROBE` and performs no `F6` or
+`N(6)` accumulation.  A canonical fallback is a hard stop, not a usable weak
+lookup key.  The decision evidence is in
+`../reports/og2/f4-lookup-coverage-20260719.md`.
+
 ## Reverse-gluing decision prototype
 
 This prototype is intentionally outside the standard build:
@@ -440,8 +478,11 @@ Do not start a full 63,199-class run.  G2 is now closed, but its 221-million
 state frontier and 13.7-minute table-backed tail demonstrate that independent
 class-local closure does not yet scale to the full outer family.  The
 later-class coverage decision is complete and negative for the fixed G1/G2
-table and naive kernel-pair batching.  Reopening reverse gluing requires an
-exact bulk lookup design that avoids, rather than merely streams, its known
-1.761-billion trivial-stabilizer pair placements.  No C=6 four-row layer may
-be launched before that design passes complete C=4/C=5 differential gates and
-a separately bounded C=6 prefix test.
+table and naive kernel-pair batching.  The class-local `2+4` audit is also
+negative: ordinary classes contain about 1.3 billion two-factors, sampled F4
+keys are nearly unique, and later-class coverage by the existing graph memo is
+only about 2--4%.  Reopening reverse gluing requires an exact bulk lookup
+design that avoids, rather than merely streams, both that top-down incidence
+work and the known 1.761-billion bottom-up trivial-stabilizer placements.  No
+C=6 four-row layer may be launched before that design passes complete C=4/C=5
+differential gates and a separately bounded C=6 prefix test.

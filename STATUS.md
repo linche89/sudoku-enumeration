@@ -131,6 +131,17 @@ reuse.  The fixed G1/G2 table therefore does not generalize into a broad
 later-class table or batching solution.  No full C=6 count is currently in
 progress.
 
+A second read-only audit tested the complementary class-local `2+4` view:
+enumerate a two-factor `H` and look up `F4(Q-H)` in the existing graph memo.
+The identity is exact but is only a regrouping of two rooted matching levels
+already present in the primary engine.  Measured ordinary classes contain
+about 1.33--1.39 billion uncolored spanning two-factors, not a small lookup
+inventory.  In distributed later classes the G1/G2 checkpoint covers only
+about 2--4% of sampled F4 keys; 20-parent checks are more than 99.8% unique.
+Across classes 3--12, 516,100 per-class unique keys reduce to a union of
+513,228, only 0.56%.  Thus this class-local F4 lookup does not remove the
+dominant enumeration either.
+
 ## Audited route decision
 
 The single-graph aggregation question now has a verified optional backend. A
@@ -267,6 +278,18 @@ gate.  Reverse gluing remains historically plausible only as a substantially
 different bulk/external lookup design.  No complete C=6 four-row gluing layer
 has been generated.
 
+The obvious top-down version of that lookup has now failed its own bounded
+scale gate.  Exact two-factor counts are 1,326,562,875 for G1,
+1,329,588,799 for G2, and roughly 1.33--1.39 billion in sampled ordinary
+classes.  The existing 5,315,962-entry graph memo self-covers G1, partially
+covers its saved G2 neighborhood, but hits only about 2--4% of F4 residual
+keys later in the class list.  A ten-class block gains only 2,872 keys by
+cross-class union out of a per-class unique-key sum of 516,100.  Therefore
+class-local `2+4` plus a shared F4 memo is not the missing historical bulk
+algorithm.  A surviving bulk design must specify a genuinely global incidence
+construction that avoids both this top-down work and the 1.761-billion
+bottom-up low-stabilizer placements.
+
 The external derivations, supplied code, local reproduction commands, hashes,
 and limitations are recorded in
 `docs/reports/og2/c6-expert-routes-audit-20260713.md`.
@@ -290,6 +313,9 @@ and C=6 decision boundary are recorded in `docs/methods/reverse-gluing.md` and
 `docs/reports/og2/reverse-gluing-c4-c5-20260718.md`.  The exact C=6 two-row
 inventory and bounded four-row samples are recorded in
 `docs/reports/og2/reverse-gluing-c6-frontier-probe-20260718.md`.
+The exact two-level differential, C=6 two-factor counts, and F4 reuse decision
+are recorded in
+`docs/reports/og2/f4-lookup-coverage-20260719.md`.
 The exact joint-histogram recurrence, orbit normalization, C=2..4 differential
 gates, bounded C=5 frontier, and current boundary are recorded in
 `docs/methods/joint-histogram.md`,
@@ -322,11 +348,12 @@ impossible.
 | proven component only | connectivity/path quotient | Exact through C=4; already 83,776 states at C=5 symbol 3, and the naive subset operator supplies no prefix merging |
 | proven component only | streaming/checkpoint infrastructure | Controls RAM and restart risk, not total arithmetic |
 | exact through C=5; naive C=6 join fails scale gate | reverse 4+2 row-block gluing | Exact C=6 inventory is 772 two-row orbits / 298,378 pairs; trivial stabilizers force at least 1.761B double cosets, and a generic 100k-leaf prefix is 99.4% distinct after anchored canonicalization; only a bulk/external redesign remains open |
+| rejected implementation | class-local `2+4` with shared F4 memo | Ordinary classes have about 1.33--1.39B two-factors; later checkpoint coverage is about 2--4%, 20-parent samples are over 99.8% unique, and a ten-class key union saves only 0.56% |
 | exact through C=4; bounded C=5 layer-2 decision | box-order joint-histogram pair DP | C=5 layer 1 has 7 states and canonical targets compress strongly, but both the 652M-leaf kernel and the labelled residual-operator lift fail scale |
 | rejected implementation | target-labelled residual operator | Exact per raw target through C=4; six C=5 sources exceed 10M states and the completed source is 97.0359% unique |
 | rejected implementation | naive symbol-synchronous double-permanent subset DP | Exact per raw target through C=4; its labelled partial state uniquely determines every assignment prefix, with zero merges in bounded C=5 probes |
 | rejected as broad reuse | fixed G1/G2 table coverage and naive kernel-pair batching | In classes 10,001--10,010 only 5,234/30,000 half occurrences hit, with zero cross-class reuse among 4,962 selected pairs and 5,000 full signatures |
-| open, lower-priority decision | exact rank of the reduced band kernel | Distinct from the rejected 3+3 ranks; the proposed C=5 modular-rank experiment was never completed |
+| open, next bounded decision | exact rank of the reduced band kernel | Distinct from the rejected 3+3 ranks; start with exact C=3/C=4 matrices before deciding whether a C=5 modular-rank extension is justified |
 | open theory route | balanced-switch/coherent-configuration transform | The naive Johnson version is inadequate; no compact algebra or fast exact transform is known |
 | open high-upside route | cross-class symbolic prefix/global contraction | Could remove class-local frontiers; no bounded exact implementation yet |
 
@@ -338,13 +365,13 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-The later-class half-kernel coverage experiment is complete and negative for
-the tested mechanism.  The retained read-only diagnostic passes C=4 table
-self-coverage and a complete 2,295-state C=5 class-300 differential.  Across
-later C=6 classes, however, fixed G1/G2-table coverage can fall to zero, while
-selected kernel pairs and full relative-transform signatures are essentially
-unique.  Extending that fixed table or naively batching those pairs is not the
-missing global contraction.
+The later-class half-kernel and class-local F4-lookup experiments are complete
+and negative for their tested mechanisms.  The first finds essentially no
+reusable kernel pairs or full relative transforms across a ten-class block.
+The second finds roughly 1.3 billion two-factors per ordinary outer graph,
+about 2--4% later-class checkpoint coverage, and more than 99.8% unique F4
+keys in larger parent samples.  Extending either fixed table or naively
+batching either incidence list is not the missing global contraction.
 
 There is still no implemented global C=6 route that has passed its scale
 gate.  The mathematical box interfaces are known, but the affordable
@@ -352,31 +379,26 @@ implementation of every pass is not.  A contraction-order planner can choose
 among verified edges; it cannot manufacture a missing sufficient quotient or
 turn a nearly injective edge into a compressive DP.
 
-The next primary research gate is a substantially different bulk
-reverse-gluing lookup, because reverse gluing has complete C=2..5 correctness
-and historical C=6 precedent.  Before any large C=6 file is generated, the
-new design must:
+Historical bulk reverse gluing remains a theory lead, not a qualified large
+run.  A new construction must avoid both the known 1.761-billion bottom-up
+low-stabilizer placements and the roughly 1.3-billion top-down two-factor list
+per ordinary outer class.  Pettersen's “more than 900 million” lookup statement
+is a rough comparison point, not authorization or an acceptance oracle.
 
-1. derive an exact construction whose work is tied to globally unique
-   four-row configurations or reusable lookup entries, rather than enumerating
-   the known 1.761-billion trivial-stabilizer pair placements;
-2. reproduce every C=4 and C=5
-   `(coordinate orbit, labelled multiplicity, F)` triple through an
-   implementation independent of the retained pairwise interval kernel; and
-3. only after that work-factor gate passes, run a positive-limit C=6 external
-   prefix with explicit record, state, time, and RSS limits.
+The next executable decision gate is the exact rank of the distinct reduced
+band kernel from `docs/math/og2-band-kernel-lowrank.md`:
 
-Merely streaming the same nearly injective placement list is not progress on
-the decisive cost.  Pettersen's “more than 900 million” lookup statement is a
-rough historical comparison point, not authorization to launch such a table
-or an acceptance oracle.
+1. explicitly construct every reduced transition matrix at C=2--4 and
+   differentially verify its entries and endpoint totals;
+2. compute exact rational ranks at C=2--4, with independent modular checks;
+3. continue to a bounded C=5 modular-rank experiment only if the small-C rank
+   profile leaves meaningful compression possible.
 
-The cross-class symbolic-prefix/global-contraction route remains the
-high-upside theory alternative.  The exact C=5 modular rank of the distinct
-reduced band kernel remains a cheap secondary falsification experiment if the
-bulk lookup derivation stalls.  Neither currently supplies an implementation.
-The final layer must still be streamed or shared across outer graphs; a
-908-MiB leaf table does not remove a 9.08-GB per-class frontier.
+This is a falsification experiment, not yet a C=6 algorithm.  Full or nearly
+full small-C rank closes the proposed ordinary low-rank factorization; a small
+rank would justify the C=5 extension and an implicit factor search.  The
+cross-class symbolic-prefix/global-contraction and balanced-switch algebra
+remain higher-upside theory alternatives without implementations.
 
 No full 63,199-class C=6 run is authorized.
 

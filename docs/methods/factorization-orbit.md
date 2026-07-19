@@ -48,5 +48,34 @@ Every command must end with `[OK]` for its known value.
 The expected first value is `6986348258918400`. Never verify a preserved
 checkpoint without `checkpointreadonly`.
 
+## Bounded F4-lookup coverage diagnostic
+
+`f4coveragecheck` expands two successive rooted matching levels and
+differentially compares the resulting exact value with the ordinary engine.
+It is a permanent C=4 short gate:
+
+```powershell
+.\build\factorization_orbit.exe 4 f4coveragecheck `
+  f4coveragemaxstates=100000 f4coveragemaxrecords=1000000 `
+  pivot rooted4
+```
+
+At C=6 the same split is diagnostic only: it computes the exact number of
+uncolored spanning two-factors, samples canonical degree-five parents, and
+measures degree-four graph-memo coverage.  It never inserts memo values or
+accumulates `F6`/`N(6)`.  A probe requires all of:
+
+```text
+checkpoint=EXISTING_PATH checkpointreadonly
+positive limit=, f4coverageparents=,
+f4coveragemaxstates=, and f4coveragemaxrecords=
+```
+
+The hard maxima are 64 classes, 1,000 sampled parents, 2,000,000 states, and
+100,000,000 records.  Strong canonical keys are mandatory; a fallback aborts
+the probe and requires a larger `canonbudget`.  The exact gates and negative
+later-class reuse decision are in
+`../reports/og2/f4-lookup-coverage-20260719.md`.
+
 Full measurements and failed alternatives are retained in
 `../reports/og2/factorization-c6-20260712.md`.

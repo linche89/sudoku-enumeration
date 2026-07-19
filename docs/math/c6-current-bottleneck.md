@@ -127,6 +127,26 @@ the C=6 scale gate.  Reverse gluing is not mathematically rejected, but it now
 requires a historical-style bulk lookup/external-reduction design rather than
 the proposed cheap pairwise implementation.
 
+The complementary top-down `2+4` lookup interpretation has now also been
+measured.  It is exact, but class-locally it is just two successive levels of
+the primary rooted matching recurrence, with the two ordered matchings grouped
+as a two-factor `H`.  Exact ternary-DP counts give about 1.33--1.39 billion
+uncolored spanning two-factors for measured ordinary C=6 classes; the final,
+highly symmetric class has 4.617 billion.  Rooted aggregation reduces the
+first matching layer to as many as about 32,000 canonical degree-five parents,
+but ten sampled generic parents still produce roughly 41,000--52,000 unique
+degree-four residual keys.
+
+The existing 5,315,962-entry G1/G2 graph memo covers only about 2--4% of those
+keys in distributed later classes.  Twenty-parent checks at classes 10,001
+and 31,600 are more than 99.8% unique within the sample.  Across classes 3--12,
+516,100 per-class unique keys reduce to a union of 513,228, only a 0.56% gain.
+Therefore class-local two-factor enumeration plus a shared F4 memo also fails
+the scale gate.  This leaves a historical bulk route open only if a new global
+incidence construction avoids both the 1.761-billion bottom-up placement
+lower bound and the roughly 1.3-billion top-down two-factor list per ordinary
+outer graph.
+
 A box-order joint-histogram route now gives a second exact global square
 formulation.  It closes C=2..4 with orbit layers `1,2,1`, `1,3,3,1`, and
 `1,5,141,5,1`.  Its bounded C=5 first layer has seven states.  The complete
@@ -287,27 +307,28 @@ all implicit full-rank contractions.
 
 ## Required next result
 
-Both proposed local operator lifts and the fixed-table later-class reuse
-proposal have now been measured and rejected in their tested coordinates.  No
-implemented global C=6 route currently passes its scale gate.  A planner may
-still compare verified contraction edges, but shortest-path optimization
-cannot replace a missing sufficient state or turn an injective enumeration
-into a compressive DP.
+Both proposed local operator lifts, both fixed-table reuse proposals, and the
+two obvious class-local/bottom-up reverse-gluing enumerations have now been
+measured and rejected in their tested coordinates.  No implemented global C=6
+route currently passes its scale gate.  A planner may still compare verified
+contraction edges, but shortest-path optimization cannot replace a missing
+sufficient state or turn an injective enumeration into a compressive DP.
 
-The next primary result must be an exact bulk reverse-gluing construction that
-changes the decisive work factor.  It must generate or look up globally unique
-four-row configurations without enumerating the known 1.761-billion
-trivial-stabilizer pair placements.  Merely sending that same nearly injective
-placement list through an external sort controls RAM but does not pass the
-gate.  Before any C=6 data file is authorized, an independent implementation
+A viable historical-style bulk construction would have to change the decisive
+work factor: generate or query globally reusable four-row/F4 incidences without
+enumerating either the known 1.761-billion trivial-stabilizer placements or a
+roughly 1.3-billion two-factor list for every ordinary outer graph.  Merely
+streaming either nearly injective list controls RAM but does not pass the gate.
+Before any large C=6 data file is authorized, an independent implementation
 must reproduce every C=4/C=5 `(coordinate orbit, labelled multiplicity, F)`
 triple.  Only then may a positive-limit, time/RSS/record-bounded C=6 prefix
 measure external bytes, duplicate ratio, and throughput.
 
-Pettersen's historical “more than 900 million” statement keeps the bulk route
-plausible, but remains a rough comparison point rather than an acceptance
-oracle.  If no exact construction removes the pair-placement factor, this
-route has no qualified next implementation step.
+Pettersen's historical “more than 900 million” statement keeps a genuinely
+global incidence route plausible, but remains a rough comparison point rather
+than an acceptance oracle.  No construction currently removes both measured
+enumeration factors, so this route has no qualified large-data implementation
+step.
 
 A cross-class symbolic prefix or global contraction remains the high-upside
 theory alternative.  A stronger exact quotient or streamed shared final layer
@@ -318,11 +339,11 @@ The 3+3 route should be reopened only if a new proposal explains how to build
 or apply the full-rank block operator without materializing the 63,199 outer
 coordinates or the larger midpoint algebra.
 
-Two older Problem-B questions remain open.  The exact C=5 modular rank of the
-reduced band kernel was never computed; this is a different operator from the
-rejected 3+3 channel maps and is a cheap secondary falsification experiment if
-the bulk lookup derivation stalls.  Also, the naive per-symbol Johnson
-commutation proposal is inadequate, but a balanced-switch or
+Two older Problem-B questions remain open.  The exact rank of the reduced band
+kernel was never computed; this is a different operator from the rejected 3+3
+channel maps and is now the next bounded executable falsification experiment,
+starting at C=3/C=4 before any C=5 modular extension.  Also, the naive
+per-symbol Johnson commutation proposal is inadequate, but a balanced-switch or
 coherent-configuration algebra has not been constructed or ruled out.  Neither
 currently supplies an algorithm.
 
@@ -344,6 +365,8 @@ The verified reverse-gluing formula and gates are in
 `../reports/og2/reverse-gluing-c4-c5-20260718.md`.  The exact C=6 two-row
 inventory and bounded pair samples are in
 `../reports/og2/reverse-gluing-c6-frontier-probe-20260718.md`.
+The exact class-local two-level differential and F4 lookup-coverage decision
+are in `../reports/og2/f4-lookup-coverage-20260719.md`.
 The box-order operator frontier is in
 `../reports/og2/joint-histogram-operator-frontier-20260719.md`.
 The connectivity subset-operator proof and measurements are in

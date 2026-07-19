@@ -25,10 +25,11 @@
 
 - `math/c6-current-bottleneck.md` — audited C=6 mathematical frontier.
 - `math/og2-band-kernel-lowrank.md` — separate formalized transfer-kernel
-  question; it is not the immediate implementation objective.
+  question and the current bounded exact-rank decision gate.
 
 ## Dated evidence
 
+- `reports/og2/f4-lookup-coverage-20260719.md`
 - `reports/og2/future-tail-later-class-coverage-20260719.md`
 - `reports/og2/connectivity-double-permanent-20260719.md`
 - `reports/og2/joint-histogram-operator-frontier-20260719.md`
