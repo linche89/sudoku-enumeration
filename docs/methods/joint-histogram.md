@@ -2,8 +2,9 @@
 
 `experiments/proto/joint_histogram.cpp` is an exact global decision prototype
 for the squared 2xC objective.  It is verified completely through C=4 and has
-bounded C=5 frontier measurements.  It is not part of the standard build and
-has not run C=6.
+bounded C=5 frontier measurements.  Its target-labelled residual-operator
+lift is also exact through C=4 but fails its C=5 scale gate.  It is not part
+of the standard build and has not run C=6.
 
 ## State and transition
 
@@ -107,14 +108,34 @@ compressible, but it does not compute the layer coefficients.  One complete
 selected source transition used 6,516,556 leaves and reduced to 20,318
 canonical targets in 189.839 seconds.
 
+## Residual-operator decision
+
+The scalar memo was lifted exactly to retain the raw target histogram,
+remaining color degrees, and the pairing of live path endpoints.  It agrees
+per source and per labelled raw target with both independent transition
+kernels at C=3 and C=4.  At the C=4 layer-2 transition its peak frontier is
+53,970 states.
+
+The C=5 growth is not controlled.  With a ten-million-state hard limit, six
+of the seven layer-1 sources cross the limit before their transition closes.
+The remaining source closes with 6,323,400 distinct raw target states from
+6,516,556 contingency leaves, or 97.0359% raw uniqueness.  Although those raw
+targets later reduce to 20,318 color-canonical targets, this operator reaches
+the near-injective labelled frontier first.  It therefore fails the
+predeclared scale gate.
+
 ## Boundary
 
-The C=5 state representation has not failed the bounded layer-2 probe, but the
-naive leaf-by-leaf transition is not a plausible C=6 kernel.  The next exact
-experiment is to lift the small residual-degree memo to an operator-valued
-frontier that also retains target and cycle information.  It must match the
-current transition per source and per raw/canonical target at C=3 and C=4
-before its seven C=5 sources are measured.
+The box-order identity and canonical target representation remain exact, but
+neither the leaf enumerator nor the target-labelled residual operator is a
+plausible C=6 kernel.  An orbit-aware partial operator would require a new
+exact normalization: a full color action can move the fixed source and the
+processed source-type prefix, so simply canonicalizing partial targets is not
+valid.  No such sufficient quotient is currently established.
+
+This result is separate from the symbol-synchronous operator-valued
+double-permanent subset DP.  That proposal acts on the connectivity
+recurrence's one-symbol transition and remains unimplemented.
 
 The mathematical box-order interfaces are known, but the affordable kernels
 for all passes are not.  No C=6 run, outer-class loop, or checkpoint access is
@@ -122,4 +143,6 @@ provided by this prototype.
 
 Exact measurements and reproduction commands are in
 `../reports/og2/joint-histogram-c2-c4-20260719.md` and
-`../reports/og2/joint-histogram-c5-frontier-20260719.md`.
+`../reports/og2/joint-histogram-c5-frontier-20260719.md`.  The lifted-operator
+gate is recorded in
+`../reports/og2/joint-histogram-operator-frontier-20260719.md`.

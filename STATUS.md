@@ -189,9 +189,13 @@ The complete scalar allocation inventory is much larger: all seven layer-1
 sources have exactly 652,001,548 layer-2 contingency leaves.  A residual-
 degree cost DP represents their leaf counts with only 49,890 memo states and
 finishes in about 0.028 seconds, but it deliberately drops target identity and
-cycle weight.  Thus the C=5 state quotient remains open while the naive
-leaf-by-leaf layer-2 kernel fails the scale decision.  The next question is an
-operator-valued lift of that small memo, not a full C=5 or C=6 run.
+cycle weight.  Its exact target- and cycle-aware lift agrees per source and
+per raw target with both independent kernels through C=4.  At C=5, however,
+six of seven sources exceed a ten-million-state limit before closing.  The
+remaining source has 6,323,400 terminal raw states from 6,516,556 leaves, or
+97.0359% raw uniqueness.  The labelled operator therefore fails its
+predeclared near-injective scale gate; the color-orbit quotient is useful only
+after the frontier that this lift was meant to avoid.
 
 Reverse row-block gluing has now passed the decision gate that the other open
 global proposals have not.  The exact orbit formula needs stabilizer orders
@@ -267,7 +271,9 @@ The exact joint-histogram recurrence, orbit normalization, C=2..4 differential
 gates, bounded C=5 frontier, and current boundary are recorded in
 `docs/methods/joint-histogram.md`,
 `docs/reports/og2/joint-histogram-c2-c4-20260719.md`, and
-`docs/reports/og2/joint-histogram-c5-frontier-20260719.md`.
+`docs/reports/og2/joint-histogram-c5-frontier-20260719.md`.  The exact
+target-labelled operator and its negative C=5 scale gate are recorded in
+`docs/reports/og2/joint-histogram-operator-frontier-20260719.md`.
 
 ## Route portfolio
 
@@ -289,8 +295,9 @@ impossible.
 | proven component only | connectivity/path quotient | Exact through C=4; already 83,776 states at C=5 symbol 3 |
 | proven component only | streaming/checkpoint infrastructure | Controls RAM and restart risk, not total arithmetic |
 | exact through C=5; naive C=6 join fails scale gate | reverse 4+2 row-block gluing | Exact C=6 inventory is 772 two-row orbits / 298,378 pairs; trivial stabilizers force at least 1.761B double cosets, and a generic 100k-leaf prefix is 99.4% distinct after anchored canonicalization; only a bulk/external redesign remains open |
-| exact through C=4; bounded C=5 layer-2 decision | box-order joint-histogram pair DP | C=5 layer 1 has 7 states; a 5M-leaf prefix has 38,373 targets, but the full layer has 652,001,548 allocation leaves and the naive kernel fails scale |
-| next global decision experiment | operator-valued residual/double-permanent DP | Scalar residual DP compresses the same C=5 layer to 49,890 cost states, but the target- and cycle-aware frontier is unimplemented |
+| exact through C=4; bounded C=5 layer-2 decision | box-order joint-histogram pair DP | C=5 layer 1 has 7 states and canonical targets compress strongly, but both the 652M-leaf kernel and the labelled residual-operator lift fail scale |
+| rejected implementation | target-labelled residual operator | Exact per raw target through C=4; six C=5 sources exceed 10M states and the completed source is 97.0359% unique |
+| next global decision experiment | symbol-synchronous operator-valued double-permanent subset DP | The connectivity source layer and direct permutation-pair kernel are exact through C=4, but the implicit one-symbol operator is unimplemented |
 | open decision experiment | later-class table coverage and kernel-pair batching | Complete data exist only for G1/G2 |
 | open, lower-priority decision | exact rank of the reduced band kernel | Distinct from the rejected 3+3 ranks; the proposed C=5 modular-rank experiment was never completed |
 | open theory route | balanced-switch/coherent-configuration transform | The naive Johnson version is inadequate; no compact algebra or fast exact transform is known |
@@ -304,21 +311,23 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-The box-order joint-histogram route has passed its complete C=2..4 gate and
-the bounded C=5 first-layer and layer-2 cost gates.  Its next global decision
-experiment is an operator-valued lift of the residual-degree DP: retain target
-histogram and exact cycle information, match the current contingency kernel
-per source and target at C=3/C=4, then measure all seven C=5 layer-1 sources.
-The critical number is the operator frontier, not the 49,890 scalar cost
-states.  Near-injective growth rejects this kernel; a controlled frontier
-would justify closing the C=5 layer and only then measuring layer 3.
+The box-order target-labelled operator experiment is complete and negative.
+The next global decision experiment is the separate symbol-synchronous
+operator-valued double-permanent subset DP proposed for the connectivity
+recurrence.  First retain a local decision prototype for the already verified
+connectivity state and direct permutation-pair transition.  Then implement the
+implicit one-symbol operator and require per-source/per-target agreement at
+C=3 and C=4 before measuring bounded C=5 states.  Its internal frontier and
+completed target support, not the formal subset count alone, decide whether it
+passes.
 
 The mathematical box interfaces are known, but the affordable implementation
 of every pass is not.  A contraction-order planner may choose among verified
 exact kernels and boundary representations using measured time, memory, and
 record costs.  It cannot drop combinatorial paths or manufacture a missing
-sufficient quotient.  No complete C=5 joint-histogram run or C=6 extension is
-authorized before the operator-valued C=3..5 gate.
+sufficient quotient.  No complete connectivity C=5 rerun through a new
+operator, complete joint-histogram C=5 run, or C=6 extension is authorized
+before the double-permanent C=3..5 decision gate.
 
 Reverse gluing stays open as a separate historical-engineering question: find
 a bulk four-row generator/lookup with delayed external reduction and a

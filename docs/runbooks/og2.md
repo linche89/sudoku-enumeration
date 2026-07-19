@@ -152,11 +152,27 @@ time/RSS guard.  For example:
 
 This closes one selected source transition, not the layer.  The expected
 support is 20,318 canonical targets from 6,516,556 exact leaves.  Prefix and
-source-probe output is explicitly partial.  Do not run an unbounded complete
-C=5 transition, and do not change the prototype to accept C=6 before the
-operator-valued C=3..5 decision gate.  See
+source-probe output is explicitly partial.
+
+The target-labelled residual operator can be rechecked at small C with:
+
+```powershell
+.\build\joint_histogram.exe 3 stop=2 operatorfinal
+.\build\joint_histogram.exe 4 stop=2 operatorfinal
+```
+
+These commands compare every raw target coefficient with the contingency and
+labelled-symbol kernels.  The C=4 layer-2 peak is 53,970 operator states.  The
+bounded C=5 decision gate is already negative: six sources exceed a
+ten-million-state limit, while the completed source 2 has 6,323,400 terminal
+raw states from 6,516,556 leaves.  Reproduction requires `operatorfinal`, a
+positive `sourceprobe`, explicit operator state/record/type limits, and the
+external time/RSS guard; use the exact command in the dated report.
+
+Do not run an unbounded complete C=5 transition or change the prototype to
+accept C=6.  See
 `../methods/joint-histogram.md` and
-`../reports/og2/joint-histogram-c5-frontier-20260719.md`.
+`../reports/og2/joint-histogram-operator-frontier-20260719.md`.
 
 ## Read-only C=6 gate
 
