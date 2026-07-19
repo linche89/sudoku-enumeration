@@ -1,6 +1,6 @@
 # Current Project Status
 
-Last updated: 2026-07-19
+Last updated: 2026-07-20
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.
@@ -239,6 +239,21 @@ remaining source has 6,323,400 terminal raw states from 6,516,556 leaves, or
 predeclared near-injective scale gate; the color-orbit quotient is useful only
 after the frontier that this lift was meant to avoid.
 
+The proposed B2/E3 fused column frontier is now closed negatively in its
+fixed-source, target-distinguishing form by an exact support theorem rather
+than a larger sampling run.  For a fixed labelled source `s`, the output
+support is exactly `|M(S)| |M(T)|`, where each map count is a `12 x 12`
+permanent divided by `2^6`.  A reachable C=6 grade-2 source with trivial
+stabilizer has `|M(S)|=74119` and `|M(T)|=74064`, hence 5,489,549,616 terminal
+targets.  Every fixed `3+3` column split has flattening rank at least
+`6488 * 6503 = 42,191,464`; a 16-byte terminal record list would already be
+81.801 GiB.  The independently retained C++ verifier checks reachability,
+stabilizer, both permanent formulas, raw map counts, and all 20 split
+supports.  This rejects fixed-source target-aware E3 and signed Ryser/Glynn
+reorderings with the same full-target output semantics.  It does not reject a
+target-only transform that sums different sources before representing any
+`(source,target)` pair.
+
 Reverse row-block gluing has now passed the decision gate that the other open
 global proposals have not.  The exact orbit formula needs stabilizer orders
 but no stored transporters.  After cancelling repeated right-orbit images,
@@ -341,6 +356,9 @@ The exact connectivity transition, subset-prefix injectivity result, complete
 C=2..4 differential gates, and bounded C=5 measurements are recorded in
 `docs/methods/connectivity-operator.md` and
 `docs/reports/og2/connectivity-double-permanent-20260719.md`.
+The fixed-source support and flattening theorem, reachable C=6 witness,
+independent verifier, and expert-follow-up audit are recorded in
+`docs/reports/og2/source-target-frontier-lower-bound-20260720.md`.
 
 ## Route portfolio
 
@@ -368,8 +386,11 @@ impossible.
 | rejected implementation | naive symbol-synchronous double-permanent subset DP | Exact per raw target through C=4; its labelled partial state uniquely determines every assignment prefix, with zero merges in bounded C=5 probes |
 | rejected as broad reuse | fixed G1/G2 table coverage and naive kernel-pair batching | In classes 10,001--10,010 only 5,234/30,000 half occurrences hit, with zero cross-class reuse among 4,962 selected pairs and 5,000 full signatures |
 | bounded negative for tiny-rank B1 | reduced band-kernel rank | Exact C=2--4 matrices; the `38801 x 38801` C=5 middle map has certified rational rank at least 1,024, rejecting a few-hundred-channel factorization but not proving full rank |
-| open theory route | balanced-switch/coherent-configuration transform | The naive Johnson version is inadequate; no compact algebra or fast exact transform is known |
-| open high-upside route | cross-class symbolic prefix/global contraction | Could remove class-local frontiers; no bounded exact implementation yet |
+| rejected implementation | fixed-source target-distinguishing column frontier | A reachable trivial-stabilizer C=6 source forces every fixed `3+3` split to width at least 42,191,464 and has 5,489,549,616 terminal targets; signed permanent reorderings with the same output semantics do not compress it |
+| rejected as primary | one-copy-orbit PSD/Kraus factorization | The identity is exact, but the factor is the already full C=4/C=5 history-to-boundary map; invariant matrices live in the orbital centralizer, not the one-point orbit basis |
+| rejected implementation | full coherent-configuration/orbital materialization | The 38,226 pairs of trivial-stabilizer two-row orbits alone expose 1,761,454,080 relative-placement coordinates; Fourier blocks change basis but do not remove them |
+| open high-upside route | target-only cross-source band transform | Compute the actual orbit vector `y=Kbar*x` while aggregating sources before any source-target pair is represented; no exact circuit or bounded C=5 implementation is known |
+| open high-upside route | common downstream response subspace/global incidence contraction | A specific small response span could still avoid full regular-block or four-row incidence semantics; it has not been constructed or lower-bounded |
 
 Several implementation variants are retired rather than separate mathematical
 routes: fixed future-twin row orders, recursive row-adaptive memoization,
@@ -379,47 +400,41 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-The later-class half-kernel and class-local F4-lookup experiments are complete
-and negative for their tested mechanisms.  The first finds essentially no
-reusable kernel pairs or full relative transforms across a ten-class block.
-The second finds roughly 1.3 billion two-factors per ordinary outer graph,
-about 2--4% later-class checkpoint coverage, and more than 99.8% unique F4
-keys in larger parent samples.  Extending either fixed table or naively
-batching either incidence list is not the missing global contraction.
-
 There is still no implemented global C=6 route that has passed its scale
-gate.  The mathematical box interfaces are known, but the affordable
-implementation of every pass is not.  A contraction-order planner can choose
-among verified edges; it cannot manufacture a missing sufficient quotient or
-turn a nearly injective edge into a compressive DP.
+gate.  The later-class half-kernel, class-local F4 lookup, direct reverse
+gluing, local operator lifts, tiny-rank band factorization, fixed-source E3,
+and full orbital-algebra implementations are closed for their tested or proved
+semantics.  More cache, external sort, or a different traversal does not alter
+their decisive work factors.
 
-Historical bulk reverse gluing remains a theory lead, not a qualified large
-run.  A new construction must avoid both the known 1.761-billion bottom-up
-low-stabilizer placements and the roughly 1.3-billion top-down two-factor list
-per ordinary outer class.  Pettersen's “more than 900 million” lookup statement
-is a rough comparison point, not authorization or an acceptance oracle.
+The immediate mathematical target is now the strictly narrower target-only
+application of one reduced band kernel.  In the orbit-total normalization used
+by the joint-histogram engine, construct an exact algorithm for
 
-The reduced band-kernel rank gate is complete through its predeclared C=5
-threshold.  C=3 is full rank 3, C=4 has only the forced adjacent-dimension
-ranks, and C=5 has certified rational rank at least 1,024.  This is enough to
-reject a few-hundred-channel B1 factorization.  It is not an exact C=5 rank;
-larger sketches would only raise a lower bound without providing the missing
-structural upper bound, so they are not the next priority.
+```text
+y_[t] = sum_[s] x_[s] Kbar_k([t],[s])
+```
 
-The next executable Problem-B decision is the distinct B2/E3 fused
-within-band column frontier:
+on the actual reachable multi-source vector `x`, while aggregating across
+sources before materializing source-target pairs or a complete row of
+`Kbar_k`.  A fast full-rank transform is acceptable; low rank is not required.
+The fixed-source frontier theorem does not apply to this output contract.
 
-1. implement the cycle-weighted direct transition at C=3 and C=4 and compare
-   every canonical matrix entry with the retained explicit matrices;
-2. expose the exact joint column-by-column frontier while preserving target
-   identity and cycle weight, rather than only the single-side permanent;
-3. run bounded C=5 source samples with explicit frontier-state, emitted-record,
-   time, and RSS limits.  Continue only if the frontier aggregates target
-   weights without becoming nearly injective in the assignment prefix.
+The parallel theory target is a common downstream Fourier/communication
+subspace for the regular reverse-gluing blocks: construct only the span needed
+by the final weighted response, not the full 1.761-billion-coordinate orbital
+algebra.  A valid proposal must give the exact representation, normalization,
+closure under the remaining bands, and a C=6 operation/memory bound.  It must
+reproduce complete C=3/C=4 output vectors or matrices under the retained
+normalization and pass a bounded C=5 actual-vector dimension/operation gate
+before any C=6 data-generation step is considered.  A relevant lower bound
+that rules out both surviving objects would also be progress.
 
-This remains a falsification experiment, not a C=6 algorithm.  The cross-class
-symbolic-prefix/global-contraction and balanced-switch algebra remain
-higher-upside theory alternatives without implementations.
+Historical reverse gluing remains evidence that some bulk organization may
+exist, not a qualified implementation.  Pettersen's “more than 900 million”
+lookup statement is a rough comparison point, not authorization or an
+acceptance oracle.  No further large C=6 experiment is justified until one of
+the two surviving structures is made exact and passes the small-C gates.
 
 No full 63,199-class C=6 run is authorized.
 

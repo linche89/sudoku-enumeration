@@ -8,10 +8,12 @@
 >
 > 记号与 `src/multiset_q.cpp` 对齐:$n=2C$ 个符号,每 stack $C$ 列,$C$ 条带。
 >
-> 2026-07-19 状态:E2 已完成到预声明的 C=5 下界门槛。C=2--4 显式矩阵和
+> 2026-07-20 状态:E2 已完成到预声明的 C=5 下界门槛。C=2--4 显式矩阵和
 > 端点全闭合;C=3 中层精确满秩 3,C=5 的 38801 方阵经双素数 CountSketch
 > 严格证明 $\operatorname{rank}_{\mathbb Q}\ge1024$。这否决“几百维”B1,
-> 但不等于证明满秩 38801。下一项有界判定是 B2/E3 联合带内列前沿。
+> 但不等于证明满秩 38801。B2/E3 的**固定源、保留完整 target**版本也已由
+> 可达 C=6 证人严格否决:任意固定 3+3 split 的线性前沿宽度至少 42,191,464。
+> 尚未否决的是先跨 source 求和、只输出实际 target 向量的快速变换。
 
 ---
 
@@ -81,9 +83,10 @@ $\dim\bar W_k=\#\{\text{grade-}k\text{ 规范态}\}$。实测(含 swap 口径):
 | 5 | $1,7,38801,38801,7,1$ |
 | 6 | $1,11,\ ?,\ ?,\dots$(中点预计百万级) |
 
-**命题(地板)**:任何"物化中间向量"的精确线性 DP 计算 $\langle\bar f|\bar K^{\,C}|\bar e\rangle$,
-其转移向量维 $=\dim\bar W_k$。§3 的等距分解**已把唯一有用的平凡块提取出来**(对称 $e,f$ ⟹ 只有 $S_n$-
-与 $S_C^2$-平凡分量有贡献),所以群表示/关联方案**不能再降这个维数**。
+**命题(地板)**:任何要表示 $\bar W_k$ 中**任意向量**的显式线性 DP,其转移
+向量维为 $\dim\bar W_k$。§3 的等距分解已经提取平凡块,所以单纯更换群表示
+或关联方案基底不能再降这个维数。这个命题不排除只作用于实际可达向量的
+fast transform,也不排除只保留最终下游响应的专用电路。
 
 ⟹ **低于该维数所隐含的成本,当且仅当利用 $\bar K$ 本身的结构**(超出"物化向量"的稀疏性,
 或一个分解 $\bar K=\prod(\text{廉价因子})$)。**这就是 Problem B。**
@@ -106,26 +109,37 @@ $$\bar K_{C-1}\cdots\bar K_0=U_{C-1}\Big(\prod(V\!U)\Big)V_0,$$
   2026-07-19 已得 C=3 满秩 3 和 C=5 严格下界 1024;见 §7.1。
 
 ### B2(初等分解 / 列转移)
-把带算子按**列逐格推进**分解:$M_A=E^{(A)}_{2C-1}\cdots E^{(A)}_0$,每个 $E_j$ 作用在一个
-**带内前沿态**(dimension $\le q(C)$)上,从而用 $O(C)$ 个廉价步替代显式 permanent / 笛卡尔积。
-- **收益**:把 $\binom{2C}{C}\times(\mathrm{per}\times\mathrm{per})$ 的带算子换成 $O(C)$ 步小转移;
-  若联合前沿维保持小,则每带多项式。
-- 这是研究日志提过、但**从未为联合 (X,Y) 问题实现**的 KSP 超带 / 列配置转移;
-  `buildHistPermDP` 是**单侧**雏形(慢 4×,因为单侧还原不掉笛卡尔积)。
-- **难点**:联合的带内前沿(既要 X-双射、又要 Y-双射、还要它们在同一顶符号集上的关联)可能本身就大(O2+O3)。
-- **判定 = 实验 E3**:C=3,4,5 测联合带内列转移前沿的最大维。它是 $\mathrm{poly}(C)$ 还是爆炸?
 
-### B3(twirl / 换位子 —— 最深也最投机)
+需要区分两个不同的输出契约。
+
+**B2a(固定源、区分 target;已否决)**:固定一个 source,按列或
+inclusion-exclusion 顺序生成该 source 的完整 target 多项式。对固定 source,
+target 由集合差唯一恢复两个 assignment map;不同 extendable prefix 的后缀-
+target 支撑互不相交。因此任何线性前沿的宽度至少是 extendable prefix 数。
+§7.2 的可达 C=6 平凡稳定子证人给出固定 3+3 split 宽度至少 42,191,464,
+terminal support 5,489,549,616。普通列 DP、signed Ryser/Glynn 与 external sort
+若仍输出完整 source row,都只是重排同一支撑。
+
+**B2b(target-only、跨 source;仍开放)**:给实际可达 orbit 向量 $x$,直接算
+
+$$y_{[t]}=\sum_{[s]}x_{[s]}\,\bar K_k([t],[s]),$$
+
+并在表示任何 $(s,t)$ pair 或完整 source row 之前跨 source 聚合。它可以满秩;
+目标是 fast transform,不是预设低秩。必须给出充分态、精确 orbit normalization、
+跨带闭包和复杂度。B2a 下界不覆盖这个输出契约。
+
+### B3(twirl / 换位子 —— 只保留响应子空间)
 $\bar K=\sum_A M_A\otimes M_A$ 是 $M_{A_0}\otimes M_{A_0}$ 在 $A_0$ 的 $S_n$-轨道上的**群平均(twirl)**。
 twirl 是 $S_n$ 作用的 intertwiner ⟹ 由 Schur 引理在每个 $S_n$-等距分量上是**块标量**。
 - **陷阱**:我们已经落在 $S_n$-平凡块里(= 多重集约简),而那个块本身就是 $D$ 维,所以
   "对 $S_n$ 做 twirl" **给不出新东西**。
-- **可能有牙口的版本**:保持符号**带标号**,换一个**不同的**分解——不是 $S_n$,而是
-  组态空间 $\binom{[C]}{k}^{[n]}/\!\sim$ 上的**关联方案 / Gelfand 对**结构(每 stack 的 Johnson 方案
-  $J(C,k)$ 的某种积)。精确开问:**$\bar K$ 是否是少数几个方案矩阵的低次多项式?**
-  若是,$\bar K$ 有紧致块形,$\bar K^{\,C}$ 可在方案的公共特征基里对角地算。
-- **判定 = 实验 E4**:$\bar K_k$ 是否与候选方案矩阵(每 stack 的 $J(C,k)$ 邻接)对易?
-  $\bar K$ 是否是它们的低次多项式?
+- **已否决的宽版本**:物化完整 coherent-configuration/orbital algebra。C=6
+  两行层有 276 个平凡稳定子 orbit;其 38,226 个无序 pair 单独就有
+  $38226\cdot46080=1,761,454,080$ 个 relative-placement coordinates。
+  Fourier block 只换基,不减少完整 $\operatorname{Hom}_G$ 维数。
+- **仍可能有牙口的版本**:证明实际下游加权响应只落在一个共同的小
+  Fourier/communication 子空间,并只构造该子空间。精确问题不是“完整代数是否
+  可分块”,而是“所需 response span 的维数和显式生成元是什么”。
 
 ---
 
@@ -141,6 +155,9 @@ twirl 是 $S_n$ 作用的 intertwiner ⟹ 由 Schur 引理在每个 $S_n$-等距
 - **O5(平凡自同构)**:规范态 $|\mathrm{Aut}|\sim O(1)$ ⟹ 骨架/轨道商只有 ≈1.16×。对称性已用尽。
 - **O6(精确性闸门)**:任何紧致 $\bar K$ 必须逐带复现 C=3 金标准权重 + C=4/5 OEIS 值(字节级)才可信;
   "看似精确实则偏一点"是最危险的失败模式。
+- **O7(固定源支撑地板)**:固定源的完整 target polynomial 在可达 C=6 证人上有
+  5,489,549,616 个正系数,且所有 3+3 flattening 都至少秩 42,191,464。下一种
+  表示必须在 source 求和之前就避免这个输出契约。
 
 ---
 
@@ -150,8 +167,13 @@ twirl 是 $S_n$ 作用的 intertwiner ⟹ 由 Schur 引理在每个 $S_n$-等距
   也界定 B1/B2 里 $r,q$ 的下界候选。
 - **E2(已完成预声明门槛)**:C=2--4 显式建完整 $\bar K_k$;C=5 对 1024 个完整源行做
   signed target CountSketch,得到严格模秩下界。结果见 §7.1。
-- **E3(对 B2)**:C=3,4,5 建联合带内列转移的前沿,测最大前沿维 vs $C$。
-- **E4(对 B3)**:测 $\bar K_k$ 与每 stack Johnson 邻接 $J(C,k)$ 的对易性;拟合 $\bar K$ 为方案矩阵的多项式。
+- **E3(已被严格下界取代)**:固定源、区分 target 的联合列前沿已由 §7.2
+  的可达 C=6 证人否决;不再通过扩大 C=5 probe 重复测试。
+- **E4(宽版本已否决)**:完整 orbital algebra 至少含 1,761,454,080 个已知
+  regular-block coordinates。只有指定的下游 response subspace 版本仍开放。
+- **E5(下一项理论闸门)**:构造 B2b 的 target-only 实际向量变换,或 B3 的共同
+  response span。先逐项复现 C=3/C=4 输出,再报告有界 C=5 actual-vector 的维数、
+  运算数、时间与 RSS;没有 exact construction 时不启动 C=6 数据实验。
 - 全部以复现 C=3 金标准(HANDOFF §3)+ C=4=29136487207403520 为闸门。
 
 ### 7.1 E2 verified result (2026-07-19)
@@ -182,12 +204,31 @@ $$\operatorname{rank}_{\mathbb Q}(\bar K_2)\ge1024.$$
 C=5 的 126 维 matching-cycle kernel 因式化;但它没有给出 38,801 的精确秩,
 也不能排除秩为 1,024 或几千。继续放大 sketch 只提高下界,没有结构上界前不再追数。
 
+### 7.2 Fixed-source frontier certificate (2026-07-20)
+
+原型 `../../experiments/proto/source_target_frontier_bound.cpp` 从两条合法 shared
+cut 和四个 assignment vectors 推导一个可达 C=6 grade-2 source。它穷举
+$S_6\times S_6\times C_2$,确认 12 个类型互异且 stabilizer 为 1;再用 subset DP、
+Ryser 和 balanced-map DFS 三条路径交叉验证:
+
+```text
+permanent(B_S) = 4743616    |M(S)| = 74119
+permanent(B_T) = 4740096    |M(T)| = 74064
+terminal support = 5489549616
+3-column prefix minima = 6488 and 6503
+fixed 3+3 rank lower bound = 42191464
+```
+
+证明使用“完整 target 由 source 与集合差唯一恢复 assignment prefix”,所以不同
+prefix 的 completion-target 支撑互不相交。完整证书、命令、哈希和适用边界见
+`../reports/og2/source-target-frontier-lower-bound-20260720.md`。
+
 ---
 
 ## 8. 一句话
 
-维数地板已证(§4):**换态空间不降维**。E2 又证实首个无小邻层的 C=5 中层
-不可能压到几百维。当前下一锤是 **E3**:联合带内列前沿能否在保留 target identity
-与 cycle weight 的同时,避免“一条 assignment prefix 一个状态”。若仍近单射,B2 也应退役;
-若前沿显著小,才值得寻找 exact short factorization。B3 的 balanced-switch algebra
-仍是更深的理论备选。
+换基不能缩小完整 invariant/orbital 空间;E2 排除几百维 B1,E3 的严格证书又
+排除固定源完整 target 前沿。现在只剩输出契约更窄的结构性问题:能否对实际
+multi-source 向量直接做 target-only fast transform,或只构造共同 downstream
+response span。没有这两者之一的 exact construction,继续扩容、换遍历顺序或外排
+都不会形成 C=6 路线。

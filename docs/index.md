@@ -25,10 +25,12 @@
 
 - `math/c6-current-bottleneck.md` — audited C=6 mathematical frontier.
 - `math/og2-band-kernel-lowrank.md` — separate formalized transfer-kernel
-  question, completed small-rank gate, and next fused-frontier experiment.
+  question, completed small-rank gate, fixed-source frontier lower bound, and
+  surviving target-only/response-subspace questions.
 
 ## Dated evidence
 
+- `reports/og2/source-target-frontier-lower-bound-20260720.md`
 - `reports/og2/band-kernel-rank-20260719.md`
 - `reports/og2/f4-lookup-coverage-20260719.md`
 - `reports/og2/future-tail-later-class-coverage-20260719.md`
@@ -59,9 +61,16 @@ verified method document, not in an old report.
 Files under `expert/` preserve questions and responses verbatim for provenance.
 They may contain conjectures or proposals that have not been implemented.
 
-- `expert/2026-07-19/c6-mathematical-bottleneck-question.md` — concise current
-  request for an exact global contraction, a fast implicit band-kernel
-  transform, or a relevant lower bound after the completed scale gates.
+- `expert/2026-07-19/c6-mathematical-bottleneck-question.md` — previous request
+  for an exact global contraction, a fast implicit band-kernel transform, or a
+  relevant lower bound after the then-completed scale gates.
+- `expert/2026-07-19/fable_response.md` — raw graph-regression, PSD/Kraus,
+  commutant, and signed-permanent suggestions; audited, not authoritative.
+- `expert/2026-07-19/gpt5.6_pro_response.md` — raw fixed-source support and
+  flattening argument that led to the independently retained certificate.
+- `expert/2026-07-20/c6-target-only-global-contraction-question.md` — narrowed
+  next question after fixed-source and full-orbital implementations were
+  rejected.
 
 ## History
 

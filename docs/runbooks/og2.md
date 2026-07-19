@@ -110,6 +110,35 @@ hash `F8620CF513430C4B`, and `[OK]`.  This proves only the exact lower bound
 `rank_Q >= 1024`; it does not prove full rank 38,801.  See
 `../reports/og2/band-kernel-rank-20260719.md`.
 
+## Fixed-source frontier certificate
+
+This bounded verifier is outside the standard build and does not read or
+write any checkpoint:
+
+```powershell
+g++ -O3 -std=c++20 -Wall -Wextra `
+  experiments\proto\source_target_frontier_bound.cpp `
+  -o build\source_target_frontier_bound.exe
+
+.\build\source_target_frontier_bound.exe
+```
+
+The retained witness must report:
+
+```text
+reachable=1 types=12 automorphisms=1 swapAutomorphisms=0
+permanents X=4743616 Y=4740096 maps X=74119 Y=74064
+splitSupport X=6488..7806 Y=6503..7806 rankLower=42191464
+terminalSupport=5489549616 recordGiB16=81.801
+orbitalDimensionLower=1761454080 [OK]
+```
+
+This certifies a lower bound only for a fixed-source linear frontier whose
+output distinguishes the complete target.  It does not rule out a target-only
+transform that combines the actual multi-source vector before representing
+source-target pairs.  See
+`../reports/og2/source-target-frontier-lower-bound-20260720.md`.
+
 ## Reverse-gluing decision prototype
 
 This prototype is intentionally outside the standard build:

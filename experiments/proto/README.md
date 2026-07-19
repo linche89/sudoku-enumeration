@@ -8,6 +8,13 @@ shortcuts, profiling results, or validation of helper identities.
 
 Highlights:
 
+- `source_target_frontier_bound.cpp` - a fast arithmetic certificate for the
+  fixed-source target-frontier lower bound.  It derives a reachable C=6
+  grade-2 witness, proves its stabilizer is trivial, cross-checks two permanent
+  algorithms against direct balanced-map enumeration, and verifies all 20
+  three-column split supports.  It allocates no C=6 layer and touches no
+  checkpoint.  See
+  `../../docs/reports/og2/source-target-frontier-lower-bound-20260720.md`.
 - `band_kernel_rank.cpp` - complete explicit reduced band-kernel matrices and
   exact rank certificates through C=4, plus a safety-bounded C=5 signed target
   CountSketch.  The retained 1,024-square sketch proves the `38801 x 38801`

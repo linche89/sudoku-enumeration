@@ -331,53 +331,109 @@ matching-cycle kernel.  It does not prove full rank or exclude a rank of 1,024
 or several thousand, so it is a bounded negative decision rather than an
 impossibility theorem for every structured factorization.
 
+## Fixed-source target-frontier lower bound
+
+The proposed fused column frontier can be decided without constructing a
+larger C=5 layer.  Fix a fully labelled grade-`k` source
+`s=((S_i,T_i))`.  Let `M(S)` be the balanced maps from the `2C` symbols to the
+`C` columns that avoid the used masks `S_i`, with two symbols mapped to each
+column; define `M(T)` analogously.  For this fixed source, the labelled target
+recovers its two new maps by set difference.  Every map pair has a positive
+cycle weight, so the terminal support is exactly
+
+```text
+T(s) = |M(S)| |M(T)|,
+|M(S)| = permanent(B_S) / 2^C.
+```
+
+At any fixed processed-column cut, different extendable assignment prefixes
+have disjoint nonzero completion-and-target supports.  The corresponding
+prefix/suffix flattening rows are therefore linearly independent.  After
+source-stabilizer reduction, the frontier width is at least the number of
+stabilizer orbits of extendable prefixes and the terminal width is at least
+`ceil(T(s)/|H_s|)`.
+
+An independently verified reachable C=6 grade-2 source has trivial
+stabilizer and gives
+
+```text
+|M(S)| = 74119
+|M(T)| = 74064
+terminal support = 5489549616
+minimum support over every 3-column split = 6488 and 6503
+minimum fixed 3+3 flattening rank = 6488 * 6503 = 42191464
+```
+
+At 16 bytes per terminal record, its fixed-source output alone would occupy
+81.801 GiB before table overhead.  This is an exact obstruction to every
+fixed-source linear frontier that distinguishes the full target, including a
+signed Ryser/Glynn reordering with that output semantics.  It does **not**
+lower-bound a target-only circuit that sums the actual multi-source input
+vector directly into target-orbit coefficients before any `(source,target)`
+pair is represented.
+
+The related full coherent-configuration proposal has a separate exact wall.
+The 276 trivial-stabilizer two-row orbits give 38,226 unordered regular-block
+pairs and hence at least
+
+```text
+38226 * 46080 = 1761454080
+```
+
+relative-placement coordinates.  Fourier decomposition changes basis but
+does not shrink this full equivariant Hom space.  Only a specifically
+constructed smaller subspace containing the downstream weighted response
+remains open.
+
 ## Required next result
 
-Both proposed local operator lifts, both fixed-table reuse proposals, and the
-two obvious class-local/bottom-up reverse-gluing enumerations have now been
-measured and rejected in their tested coordinates.  No implemented global C=6
-route currently passes its scale gate.  A planner may still compare verified
-contraction edges, but shortest-path optimization cannot replace a missing
-sufficient state or turn an injective enumeration into a compressive DP.
+No implemented global C=6 route currently passes its scale gate.  The
+fixed-source E3 frontier is no longer the next experiment: its C=6 witness
+already proves that increasing state limits, changing assignment order, using
+signed inclusion-exclusion, or externalizing the same target polynomial
+cannot make it small.  Materializing the complete coherent-configuration
+algebra merely restates the known 1.761-billion regular-block work factor.
 
-A viable historical-style bulk construction would have to change the decisive
-work factor: generate or query globally reusable four-row/F4 incidences without
-enumerating either the known 1.761-billion trivial-stabilizer placements or a
-roughly 1.3-billion two-factor list for every ordinary outer graph.  Merely
-streaming either nearly injective list controls RAM but does not pass the gate.
-Before any large C=6 data file is authorized, an independent implementation
-must reproduce every C=4/C=5 `(coordinate orbit, labelled multiplicity, F)`
-triple.  Only then may a positive-limit, time/RSS/record-bounded C=6 prefix
-measure external bytes, duplicate ratio, and throughput.
+The primary remaining question is target-only and multi-source.  With the
+orbit-total normalization used by the verified joint-histogram engine, find an
+exact circuit for
 
-Pettersen's historical “more than 900 million” statement keeps a genuinely
-global incidence route plausible, but remains a rough comparison point rather
-than an acceptance oracle.  No construction currently removes both measured
-enumeration factors, so this route has no qualified large-data implementation
-step.
+```text
+y_[t] = sum_[s] x_[s] Kbar_k([t],[s])
+```
 
-A cross-class symbolic prefix or global contraction remains the high-upside
-theory alternative.  A stronger exact quotient or streamed shared final layer
-is still needed to avoid one 9-GB-class job per orbit.  G1 and G2 do not
-justify a full-run projection.
+on the actual reachable input vector `x`.  It must aggregate different sources
+before materializing a source-target pair or a complete source row.  It may be
+full rank: the desired gain is a fast transform or structured application,
+not necessarily a low-rank factorization.  The construction must specify its
+sufficient representation, exact normalization, closure across successive
+bands, and operation/memory bounds.
 
-The 3+3 route should be reopened only if a new proposal explains how to build
-or apply the full-rank block operator without materializing the 63,199 outer
-coordinates or the larger midpoint algebra.
+The parallel reverse-gluing question is whether the specific downstream
+weighted responses of many regular relative-placement blocks lie in a common
+small Fourier/communication subspace.  This asks for a response subspace, not
+the full orbital algebra.  A useful answer must construct that subspace and
+bound its dimension, or prove a lower bound that also applies after the actual
+source weights are combined.
 
-The reduced-kernel rank ladder is complete through its declared 1,024 bound.
-Larger CountSketches would only raise a lower bound without a structural upper
-bound, so the next executable Problem-B decision is the fused joint
-within-band column frontier.  It must reproduce every C=3/C=4 matrix entry,
-then measure bounded C=5 sources while retaining target identity and cycle
-weight.  If its partial state recovers nearly every assignment prefix, as in
-the rejected labelled operator lifts, it is not a route.  The naive per-symbol
-Johnson commutation proposal is also inadequate; a balanced-switch or
-coherent-configuration algebra has not been constructed or ruled out.
+Either proposal must reproduce complete C=3/C=4 output vectors or matrices
+under the retained normalization, then pass a bounded C=5 actual-vector gate
+that reports representation dimension, operations, time, and RSS.  Only an
+exact construction with a credible C=6 projection justifies another bounded
+C=6 implementation.  A lower bound eliminating these two remaining output
+contracts is equally useful.  G1/G2 symmetry, cache tuning, a contraction-order
+planner, and Pettersen's rough “more than 900 million” lookup statement are not
+acceptance evidence.
+
+There is therefore no authorized large-data step at present.  Historical bulk
+reverse gluing remains a theory lead, and no full 63,199-class run is
+authorized.
 
 Raw source material is preserved under `../expert/2026-07-12/`,
 `../expert/2026-07-13/`, `../expert/2026-07-14/`,
-`../expert/2026-07-15/`, and `../expert/2026-07-17/`.  Reproduction evidence is in
+`../expert/2026-07-15/`, `../expert/2026-07-17/`, and
+`../expert/2026-07-19/`.  The narrowed follow-up question is under
+`../expert/2026-07-20/`.  Reproduction evidence is in
 `../reports/og2/c6-expert-routes-audit-20260713.md` and
 `../reports/og2/future-pair-tail-external-c6-20260714.md`.  Color-symmetry
 implementation and full-rescan evidence are in
@@ -402,3 +458,6 @@ The box-order operator frontier is in
 The connectivity subset-operator proof and measurements are in
 `../methods/connectivity-operator.md` and
 `../reports/og2/connectivity-double-permanent-20260719.md`.
+The fixed-source support theorem, C=6 witness certificate, coherent-space
+consequence, and expert-follow-up audit are in
+`../reports/og2/source-target-frontier-lower-bound-20260720.md`.
