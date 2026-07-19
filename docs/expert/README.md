@@ -14,6 +14,9 @@ Current conclusions are maintained in `../../STATUS.md` and `../math/`.
 
 ## Recent C=6 inputs
 
+- `2026-07-19/c6-mathematical-bottleneck-question.md` — current expert
+  discussion brief after the class-local, reverse-gluing, operator-frontier,
+  and reduced-rank scale gates.
 - `2026-07-12/p1_response.md` — future-twin recurrence for evaluating one
   factorization count without materializing degree-5 residual graphs.
 - `2026-07-13/p2_response.md` — exact 3+3 block formulation and small-C

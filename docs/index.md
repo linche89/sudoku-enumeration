@@ -59,6 +59,10 @@ verified method document, not in an old report.
 Files under `expert/` preserve questions and responses verbatim for provenance.
 They may contain conjectures or proposals that have not been implemented.
 
+- `expert/2026-07-19/c6-mathematical-bottleneck-question.md` — concise current
+  request for an exact global contraction, a fast implicit band-kernel
+  transform, or a relevant lower bound after the completed scale gates.
+
 ## History
 
 Files under `history/` explain how the project arrived here. Their statements,
