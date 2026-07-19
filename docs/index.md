@@ -10,6 +10,11 @@
 
 - `methods/factorization-orbit.md` — current factorization/orbit algorithm.
 - `methods/future-twin.md` — optional exact future-twin recurrence and gates.
+- `methods/joint-histogram.md` — exact box-order paired-histogram contraction
+  through C=4 and its bounded C=5 decision boundary.
+- `methods/reverse-gluing.md` — reverse row-block gluing, exact orbit
+  normalization, complete C=2..5 gates, exact C=6 two-row inventory, and the
+  failed scale gate for immediate pairwise canonicalization.
 - `../fj9/reproduction.md` — complete FJ05 9x9 reproduction.
 
 ## Current mathematics
@@ -20,6 +25,13 @@
 
 ## Dated evidence
 
+- `reports/og2/joint-histogram-c2-c4-20260719.md`
+- `reports/og2/reverse-gluing-c6-frontier-probe-20260718.md`
+- `reports/og2/reverse-gluing-c4-c5-20260718.md`
+- `reports/og2/c6-route-portfolio-20260717.md`
+- `reports/og2/future-tail-kernel-table-c6-20260715.md`
+- `reports/og2/future-tail-color-symmetry-c6-20260715.md`
+- `reports/og2/future-pair-tail-external-c6-20260714.md`
 - `reports/og2/future-twin-c6-20260714.md`
 - `reports/og2/c6-expert-routes-audit-20260713.md`
 - `reports/og2/literature-audit-20260712.md`
