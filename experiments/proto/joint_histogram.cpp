@@ -160,6 +160,15 @@ public:
         return n * n;
     }
 
+    int activePosition(int s, int t, int layer) const {
+        const int first = positions_[layer][s];
+        const int second = positions_[layer][t];
+        if (first < 0 || second < 0) {
+            throw std::runtime_error("mask is outside the requested active layer");
+        }
+        return first * static_cast<int>(masks_[layer].size()) + second;
+    }
+
     Key encode(const Hist& hist, int layer) const {
         Key key;
         int pos = 0;
@@ -737,6 +746,414 @@ private:
     std::unordered_map<std::uint64_t, Count> countMemo_;
 };
 
+struct OperatorKey {
+    Key target;
+    std::uint32_t residual = 0;
+    std::uint64_t mate = 0;
+
+    bool operator==(const OperatorKey& other) const noexcept {
+        return target == other.target && residual == other.residual &&
+               mate == other.mate;
+    }
+};
+
+struct OperatorKeyHash {
+    std::size_t operator()(const OperatorKey& key) const noexcept {
+        std::uint64_t h = static_cast<std::uint64_t>(KeyHash{}(key.target));
+        auto mix = [&](std::uint64_t value) {
+            value ^= value >> 30;
+            value *= 0xbf58476d1ce4e5b9ULL;
+            value ^= value >> 27;
+            value *= 0x94d049bb133111ebULL;
+            value ^= value >> 31;
+            h ^= value + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+        };
+        mix(key.residual);
+        mix(key.mate);
+        return static_cast<std::size_t>(h);
+    }
+};
+
+using OperatorMap = std::unordered_map<OperatorKey, Count, OperatorKeyHash>;
+
+// Exact source-type allocation DP.  A state retains the labelled raw target
+// histogram plus the degree-two path quotient used to apply the cycle weight.
+struct OperatorCell {
+    int a = 0;
+    int b = 0;
+    int targetPosition = 0;
+};
+
+struct OperatorType {
+    int s = 0;
+    int t = 0;
+    int multiplicity = 0;
+    std::vector<OperatorCell> cells;
+};
+
+class OperatorTransition {
+public:
+    OperatorTransition(const StateSpace& space, const Hist& source, int layer,
+                       std::size_t maxStates, std::uint64_t maxRecords,
+                       int stopTypes, bool materializeRawTargets)
+        : space_(space), c_(space.c()), layer_(layer), maxStates_(maxStates),
+          maxRecords_(maxRecords), stopTypes_(stopTypes),
+          materializeRawTargets_(materializeRawTargets) {
+        for (int i = 0; i <= 2 * c_; ++i) factorial_[i] = factorial(i);
+        for (int s : space_.masks(layer_)) {
+            for (int t : space_.masks(layer_)) {
+                const int multiplicity = source[StateSpace::index(s, t)];
+                if (multiplicity == 0) continue;
+                OperatorType type;
+                type.s = s;
+                type.t = t;
+                type.multiplicity = multiplicity;
+                for (int a = 0; a < c_; ++a) {
+                    if (s & (1 << a)) continue;
+                    for (int b = 0; b < c_; ++b) {
+                        if (t & (1 << b)) continue;
+                        type.cells.push_back({
+                            a, b,
+                            space_.activePosition(s | (1 << a),
+                                                  t | (1 << b), layer_ + 1)});
+                    }
+                }
+                types_.push_back(std::move(type));
+            }
+        }
+        std::sort(types_.begin(), types_.end(),
+                  [](const OperatorType& left, const OperatorType& right) {
+                      if (left.cells.size() != right.cells.size()) {
+                          return left.cells.size() < right.cells.size();
+                      }
+                      if (left.multiplicity != right.multiplicity) {
+                          return left.multiplicity > right.multiplicity;
+                      }
+                      if (left.s != right.s) return left.s < right.s;
+                      return left.t < right.t;
+                  });
+    }
+
+    void run() {
+        std::array<std::uint8_t, MAX_C> residualA{};
+        std::array<std::uint8_t, MAX_C> residualB{};
+        residualA.fill(2);
+        residualB.fill(2);
+        std::array<std::uint8_t, 2 * MAX_C> mate{};
+        mate.fill(NO_MATE);
+
+        OperatorKey start;
+        start.residual = encodeResidual(residualA, residualB);
+        start.mate = encodeMate(mate);
+        OperatorMap current;
+        current.emplace(start, 1);
+        peakStates_ = 1;
+
+        for (int typeIndex = 0;
+             typeIndex < static_cast<int>(types_.size());
+             ++typeIndex) {
+            const auto started = std::chrono::steady_clock::now();
+            OperatorMap next;
+            next.reserve(std::min<std::size_t>(maxStates_,
+                                               current.size() * 4 + 128));
+            const std::uint64_t recordsBefore = generatedRecords_;
+            for (const auto& [state, coefficient] : current) {
+                decodeResidual(state.residual, residualA, residualB);
+                decodeMate(state.mate, mate);
+                if (!futureFeasible(typeIndex, residualA, residualB)) continue;
+                allocateType(typeIndex, 0, types_[typeIndex].multiplicity, 1,
+                             state.target, residualA, residualB, mate, 1,
+                             coefficient, next);
+            }
+            current.swap(next);
+            ++processedTypes_;
+            peakStates_ = std::max(peakStates_, current.size());
+            const double seconds = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - started).count();
+            std::cout << "operator_type target_layer=" << (layer_ + 1)
+                      << " type=" << processedTypes_ << "/" << types_.size()
+                      << " multiplicity=" << types_[typeIndex].multiplicity
+                      << " cells=" << types_[typeIndex].cells.size()
+                      << " frontier=" << current.size()
+                      << " generated=" << (generatedRecords_ - recordsBefore)
+                      << " generated_total=" << generatedRecords_
+                      << " seconds=" << seconds << std::endl;
+            if (current.empty()) {
+                throw std::runtime_error("operator frontier became empty");
+            }
+            if (stopTypes_ != 0 && processedTypes_ >= stopTypes_ &&
+                processedTypes_ < static_cast<int>(types_.size())) {
+                finalFrontier_ = current.size();
+                return;
+            }
+        }
+
+        std::array<std::uint8_t, MAX_C> zeroResidual{};
+        std::array<std::uint8_t, 2 * MAX_C> emptyMate{};
+        emptyMate.fill(NO_MATE);
+        const std::uint32_t expectedResidual =
+            encodeResidual(zeroResidual, zeroResidual);
+        const std::uint64_t expectedMate = encodeMate(emptyMate);
+        for (const auto& [state, coefficient] : current) {
+            if (state.residual != expectedResidual || state.mate != expectedMate) {
+                throw std::runtime_error("operator terminal state is not closed");
+            }
+            (void)coefficient;
+        }
+        finalFrontier_ = current.size();
+        completed_ = true;
+        if (!materializeRawTargets_) return;
+
+        rawTargets_.reserve(current.size());
+        for (const auto& [state, coefficient] : current) {
+            const auto [it, inserted] = rawTargets_.emplace(state.target, coefficient);
+            (void)it;
+            if (!inserted) {
+                throw std::runtime_error("duplicate terminal operator target");
+            }
+        }
+    }
+
+    const CountMap& rawTargets() const { return rawTargets_; }
+    CountMap takeRawTargets() { return std::move(rawTargets_); }
+    bool completed() const { return completed_; }
+    std::size_t peakStates() const { return peakStates_; }
+    std::size_t finalFrontier() const { return finalFrontier_; }
+    std::uint64_t generatedRecords() const { return generatedRecords_; }
+    int processedTypes() const { return processedTypes_; }
+    int typeCount() const { return static_cast<int>(types_.size()); }
+
+private:
+    static constexpr std::uint8_t NO_MATE = 15;
+
+    static std::uint64_t factorial(int n) {
+        std::uint64_t value = 1;
+        for (int i = 2; i <= n; ++i) value *= static_cast<std::uint64_t>(i);
+        return value;
+    }
+
+    static std::uint8_t targetCount(const Key& key, int position) {
+        return static_cast<std::uint8_t>(
+            (key.words[position / 16] >> (4 * (position % 16))) & 0xFULL);
+    }
+
+    static void addTargetCount(Key& key, int position, int amount) {
+        const std::uint8_t old = targetCount(key, position);
+        if (old + amount > 15) {
+            throw std::runtime_error("operator target count exceeds key nibble");
+        }
+        key.words[position / 16] +=
+            static_cast<std::uint64_t>(amount) << (4 * (position % 16));
+    }
+
+    std::uint32_t encodeResidual(
+        const std::array<std::uint8_t, MAX_C>& residualA,
+        const std::array<std::uint8_t, MAX_C>& residualB) const {
+        std::uint32_t code = 0;
+        for (int color = 0; color < c_; ++color) code = code * 3 + residualA[color];
+        for (int color = 0; color < c_; ++color) code = code * 3 + residualB[color];
+        return code;
+    }
+
+    void decodeResidual(std::uint32_t code,
+                        std::array<std::uint8_t, MAX_C>& residualA,
+                        std::array<std::uint8_t, MAX_C>& residualB) const {
+        residualA.fill(0);
+        residualB.fill(0);
+        for (int color = c_ - 1; color >= 0; --color) {
+            residualB[color] = static_cast<std::uint8_t>(code % 3);
+            code /= 3;
+        }
+        for (int color = c_ - 1; color >= 0; --color) {
+            residualA[color] = static_cast<std::uint8_t>(code % 3);
+            code /= 3;
+        }
+        if (code != 0) throw std::runtime_error("invalid operator residual code");
+    }
+
+    std::uint64_t encodeMate(
+        const std::array<std::uint8_t, 2 * MAX_C>& mate) const {
+        std::uint64_t code = 0;
+        for (int vertex = 0; vertex < 2 * c_; ++vertex) {
+            code |= static_cast<std::uint64_t>(mate[vertex]) << (4 * vertex);
+        }
+        return code;
+    }
+
+    void decodeMate(std::uint64_t code,
+                    std::array<std::uint8_t, 2 * MAX_C>& mate) const {
+        mate.fill(NO_MATE);
+        for (int vertex = 0; vertex < 2 * c_; ++vertex) {
+            mate[vertex] = static_cast<std::uint8_t>((code >> (4 * vertex)) & 0xFULL);
+        }
+    }
+
+    bool futureFeasible(
+        int typeIndex,
+        const std::array<std::uint8_t, MAX_C>& residualA,
+        const std::array<std::uint8_t, MAX_C>& residualB) const {
+        for (int a = 0; a < c_; ++a) {
+            int capacity = 0;
+            for (int i = typeIndex; i < static_cast<int>(types_.size()); ++i) {
+                if ((types_[i].s & (1 << a)) == 0) capacity += types_[i].multiplicity;
+            }
+            if (capacity < residualA[a]) return false;
+        }
+        for (int b = 0; b < c_; ++b) {
+            int capacity = 0;
+            for (int i = typeIndex; i < static_cast<int>(types_.size()); ++i) {
+                if ((types_[i].t & (1 << b)) == 0) capacity += types_[i].multiplicity;
+            }
+            if (capacity < residualB[b]) return false;
+        }
+        return true;
+    }
+
+    bool addEdge(int a, int b,
+                 std::array<std::uint8_t, MAX_C>& residualA,
+                 std::array<std::uint8_t, MAX_C>& residualB,
+                 std::array<std::uint8_t, 2 * MAX_C>& mate,
+                 Count& cycleFactor) const {
+        if (residualA[a] == 0 || residualB[b] == 0) return false;
+        const int left = a;
+        const int right = c_ + b;
+        const int degreeLeft = 2 - residualA[a];
+        const int degreeRight = 2 - residualB[b];
+        if (degreeLeft == 0 && degreeRight == 0) {
+            if (mate[left] != NO_MATE || mate[right] != NO_MATE) {
+                throw std::runtime_error("operator isolated endpoint invariant failure");
+            }
+            mate[left] = static_cast<std::uint8_t>(right);
+            mate[right] = static_cast<std::uint8_t>(left);
+        } else if (degreeLeft == 1 && degreeRight == 0) {
+            const std::uint8_t other = mate[left];
+            if (other == NO_MATE || mate[right] != NO_MATE) {
+                throw std::runtime_error("operator left-extension invariant failure");
+            }
+            mate[left] = NO_MATE;
+            mate[right] = other;
+            mate[other] = static_cast<std::uint8_t>(right);
+        } else if (degreeLeft == 0 && degreeRight == 1) {
+            const std::uint8_t other = mate[right];
+            if (other == NO_MATE || mate[left] != NO_MATE) {
+                throw std::runtime_error("operator right-extension invariant failure");
+            }
+            mate[right] = NO_MATE;
+            mate[left] = other;
+            mate[other] = static_cast<std::uint8_t>(left);
+        } else if (degreeLeft == 1 && degreeRight == 1) {
+            const std::uint8_t otherLeft = mate[left];
+            const std::uint8_t otherRight = mate[right];
+            if (otherLeft == NO_MATE || otherRight == NO_MATE) {
+                throw std::runtime_error("operator path-join invariant failure");
+            }
+            mate[left] = NO_MATE;
+            mate[right] = NO_MATE;
+            if (otherLeft == right) {
+                if (otherRight != left) {
+                    throw std::runtime_error("operator cycle pairing mismatch");
+                }
+                cycleFactor *= 2;
+            } else {
+                mate[otherLeft] = otherRight;
+                mate[otherRight] = otherLeft;
+            }
+        } else {
+            return false;
+        }
+        --residualA[a];
+        --residualB[b];
+        return true;
+    }
+
+    void allocateType(
+        int typeIndex, int cellIndex, int unitsLeft, std::uint64_t denominator,
+        Key target, std::array<std::uint8_t, MAX_C> residualA,
+        std::array<std::uint8_t, MAX_C> residualB,
+        std::array<std::uint8_t, 2 * MAX_C> mate, Count cycleFactor,
+        Count stateCoefficient, OperatorMap& next) {
+        const OperatorType& type = types_[typeIndex];
+        if (unitsLeft == 0) {
+            if (!futureFeasible(typeIndex + 1, residualA, residualB)) return;
+            OperatorKey output;
+            output.target = target;
+            output.residual = encodeResidual(residualA, residualB);
+            output.mate = encodeMate(mate);
+            const Count multinomial = factorial_[type.multiplicity] / denominator;
+            next[output] += stateCoefficient * multinomial * cycleFactor;
+            ++generatedRecords_;
+            if (maxRecords_ != 0 && generatedRecords_ > maxRecords_) {
+                throw ScaleLimit(
+                    "operator generated-record limit " +
+                    std::to_string(maxRecords_) + " exceeded at type " +
+                    std::to_string(typeIndex + 1));
+            }
+            if (next.size() > maxStates_) {
+                throw ScaleLimit("operator state limit " +
+                                 std::to_string(maxStates_) +
+                                 " exceeded at type " +
+                                 std::to_string(typeIndex + 1));
+            }
+            return;
+        }
+        if (cellIndex == static_cast<int>(type.cells.size())) return;
+
+        std::array<bool, MAX_C> rows{};
+        std::array<bool, MAX_C> columns{};
+        for (int i = cellIndex; i < static_cast<int>(type.cells.size()); ++i) {
+            rows[type.cells[i].a] = true;
+            columns[type.cells[i].b] = true;
+        }
+        int rowCapacity = 0;
+        int columnCapacity = 0;
+        for (int a = 0; a < c_; ++a) if (rows[a]) rowCapacity += residualA[a];
+        for (int b = 0; b < c_; ++b) if (columns[b]) columnCapacity += residualB[b];
+        if (unitsLeft > std::min(rowCapacity, columnCapacity)) return;
+
+        const OperatorCell& cell = type.cells[cellIndex];
+        const int maximum = std::min({unitsLeft,
+                                      static_cast<int>(residualA[cell.a]),
+                                      static_cast<int>(residualB[cell.b])});
+        for (int amount = 0; amount <= maximum; ++amount) {
+            Key nextTarget = target;
+            auto nextResidualA = residualA;
+            auto nextResidualB = residualB;
+            auto nextMate = mate;
+            Count nextCycleFactor = cycleFactor;
+            bool valid = true;
+            for (int copy = 0; copy < amount; ++copy) {
+                if (!addEdge(cell.a, cell.b, nextResidualA, nextResidualB,
+                             nextMate, nextCycleFactor)) {
+                    valid = false;
+                    break;
+                }
+            }
+            if (!valid) continue;
+            addTargetCount(nextTarget, cell.targetPosition, amount);
+            allocateType(typeIndex, cellIndex + 1, unitsLeft - amount,
+                         denominator * factorial_[amount], nextTarget,
+                         nextResidualA, nextResidualB, nextMate,
+                         nextCycleFactor, stateCoefficient, next);
+        }
+    }
+
+    const StateSpace& space_;
+    int c_;
+    int layer_;
+    std::size_t maxStates_;
+    std::uint64_t maxRecords_;
+    int stopTypes_;
+    bool materializeRawTargets_;
+    std::vector<OperatorType> types_;
+    std::array<std::uint64_t, 2 * MAX_C + 1> factorial_{};
+    CountMap rawTargets_;
+    std::size_t peakStates_ = 0;
+    std::size_t finalFrontier_ = 0;
+    std::uint64_t generatedRecords_ = 0;
+    int processedTypes_ = 0;
+    bool completed_ = false;
+};
+
 class DirectTransition {
 public:
     DirectTransition(const StateSpace& space, const Hist& source, int layer)
@@ -858,6 +1275,11 @@ struct LayerStats {
     std::uint64_t fullCanonicalCandidates = 0;
     std::uint64_t countDpStates = 0;
     std::size_t maxCountDpStatesPerSource = 0;
+    std::uint64_t operatorGeneratedRecords = 0;
+    std::size_t operatorPeakStates = 0;
+    std::size_t operatorFinalFrontier = 0;
+    int operatorProcessedTypes = 0;
+    bool operatorProbeStopped = false;
     double seconds = 0;
     Count layerTotal = 0;
     bool closed = true;
@@ -879,6 +1301,12 @@ struct Options {
     bool directCheck = true;
     bool copySwap = true;
     bool countLeavesOnly = false;
+    bool operatorFinal = false;
+    bool operatorRawProbe = false;
+    std::size_t operatorMaxStates = 2'000'000;
+    std::uint64_t operatorMaxRecords = 0;
+    int operatorStopTypes = 0;
+    bool operatorStateLimitExplicit = false;
 };
 
 struct RunResult {
@@ -888,6 +1316,7 @@ struct RunResult {
     bool sourceProbeStopped = false;
     bool leafProbeStopped = false;
     bool countOnlyStopped = false;
+    bool operatorProbeStopped = false;
     std::vector<LayerStats> stats;
 };
 
@@ -982,6 +1411,11 @@ RunResult run(const Options& options) {
               << " leaf_probe=" << options.leafProbe
               << " raw_batch=" << options.rawBatchSize
               << " count_leaves_only=" << (options.countLeavesOnly ? 1 : 0)
+              << " operator_final=" << (options.operatorFinal ? 1 : 0)
+              << " operator_raw_probe=" << (options.operatorRawProbe ? 1 : 0)
+              << " operator_max_states=" << options.operatorMaxStates
+              << " operator_max_records=" << options.operatorMaxRecords
+              << " operator_stop_types=" << options.operatorStopTypes
               << " stop_layer=" << stopLayer
               << " max_states=" << options.maxStates << "\n";
     std::cout << "layer=0 states=1 total=1\n";
@@ -1027,6 +1461,7 @@ RunResult run(const Options& options) {
             const std::size_t sourceIndex = sourceStart + localSourceIndex;
             const auto& [sourceKey, sourceTotal] = orderedSources[sourceIndex];
             const Hist source = space.decode(sourceKey, layer);
+            std::uint64_t operatorSourceLeaves = 0;
             if (stats.countOnly || options.sourceProbe != 0 || sourceStart != 0) {
                 std::cout << "source_begin target_layer=" << (layer + 1)
                           << " ordered_index=" << sourceIndex
@@ -1073,6 +1508,132 @@ RunResult run(const Options& options) {
                                      std::to_string(layer + 1));
                 }
             };
+
+            const bool useOperator = options.operatorFinal &&
+                                     layer + 1 == stopLayer;
+            if (useOperator) {
+                if (options.c == 5) {
+                    ContingencyTransition scalarCost(
+                        space, source, layer, 0, 0, 0,
+                        ContingencyTransition::BatchSink{}, true);
+                    scalarCost.run();
+                    operatorSourceLeaves = scalarCost.leaves();
+                    stats.contingencyLeaves += operatorSourceLeaves;
+                    stats.countDpStates += scalarCost.countMemoStates();
+                    stats.maxCountDpStatesPerSource = std::max(
+                        stats.maxCountDpStatesPerSource,
+                        scalarCost.countMemoStates());
+                }
+
+                OperatorTransition operatorTransition(
+                    space, source, layer, options.operatorMaxStates,
+                    options.operatorMaxRecords, options.operatorStopTypes,
+                    !options.operatorRawProbe);
+                operatorTransition.run();
+                stats.operatorGeneratedRecords +=
+                    operatorTransition.generatedRecords();
+                stats.operatorPeakStates = std::max(
+                    stats.operatorPeakStates, operatorTransition.peakStates());
+                stats.operatorFinalFrontier = std::max(
+                    stats.operatorFinalFrontier,
+                    operatorTransition.finalFrontier());
+                stats.operatorProcessedTypes = std::max(
+                    stats.operatorProcessedTypes,
+                    operatorTransition.processedTypes());
+
+                if (!operatorTransition.completed()) {
+                    stats.closed = false;
+                    stats.operatorProbeStopped = true;
+                    ++stats.processedSourceStates;
+                    std::cout << "source_end target_layer=" << (layer + 1)
+                              << " ordered_index=" << sourceIndex
+                              << " leaves=" << operatorSourceLeaves
+                              << " operator_completed=0"
+                              << " operator_types="
+                              << operatorTransition.processedTypes()
+                              << "/" << operatorTransition.typeCount()
+                              << " operator_frontier="
+                              << operatorTransition.finalFrontier()
+                              << " operator_peak="
+                              << operatorTransition.peakStates()
+                              << " operator_generated="
+                              << operatorTransition.generatedRecords() << "\n";
+                    break;
+                }
+
+                if (options.operatorRawProbe) {
+                    stats.closed = false;
+                    stats.operatorProbeStopped = true;
+                    stats.rawTargetOccurrences +=
+                        operatorTransition.finalFrontier();
+                    ++stats.processedSourceStates;
+                    std::cout << "source_end target_layer=" << (layer + 1)
+                              << " ordered_index=" << sourceIndex
+                              << " leaves=" << operatorSourceLeaves
+                              << " operator_completed=1"
+                              << " operator_raw_probe=1"
+                              << " operator_types="
+                              << operatorTransition.processedTypes()
+                              << "/" << operatorTransition.typeCount()
+                              << " operator_frontier="
+                              << operatorTransition.finalFrontier()
+                              << " operator_peak="
+                              << operatorTransition.peakStates()
+                              << " operator_generated="
+                              << operatorTransition.generatedRecords()
+                              << " raw_support="
+                              << operatorTransition.finalFrontier() << "\n";
+                    break;
+                }
+
+                CountMap operatorTargets = operatorTransition.takeRawTargets();
+                if (options.c <= 4) {
+                    ContingencyTransition reference(
+                        space, source, layer, options.maxLeavesPerSource,
+                        0, 0, ContingencyTransition::BatchSink{}, false);
+                    reference.run();
+                    operatorSourceLeaves = reference.leaves();
+                    compareRawTransitions(reference.rawTargets(), operatorTargets,
+                                          options.c, layer);
+                    stats.contingencyLeaves += operatorSourceLeaves;
+                    if (options.directCheck) {
+                        DirectTransition direct(space, source, layer);
+                        direct.run();
+                        compareRawTransitions(reference.rawTargets(),
+                                              direct.rawTargets(),
+                                              options.c, layer);
+                        stats.directLeaves += direct.leaves();
+                    }
+                }
+
+                reduceRawTargets(operatorTargets);
+                stats.orbitTransitions += orbitTransitions.size();
+                for (const auto& [target, multiplicity] : orbitTransitions) {
+                    next[target] += sourceTotal * multiplicity;
+                }
+                ++stats.processedSourceStates;
+                std::cout << "source_end target_layer=" << (layer + 1)
+                          << " ordered_index=" << sourceIndex
+                          << " leaves=" << operatorSourceLeaves
+                          << " operator_completed=1"
+                          << " operator_types="
+                          << operatorTransition.processedTypes()
+                          << "/" << operatorTransition.typeCount()
+                          << " operator_frontier="
+                          << operatorTransition.finalFrontier()
+                          << " operator_peak="
+                          << operatorTransition.peakStates()
+                          << " operator_generated="
+                          << operatorTransition.generatedRecords()
+                          << " raw_support=" << operatorTargets.size()
+                          << " orbit_support=" << orbitTransitions.size()
+                          << "\n";
+                if (next.size() > options.maxStates) {
+                    throw ScaleLimit("state limit exceeded at layer " +
+                                     std::to_string(layer + 1));
+                }
+                continue;
+            }
 
             ContingencyTransition::BatchSink batchSink;
             if (options.rawBatchSize != 0) batchSink = reduceRawTargets;
@@ -1155,12 +1716,16 @@ RunResult run(const Options& options) {
         if (!stats.closed) {
             result.leafProbeStopped = stats.leafProbeStopped;
             result.countOnlyStopped = stats.countOnly;
+            result.operatorProbeStopped = stats.operatorProbeStopped;
             result.sourceProbeStopped =
-                !stats.leafProbeStopped && !stats.countOnly;
+                !stats.leafProbeStopped && !stats.countOnly &&
+                !stats.operatorProbeStopped;
             std::cout << "layer=" << (layer + 1)
                       << " closed=0"
                       << " leaf_probe_stopped=" << (stats.leafProbeStopped ? 1 : 0)
                       << " count_only=" << (stats.countOnly ? 1 : 0)
+                      << " operator_probe_stopped="
+                      << (stats.operatorProbeStopped ? 1 : 0)
                       << " source_start=" << sourceStart
                       << " processed_sources=" << stats.processedSourceStates
                       << " source_states=" << stats.sourceStates
@@ -1181,6 +1746,13 @@ RunResult run(const Options& options) {
                       << " count_dp_states=" << stats.countDpStates
                       << " max_count_dp_states_per_source="
                       << stats.maxCountDpStatesPerSource
+                      << " operator_generated_records="
+                      << stats.operatorGeneratedRecords
+                      << " operator_peak_states=" << stats.operatorPeakStates
+                      << " operator_final_frontier="
+                      << stats.operatorFinalFrontier
+                      << " operator_processed_types="
+                      << stats.operatorProcessedTypes
                       << " partial_total=" << countToString(stats.layerTotal)
                       << " seconds=" << stats.seconds << "\n";
             return result;
@@ -1210,6 +1782,13 @@ RunResult run(const Options& options) {
                   << " count_dp_states=" << stats.countDpStates
                   << " max_count_dp_states_per_source="
                   << stats.maxCountDpStatesPerSource
+                  << " operator_generated_records="
+                  << stats.operatorGeneratedRecords
+                  << " operator_peak_states=" << stats.operatorPeakStates
+                  << " operator_final_frontier="
+                  << stats.operatorFinalFrontier
+                  << " operator_processed_types="
+                  << stats.operatorProcessedTypes
                   << " total=" << countToString(stats.layerTotal)
                   << " seconds=" << stats.seconds << "\n";
     }
@@ -1235,7 +1814,10 @@ Options parseOptions(int argc, char** argv) {
     if (argc < 2) throw std::runtime_error(
         "usage: joint_histogram C [stop=N] [maxstates=N] [maxleaves=N] "
         "[sourcestart=N] [sourceprobe=N] [leafprobe=N] [rawbatch=N] "
-        "[canoncheck=N] [countleaves] [nodirect] [noswap]");
+        "[canoncheck=N] [countleaves] [operatorfinal] "
+        "[operatorrawprobe] "
+        "[operatormaxstates=N] [operatormaxrecords=N] "
+        "[operatorstoptypes=N] [nodirect] [noswap]");
     Options options;
     options.c = std::atoi(argv[1]);
     options.directCheck = options.c <= 4;
@@ -1274,12 +1856,29 @@ Options parseOptions(int argc, char** argv) {
         } else if (arg.rfind("canoncheck=", 0) == 0) {
             options.canonicalCheckLimit = static_cast<std::size_t>(
                 std::strtoull(arg.c_str() + 11, nullptr, 10));
+        } else if (arg.rfind("operatormaxstates=", 0) == 0) {
+            options.operatorMaxStates = static_cast<std::size_t>(
+                std::strtoull(
+                    arg.c_str() + std::string("operatormaxstates=").size(),
+                    nullptr, 10));
+            options.operatorStateLimitExplicit = true;
+        } else if (arg.rfind("operatormaxrecords=", 0) == 0) {
+            options.operatorMaxRecords = std::strtoull(
+                arg.c_str() + std::string("operatormaxrecords=").size(),
+                nullptr, 10);
+        } else if (arg.rfind("operatorstoptypes=", 0) == 0) {
+            options.operatorStopTypes = std::atoi(
+                arg.c_str() + std::string("operatorstoptypes=").size());
         } else if (arg == "nodirect") {
             options.directCheck = false;
         } else if (arg == "noswap") {
             options.copySwap = false;
         } else if (arg == "countleaves") {
             options.countLeavesOnly = true;
+        } else if (arg == "operatorfinal") {
+            options.operatorFinal = true;
+        } else if (arg == "operatorrawprobe") {
+            options.operatorRawProbe = true;
         } else {
             throw std::runtime_error("unknown argument: " + arg);
         }
@@ -1296,6 +1895,39 @@ Options parseOptions(int argc, char** argv) {
     }
     if (options.countLeavesOnly && options.rawBatchSize != 0) {
         throw std::runtime_error("countleaves does not use rawbatch");
+    }
+    if (options.operatorMaxStates == 0) {
+        throw std::runtime_error("operatormaxstates must be positive");
+    }
+    if (options.operatorStopTypes < 0) {
+        throw std::runtime_error("operatorstoptypes cannot be negative");
+    }
+    if (options.operatorFinal &&
+        (options.countLeavesOnly || options.leafProbe != 0 ||
+         options.rawBatchSize != 0)) {
+        throw std::runtime_error(
+            "operatorfinal is incompatible with countleaves, leafprobe, and rawbatch");
+    }
+    if (!options.operatorFinal &&
+        (options.operatorRawProbe || options.operatorStateLimitExplicit ||
+         options.operatorMaxRecords != 0 || options.operatorStopTypes != 0)) {
+        throw std::runtime_error("operator limits require operatorfinal");
+    }
+    if (options.operatorRawProbe &&
+        (options.c != 5 || options.sourceProbe != 1)) {
+        throw std::runtime_error(
+            "operatorrawprobe requires C=5 and sourceprobe=1");
+    }
+    if (options.operatorFinal && options.c == 5) {
+        if (options.sourceProbe == 0) {
+            throw std::runtime_error("C=5 operatorfinal requires sourceprobe");
+        }
+        if (!options.operatorStateLimitExplicit ||
+            options.operatorMaxRecords == 0 || options.operatorStopTypes == 0) {
+            throw std::runtime_error(
+                "C=5 operatorfinal requires explicit positive "
+                "operatormaxstates, operatormaxrecords, and operatorstoptypes");
+        }
     }
     return options;
 }
@@ -1327,6 +1959,9 @@ int main(int argc, char** argv) {
         } else if (result.leafProbeStopped) {
             std::cout << "[PROBE] stopped after deterministic leaf prefix; "
                          "reported target data are partial\n";
+        } else if (result.operatorProbeStopped) {
+            std::cout << "[PROBE] stopped after deterministic operator-type "
+                         "prefix; the operator frontier is exact for that prefix\n";
         } else if (result.sourceProbeStopped) {
             std::cout << "[PROBE] stopped after deterministic source prefix; "
                          "reported target data are partial\n";
