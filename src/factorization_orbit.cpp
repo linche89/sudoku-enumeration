@@ -2629,6 +2629,30 @@ int main(int argc, char** argv) {
     future_twin::OrderMode futureTwinOrder = future_twin::OrderMode::Minimax;
     size_t futureTwinCanonCacheCap = 500000;
     uint64_t futureTwinCanonNodeBudget = 20000;
+    std::string futureTwinExternalBase;
+    size_t futureTwinExternalBufferRecords = 500000;
+    size_t futureTwinExternalMergeFanIn = 32;
+    uint64_t futureTwinExternalTailCheckpointRecords = 100000;
+    uint64_t futureTwinExternalGenerationCheckpointParents = 100000;
+    int futureTwinExternalLayers = 0;
+    uint64_t futureTwinProgressParentInterval = 100000;
+    int futureTwinTailRows = 6;
+    size_t futureTwinTailKernelCacheRecords = 2000000;
+    int futureTwinTailThreads = 1;
+    size_t futureTwinTailChunkRecords = 240000;
+    std::string futureTwinTailSignatureBase;
+    std::string futureTwinTailSignatureReference;
+    uint64_t futureTwinTailSignatureSamples = 0;
+    uint64_t futureTwinTailSignatureValidationRecords = 0;
+    uint64_t futureTwinTailBenchmarkRecords = 0;
+    uint64_t futureTwinTailColorCanonicalSamples = 0;
+    uint64_t futureTwinTailColorSignatureRecords = 0;
+    std::string futureTwinTailKernelInventoryBase;
+    std::string futureTwinTailKernelInventoryReference;
+    uint64_t futureTwinTailKernelInventoryRecords = 0;
+    std::string futureTwinTailKernelTableDirectory;
+    bool futureTwinTailColorCanonical = false;
+    bool futureTwinForceTailRescan = false;
     int limit = -1;
     int startClass = 0;
     for (int i = 2; i < argc; ++i) {
@@ -2648,11 +2672,101 @@ int main(int argc, char** argv) {
         else if (arg == "futureorder=reachable") futureTwinOrder = future_twin::OrderMode::ReachableGreedy;
         else if (arg == "futureorder=canonical-first") futureTwinOrder = future_twin::OrderMode::CanonicalFirst;
         else if (arg == "futureorder=canonical-last") futureTwinOrder = future_twin::OrderMode::CanonicalLast;
+        else if (arg == "futureorder=pair-first-tail") futureTwinOrder = future_twin::OrderMode::PairFirstTail;
+        else if (arg == "futureorder=pair-last-tail") futureTwinOrder = future_twin::OrderMode::PairLastTail;
+        else if (arg == "futureorder=pair-adaptive-tail") futureTwinOrder = future_twin::OrderMode::PairAdaptiveTail;
         else if (arg.rfind("futurecachecap=", 0) == 0) {
             futureTwinCanonCacheCap = (size_t)std::strtoull(arg.c_str() + 15, nullptr, 10);
         }
         else if (arg.rfind("futurecanonbudget=", 0) == 0) {
             futureTwinCanonNodeBudget = std::strtoull(arg.c_str() + 18, nullptr, 10);
+        }
+        else if (arg.rfind("futureexternal=", 0) == 0) {
+            futureTwinExternalBase = arg.substr(15);
+        }
+        else if (arg.rfind("futureexternalrecords=", 0) == 0) {
+            futureTwinExternalBufferRecords = std::max<size_t>(
+                1, (size_t)std::strtoull(arg.c_str() + 22, nullptr, 10));
+        }
+        else if (arg.rfind("futureexternalfanin=", 0) == 0) {
+            futureTwinExternalMergeFanIn = std::max<size_t>(
+                2, (size_t)std::strtoull(arg.c_str() + 20, nullptr, 10));
+        }
+        else if (arg.rfind("futureexternallayers=", 0) == 0) {
+            futureTwinExternalLayers = std::max(
+                1, std::atoi(arg.c_str() + 21));
+        }
+        else if (arg.rfind("futureprogressparents=", 0) == 0) {
+            futureTwinProgressParentInterval = std::strtoull(
+                arg.c_str() + 22, nullptr, 10);
+        }
+        else if (arg.rfind("futuretailrows=", 0) == 0) {
+            futureTwinTailRows = std::atoi(arg.c_str() + 15);
+        }
+        else if (arg.rfind("futuretailcacherecords=", 0) == 0) {
+            futureTwinTailKernelCacheRecords = (size_t)std::strtoull(
+                arg.c_str() + 23, nullptr, 10);
+        }
+        else if (arg.rfind("futuretailcheckpointrecords=", 0) == 0) {
+            futureTwinExternalTailCheckpointRecords = std::strtoull(
+                arg.c_str() + 28, nullptr, 10);
+        }
+        else if (arg.rfind("futurelayercheckpointparents=", 0) == 0) {
+            futureTwinExternalGenerationCheckpointParents = std::strtoull(
+                arg.c_str() + 29, nullptr, 10);
+        }
+        else if (arg.rfind("futuretailthreads=", 0) == 0) {
+            futureTwinTailThreads = std::max(
+                1, std::atoi(arg.c_str() + 18));
+        }
+        else if (arg.rfind("futuretailchunkrecords=", 0) == 0) {
+            futureTwinTailChunkRecords = std::max<size_t>(
+                1, (size_t)std::strtoull(arg.c_str() + 23, nullptr, 10));
+        }
+        else if (arg.rfind("futuretailscan=", 0) == 0) {
+            futureTwinTailSignatureBase = arg.substr(15);
+        }
+        else if (arg.rfind("futuretailsamples=", 0) == 0) {
+            futureTwinTailSignatureSamples = std::strtoull(
+                arg.c_str() + 18, nullptr, 10);
+        }
+        else if (arg.rfind("futuretailreference=", 0) == 0) {
+            futureTwinTailSignatureReference = arg.substr(20);
+        }
+        else if (arg.rfind("futuretailvalidate=", 0) == 0) {
+            futureTwinTailSignatureValidationRecords = std::strtoull(
+                arg.c_str() + 19, nullptr, 10);
+        }
+        else if (arg.rfind("futuretailbenchmarkrecords=", 0) == 0) {
+            futureTwinTailBenchmarkRecords = std::strtoull(
+                arg.c_str() + 27, nullptr, 10);
+        }
+        else if (arg.rfind("futuretailcolorsamples=", 0) == 0) {
+            futureTwinTailColorCanonicalSamples = std::strtoull(
+                arg.c_str() + 23, nullptr, 10);
+        }
+        else if (arg.rfind("futuretailcolorsignatures=", 0) == 0) {
+            futureTwinTailColorSignatureRecords = std::strtoull(
+                arg.c_str() + 26, nullptr, 10);
+        }
+        else if (arg.rfind("futuretailinventory=", 0) == 0) {
+            futureTwinTailKernelInventoryBase = arg.substr(20);
+        }
+        else if (arg.rfind("futuretailinventoryrecords=", 0) == 0) {
+            futureTwinTailKernelInventoryRecords = std::strtoull(
+                arg.c_str() + 27, nullptr, 10);
+        }
+        else if (arg.rfind("futuretailinventoryreference=", 0) == 0) {
+            futureTwinTailKernelInventoryReference = arg.substr(29);
+        }
+        else if (arg.rfind("futuretailkerneltable=", 0) == 0) {
+            futureTwinTailKernelTableDirectory = arg.substr(22);
+        }
+        else if (arg == "futuretailcolorcanon") {
+            futureTwinTailColorCanonical = true;
+        }
+        else if (arg == "futuretailforcerescan") {
+            futureTwinForceTailRescan = true;
         }
         else if (arg == "progress") verboseProbeProgress = true;
         else if (arg == "d3iso") useDegree3IsoBatch = true;
@@ -2718,6 +2832,78 @@ int main(int argc, char** argv) {
             throw std::runtime_error(
                 "future-twin mode is cold and does not accept a graph checkpoint");
         }
+        if (!futureTwinExternalBase.empty() &&
+            (!useFutureTwin || !future_twin::isPairTailOrder(futureTwinOrder) || C < 4)) {
+            throw std::runtime_error(
+                "futureexternal requires future/futurecheck, C>=4, and a pair-*-tail order");
+        }
+        if (future_twin::isPairTailOrder(futureTwinOrder) &&
+            futureTwinTailRows != 6 && futureTwinTailRows != 7) {
+            throw std::runtime_error("futuretailrows must be 6 or 7");
+        }
+        if (!futureTwinTailSignatureBase.empty() &&
+            (futureTwinExternalBase.empty() || !graphCheckpointReadOnly ||
+             futureTwinTailRows != 7 || futureTwinTailSignatureSamples == 0)) {
+            throw std::runtime_error(
+                "futuretailscan requires futureexternal, checkpointreadonly, "
+                "futuretailrows=7, and a positive futuretailsamples=");
+        }
+        if (!futureTwinTailSignatureReference.empty() &&
+            futureTwinTailSignatureBase.empty()) {
+            throw std::runtime_error(
+                "futuretailreference requires futuretailscan");
+        }
+        if (futureTwinTailColorCanonicalSamples != 0 &&
+            futureTwinTailSignatureBase.empty()) {
+            throw std::runtime_error(
+                "futuretailcolorsamples requires futuretailscan");
+        }
+        if (futureTwinTailColorSignatureRecords != 0 &&
+            futureTwinTailSignatureBase.empty()) {
+            throw std::runtime_error(
+                "futuretailcolorsignatures requires futuretailscan");
+        }
+        if (futureTwinTailBenchmarkRecords != 0 &&
+            futureTwinTailSignatureBase.empty()) {
+            throw std::runtime_error(
+                "futuretailbenchmarkrecords requires futuretailscan");
+        }
+        if (!futureTwinTailKernelInventoryBase.empty() &&
+            (futureTwinExternalBase.empty() || !graphCheckpointReadOnly ||
+             futureTwinTailRows != 7 ||
+             futureTwinTailKernelInventoryRecords == 0)) {
+            throw std::runtime_error(
+                "futuretailinventory requires futureexternal, checkpointreadonly, "
+                "futuretailrows=7, and a positive futuretailinventoryrecords=");
+        }
+        if (!futureTwinTailKernelInventoryReference.empty() &&
+            futureTwinTailKernelInventoryBase.empty()) {
+            throw std::runtime_error(
+                "futuretailinventoryreference requires futuretailinventory");
+        }
+        if (!futureTwinTailKernelTableDirectory.empty() &&
+            (futureTwinExternalBase.empty() || !graphCheckpointReadOnly ||
+             futureTwinTailRows != 7 ||
+             !futureTwinTailColorCanonical)) {
+            throw std::runtime_error(
+                "futuretailkerneltable requires futureexternal, "
+                "checkpointreadonly, futuretailrows=7, and "
+                "futuretailcolorcanon");
+        }
+        if (futureTwinTailColorCanonical && futureTwinTailRows != 7) {
+            throw std::runtime_error(
+                "futuretailcolorcanon requires futuretailrows=7");
+        }
+        if (futureTwinTailColorCanonical &&
+            !futureTwinExternalBase.empty() && !graphCheckpointReadOnly) {
+            throw std::runtime_error(
+                "futuretailcolorcanon external runs require checkpointreadonly");
+        }
+        if (futureTwinForceTailRescan &&
+            (futureTwinExternalBase.empty() || !graphCheckpointReadOnly)) {
+            throw std::runtime_error(
+                "futuretailforcerescan requires futureexternal and checkpointreadonly");
+        }
         const auto outerStart = std::chrono::steady_clock::now();
         std::vector<OuterClass> classes = enumerateOuterClasses();
         const double outerSeconds = std::chrono::duration<double>(
@@ -2770,6 +2956,29 @@ int main(int argc, char** argv) {
         uint64_t futureCanonicalSearchNodes = 0;
         uint64_t futureCanonicalFallbacks = 0;
         uint64_t futureMaxCanonicalSearchNodes = 0;
+        uint64_t futureTailStates = 0;
+        uint64_t futureTailZeroStates = 0;
+        uint64_t futureTailSupportTotal = 0;
+        uint64_t futureTailSupportMax = 0;
+        uint64_t futureTailLocalAssignments = 0;
+        uint64_t futureTailValueMax = 0;
+        uint64_t futureTailKernelLookups = 0;
+        uint64_t futureTailKernelHits = 0;
+        uint64_t futureTailKernelEvictions = 0;
+        uint64_t futureTailColorLookups = 0;
+        uint64_t futureTailColorHits = 0;
+        uint64_t futureTailColorOrbits = 0;
+        uint64_t futureTailColorMappings = 0;
+        double futureTailSeconds = 0;
+        uint64_t futureExternalRawRecords = 0;
+        uint64_t futureExternalReducedRecords = 0;
+        uint64_t futureExternalRuns = 0;
+        uint64_t futureExternalBytesWritten = 0;
+        uint64_t futureExternalReusedLayers = 0;
+        uint64_t futureExternalReusedRecords = 0;
+        uint64_t futureExternalGenerationResumedParents = 0;
+        uint64_t futureExternalTailResumedRecords = 0;
+        double futureExternalSeconds = 0;
         unsigned __int128 answer = 0;
         startClass = std::clamp(startClass, 0, (int)classes.size());
         const int endClass = limit < 0 ? (int)classes.size()
@@ -2787,6 +2996,58 @@ int main(int argc, char** argv) {
                 options.canonicalNodeBudget = futureTwinCanonNodeBudget;
                 options.validateStates = futureTwinCheck;
                 options.progress = futureTwinProgress;
+                options.tailRemainingRows = futureTwinTailRows;
+                options.tailKernelCacheRecords = futureTwinTailKernelCacheRecords;
+                options.tailThreads = futureTwinTailThreads;
+                options.tailChunkRecords = futureTwinTailChunkRecords;
+                options.useColorCanonicalTail =
+                    futureTwinTailColorCanonical;
+                options.progressParentInterval =
+                    futureTwinProgressParentInterval;
+                if (!futureTwinExternalBase.empty()) {
+                    options.externalReadOnly = graphCheckpointReadOnly;
+                    options.externalForceTailRescan =
+                        futureTwinForceTailRescan;
+                    options.externalLayerCount = futureTwinExternalLayers;
+                    options.externalDirectory = (
+                        std::filesystem::path(futureTwinExternalBase) /
+                        ("class-" + std::to_string(i + 1))).string();
+                    options.externalBufferRecords = futureTwinExternalBufferRecords;
+                    options.externalMergeFanIn = futureTwinExternalMergeFanIn;
+                    options.externalTailCheckpointRecords =
+                        futureTwinExternalTailCheckpointRecords;
+                    options.externalGenerationCheckpointParents =
+                        futureTwinExternalGenerationCheckpointParents;
+                }
+                if (!futureTwinTailSignatureBase.empty()) {
+                    options.tailSignatureDirectory = (
+                        std::filesystem::path(futureTwinTailSignatureBase) /
+                        ("class-" + std::to_string(i + 1))).string();
+                    options.tailSignatureSampleRecords =
+                        futureTwinTailSignatureSamples;
+                    options.tailSignatureValidationRecords =
+                        futureTwinTailSignatureValidationRecords;
+                    options.tailBenchmarkRecords =
+                        futureTwinTailBenchmarkRecords;
+                    options.tailColorCanonicalSampleKeys =
+                        futureTwinTailColorCanonicalSamples;
+                    options.tailColorSignatureRecords =
+                        futureTwinTailColorSignatureRecords;
+                    options.tailSignatureReferenceDirectory =
+                        futureTwinTailSignatureReference;
+                }
+                if (!futureTwinTailKernelInventoryBase.empty()) {
+                    options.tailKernelInventoryDirectory = (
+                        std::filesystem::path(
+                            futureTwinTailKernelInventoryBase) /
+                        ("class-" + std::to_string(i + 1))).string();
+                    options.tailKernelInventoryRecords =
+                        futureTwinTailKernelInventoryRecords;
+                    options.tailKernelInventoryReferenceDirectory =
+                        futureTwinTailKernelInventoryReference;
+                }
+                options.tailKernelTableDirectory =
+                    futureTwinTailKernelTableDirectory;
                 const future_twin::Result future = futureEngine->count(graph, options);
                 oc.factorizationCount = future.value;
                 futurePeakStates = std::max(futurePeakStates, future.stats.peakStates);
@@ -2799,6 +3060,37 @@ int main(int argc, char** argv) {
                 futureCanonicalFallbacks += future.stats.canonicalFallbacks;
                 futureMaxCanonicalSearchNodes = std::max(
                     futureMaxCanonicalSearchNodes, future.stats.maxCanonicalSearchNodes);
+                futureTailStates += future.stats.tailStates;
+                futureTailZeroStates += future.stats.tailZeroStates;
+                futureTailSupportTotal += future.stats.tailSupportTotal;
+                futureTailSupportMax = std::max(
+                    futureTailSupportMax, future.stats.tailSupportMax);
+                futureTailLocalAssignments += future.stats.tailLocalAssignments;
+                futureTailValueMax = std::max(
+                    futureTailValueMax, future.stats.tailValueMax);
+                futureTailKernelLookups += future.stats.tailKernelLookups;
+                futureTailKernelHits += future.stats.tailKernelHits;
+                futureTailKernelEvictions += future.stats.tailKernelEvictions;
+                futureTailColorLookups +=
+                    future.stats.tailColorCanonicalLookups;
+                futureTailColorHits +=
+                    future.stats.tailColorCanonicalHits;
+                futureTailColorOrbits +=
+                    future.stats.tailColorCanonicalOrbits;
+                futureTailColorMappings +=
+                    future.stats.tailColorCanonicalMappings;
+                futureTailSeconds += future.stats.tailSeconds;
+                futureExternalRawRecords += future.stats.externalRawRecords;
+                futureExternalReducedRecords += future.stats.externalReducedRecords;
+                futureExternalRuns += future.stats.externalRuns;
+                futureExternalBytesWritten += future.stats.externalBytesWritten;
+                futureExternalReusedLayers += future.stats.externalReusedLayers;
+                futureExternalReusedRecords += future.stats.externalReusedRecords;
+                futureExternalGenerationResumedParents +=
+                    future.stats.externalGenerationResumedParents;
+                futureExternalTailResumedRecords +=
+                    future.stats.externalTailResumedRecords;
+                futureExternalSeconds += future.stats.externalSeconds;
                 if (futureTwinCheck) {
                     const FactorCount reference = countFactorizations(graph, C);
                     if (reference != oc.factorizationCount) {
@@ -2813,10 +3105,12 @@ int main(int argc, char** argv) {
                     std::string orderText;
                     for (size_t k = 0; k < future.stats.order.size(); ++k) {
                         if (k) orderText.push_back(',');
-                        orderText += std::to_string(future.stats.order[k] + 1);
+                        if (future.stats.order[k] == -2) orderText += "adaptive";
+                        else if (future.stats.order[k] < 0) orderText += "mate";
+                        else orderText += std::to_string(future.stats.order[k] + 1);
                     }
                     std::fprintf(stderr,
-                        "future class=%d order=%s sequence=%s peak=%llu expanded=%llu leaves=%llu canon=%llu hits=%llu perms=%llu searchNodes=%llu fallbacks=%llu maxSearch=%llu\n",
+                        "future class=%d order=%s sequence=%s peak=%llu expanded=%llu leaves=%llu canon=%llu hits=%llu perms=%llu searchNodes=%llu fallbacks=%llu maxSearch=%llu tailStates=%llu tailZero=%llu tailMeanSupport=%.3f tailMaxSupport=%llu tailAssignments=%llu tailMaxValue=%llu tailKernelHits=%llu/%llu tailKernelEvictions=%llu tailColorHits=%llu/%llu tailColorOrbits=%llu tailColorMappings=%llu tailTime=%.3fs externalRaw=%llu externalReduced=%llu externalRuns=%llu externalBytes=%llu externalReusedLayers=%llu externalReusedRecords=%llu externalGenResumedParents=%llu externalTailResumed=%llu externalTime=%.3fs\n",
                         i + 1, future_twin::orderName(futureTwinOrder), orderText.c_str(),
                         (unsigned long long)future.stats.peakStates,
                         (unsigned long long)future.stats.statesExpanded,
@@ -2826,7 +3120,36 @@ int main(int argc, char** argv) {
                         (unsigned long long)future.stats.colorPermutationsTried,
                         (unsigned long long)future.stats.canonicalSearchNodes,
                         (unsigned long long)future.stats.canonicalFallbacks,
-                        (unsigned long long)future.stats.maxCanonicalSearchNodes);
+                        (unsigned long long)future.stats.maxCanonicalSearchNodes,
+                        (unsigned long long)future.stats.tailStates,
+                        (unsigned long long)future.stats.tailZeroStates,
+                        future.stats.tailStates == 0 ? 0.0 :
+                            (double)future.stats.tailSupportTotal / future.stats.tailStates,
+                        (unsigned long long)future.stats.tailSupportMax,
+                        (unsigned long long)future.stats.tailLocalAssignments,
+                        (unsigned long long)future.stats.tailValueMax,
+                        (unsigned long long)future.stats.tailKernelHits,
+                        (unsigned long long)future.stats.tailKernelLookups,
+                        (unsigned long long)future.stats.tailKernelEvictions,
+                        (unsigned long long)
+                            future.stats.tailColorCanonicalHits,
+                        (unsigned long long)
+                            future.stats.tailColorCanonicalLookups,
+                        (unsigned long long)
+                            future.stats.tailColorCanonicalOrbits,
+                        (unsigned long long)
+                            future.stats.tailColorCanonicalMappings,
+                        future.stats.tailSeconds,
+                        (unsigned long long)future.stats.externalRawRecords,
+                        (unsigned long long)future.stats.externalReducedRecords,
+                        (unsigned long long)future.stats.externalRuns,
+                        (unsigned long long)future.stats.externalBytesWritten,
+                        (unsigned long long)future.stats.externalReusedLayers,
+                        (unsigned long long)future.stats.externalReusedRecords,
+                        (unsigned long long)
+                            future.stats.externalGenerationResumedParents,
+                        (unsigned long long)future.stats.externalTailResumedRecords,
+                        future.stats.externalSeconds);
                 }
             } else {
                 oc.factorizationCount = countFactorizations(graph, C);
@@ -2905,7 +3228,7 @@ int main(int argc, char** argv) {
                     (unsigned long long)degree3IsoKnownKeyMisses);
         if (useFutureTwin) {
             std::printf(
-                "futureStats order=%s checks=%llu peakStates=%llu expanded=%llu leaves=%llu canon=%llu cacheHits=%llu colorPerms=%llu searchNodes=%llu fallbacks=%llu maxSearch=%llu\n",
+                "futureStats order=%s checks=%llu peakStates=%llu expanded=%llu leaves=%llu canon=%llu cacheHits=%llu colorPerms=%llu searchNodes=%llu fallbacks=%llu maxSearch=%llu tailStates=%llu tailZero=%llu tailMeanSupport=%.3f tailMaxSupport=%llu tailAssignments=%llu tailMaxValue=%llu tailKernelHits=%llu/%llu tailKernelEvictions=%llu tailColorHits=%llu/%llu tailColorOrbits=%llu tailColorMappings=%llu tailTime=%.3fs externalRaw=%llu externalReduced=%llu externalRuns=%llu externalBytes=%llu externalReusedLayers=%llu externalReusedRecords=%llu externalGenResumedParents=%llu externalTailResumed=%llu externalTime=%.3fs\n",
                 future_twin::orderName(futureTwinOrder),
                 (unsigned long long)futureChecks,
                 (unsigned long long)futurePeakStates,
@@ -2916,7 +3239,31 @@ int main(int argc, char** argv) {
                 (unsigned long long)futureColorPermutations,
                 (unsigned long long)futureCanonicalSearchNodes,
                 (unsigned long long)futureCanonicalFallbacks,
-                (unsigned long long)futureMaxCanonicalSearchNodes);
+                (unsigned long long)futureMaxCanonicalSearchNodes,
+                (unsigned long long)futureTailStates,
+                (unsigned long long)futureTailZeroStates,
+                futureTailStates == 0 ? 0.0 :
+                    (double)futureTailSupportTotal / futureTailStates,
+                (unsigned long long)futureTailSupportMax,
+                (unsigned long long)futureTailLocalAssignments,
+                (unsigned long long)futureTailValueMax,
+                (unsigned long long)futureTailKernelHits,
+                (unsigned long long)futureTailKernelLookups,
+                (unsigned long long)futureTailKernelEvictions,
+                (unsigned long long)futureTailColorHits,
+                (unsigned long long)futureTailColorLookups,
+                (unsigned long long)futureTailColorOrbits,
+                (unsigned long long)futureTailColorMappings,
+                futureTailSeconds,
+                (unsigned long long)futureExternalRawRecords,
+                (unsigned long long)futureExternalReducedRecords,
+                (unsigned long long)futureExternalRuns,
+                (unsigned long long)futureExternalBytesWritten,
+                (unsigned long long)futureExternalReusedLayers,
+                (unsigned long long)futureExternalReusedRecords,
+                (unsigned long long)futureExternalGenerationResumedParents,
+                (unsigned long long)futureExternalTailResumedRecords,
+                futureExternalSeconds);
         }
         if (limit < 0 && startClass == 0) {
             const std::string expected = expectedValue(C);
