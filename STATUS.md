@@ -1,6 +1,6 @@
 # Current Project Status
 
-Last updated: 2026-07-20
+Last updated: 2026-07-27
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.
@@ -400,43 +400,35 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-There is still no implemented global C=6 route that has passed its scale
-gate.  The later-class half-kernel, class-local F4 lookup, direct reverse
-gluing, local operator lifts, tiny-rank band factorization, fixed-source E3,
-and full orbital-algebra implementations are closed for their tested or proved
-semantics.  More cache, external sort, or a different traversal does not alter
-their decisive work factors.
+Updated 2026-07-27.  A global C=6 route has now passed its scale gates: the
+row-incremental layer DP (`experiments/proto/layer_dp_gate.cpp`) reproduces
+complete C=2..5 exactly (all 355 C=5 triples against `factorization_orbit`,
+every invariance/full-group differential green, C=5 full gate ~4 s on 8
+threads) and has completed bounded C=6 stages: the exact three-row layer
+M_3 = 12,324,872 (with the known 772 / 20,338,525 / 2,605,194,602 values
+reproduced in-run), a measured 3->4 volume of 2.136e12, and a calibrated
+hash-window measurement M_4 = 9.0e8, 95% [8.87e8, 9.20e8] — consistent with
+Pettersen's "more than 900 million".  Mathematics, measurements, and the
+2026-07-26 pre-flight audit are in
+`docs/expert/2026-07-26/layer-dp-permanent-profile.md`.
 
-The immediate mathematical target is now the strictly narrower target-only
-application of one reduced band kernel.  In the orbit-total normalization used
-by the joint-histogram engine, construct an exact algorithm for
+The two prior theory targets of this section are resolved by measurement:
+the target-only reduced-kernel question has answer "compression exists but
+is O(1)" (completion-operator rank defect exactly 2 at C=4 and C=5, created
+entirely at the 3->4 boundary; certified null vectors in
+`docs/expert/2026-07-26/c5_wvecs.txt`), so no target-side contraction can
+change the C=6 scale; the bulk-organization question is answered by the
+layer DP itself.
 
-```text
-y_[t] = sum_[s] x_[s] Kbar_k([t],[s])
-```
+The immediate objective is now operational: the pre-flight program of
+`docs/expert/2026-07-27/c6-runbook.md` (layer-5 anchored canonizer,
+checkpoint/restart with kill-loop validation, 4x M_4 probe, 4->5
+calibration, T1-T10 battery, 1% dress rehearsal), after which the staged
+production run (~4.5e12 emissions, ~59 GB, days-scale on the 32-thread
+box) awaits an explicit owner decision.
 
-on the actual reachable multi-source vector `x`, while aggregating across
-sources before materializing source-target pairs or a complete row of
-`Kbar_k`.  A fast full-rank transform is acceptable; low rank is not required.
-The fixed-source frontier theorem does not apply to this output contract.
-
-The parallel theory target is a common downstream Fourier/communication
-subspace for the regular reverse-gluing blocks: construct only the span needed
-by the final weighted response, not the full 1.761-billion-coordinate orbital
-algebra.  A valid proposal must give the exact representation, normalization,
-closure under the remaining bands, and a C=6 operation/memory bound.  It must
-reproduce complete C=3/C=4 output vectors or matrices under the retained
-normalization and pass a bounded C=5 actual-vector dimension/operation gate
-before any C=6 data-generation step is considered.  A relevant lower bound
-that rules out both surviving objects would also be progress.
-
-Historical reverse gluing remains evidence that some bulk organization may
-exist, not a qualified implementation.  Pettersen's “more than 900 million”
-lookup statement is a rough comparison point, not authorization or an
-acceptance oracle.  No further large C=6 experiment is justified until one of
-the two surviving structures is made exact and passes the small-C gates.
-
-No full 63,199-class C=6 run is authorized.
+No full 63,199-class C=6 run is authorized.  Bounded probes and the
+pre-flight program are within scope.
 
 ## Current checkpoint
 
@@ -447,7 +439,10 @@ gate cannot rewrite it.
 
 ## Active implementation tracks
 
-- `factorization_orbit`: primary C=2..6 exact factorization/orbit route.
+- `layer_dp_gate` (experiments/proto): row-incremental layer DP, the
+  qualified C=6 route; runbook in `docs/expert/2026-07-27/c6-runbook.md`.
+- `factorization_orbit`: primary C=2..5 exact factorization/orbit engine and
+  the C=5 oracle for the layer DP.
 - `multiset_q`: independent transfer-kernel research and cross-check route.
 - `multiset_fast` / `multiset_c6`: older independent exact validators.
 - `main.cpp`: completed FJ05 9x9 reproduction.
