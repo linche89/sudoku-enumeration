@@ -1,0 +1,38 @@
+row=0 memo=972 transitions=96609 sec=0.00888109
+row=25 memo=717126 transitions=59165256 sec=7.841
+row=50 memo=1578874 transitions=140191011 sec=22.6748
+row=75 memo=2344990 transitions=213046515 sec=36.6542
+row=100 memo=3809687 transitions=350855329 sec=69.3202
+row=125 memo=6721070 transitions=600883999 sec=131.539
+row=150 memo=8322147 transitions=751884202 sec=176.101
+row=175 memo=9044409 transitions=830362642 sec=201.179
+row=200 memo=9677268 transitions=892795274 sec=219.277
+row=225 memo=10523072 transitions=977798766 sec=245.378
+row=250 memo=12378972 transitions=1161318534 sec=304.516
+row=275 memo=14322544 transitions=1361999305 sec=374.207
+row=300 memo=15993118 transitions=1530725614 sec=438.605
+row=325 memo=18114371 transitions=1750050107 sec=519.948
+row=350 memo=22076501 transitions=2116972296 sec=655.19
+	Command being timed: "/mnt/data/native_c5_triples_independent_verify"
+	User time (seconds): 666.51
+	System time (seconds): 1.43
+	Percent of CPU this job got: 93%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 11:54.84
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1398616
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 0
+	Voluntary context switches: 0
+	Involuntary context switches: 0
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
