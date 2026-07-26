@@ -471,6 +471,70 @@ checks    772 / 20,338,525 / 2,605,194,602 / M_3 / F6(G1) / F6(G2)
 The full 3->4 + 4->5 + 5->6 production run is the remaining resource
 commitment; nothing in it is unmeasured anymore.
 
+## 8.9 Pre-flight ultra audit (15-agent sweep, same day)
+
+Seven parallel lenses plus adversarial verification of every review
+finding.  Confirmed defects, all fixed in the engine the same day and
+the full C=2..5 gate ladder re-run green:
+
+1. **5->6 u64 T overflow was arithmetically certain at C=6** (T_q =
+   m*F ~ 3.6e20 = 19.6 x 2^64 for typical classes): the final
+   transition now accumulates into per-thread u128 vectors merged after
+   the parallel region; F extracted in u128 with a range check.
+2. **Final N term overflows u128 at C=6** (ell*m*F^2 ~ 1e45): the
+   engine now writes the exact per-class (m, ell, F) dump at C >= 6 and
+   defers the weighted square sum to external exact arithmetic — which
+   is also where the comparison against Pettersen happens.
+3. u32 index-space ceiling now enforced in init_fixed (caps >= 2^32-64
+   abort instead of silently corrupting).
+4. Strided samplers clamp to their stride window (a hole run >= stride
+   could double-count a parent in the estimators).
+5. Operational: fixed caps must include hole slack (0.1-1%); holes are
+   nondeterministic run to run.
+6. The lock-free insert design itself was **confirmed sound** (no ABA,
+   no torn reads, correct release/acquire pairing), and the
+   layers-2..5 u64-safety proof (Bregman peeling chain, per-term
+   membership) **survived adversarial re-derivation — no CRT needed
+   anywhere**.
+
+Exploration results:
+
+- **Defect-2 structure cracked (C=5)**: the null space of U_3 is
+  exactly 2-dimensional over Z.  Sparse relation: R(x,q0) - 3 R(x,q2)
+  + 4 R(x,q39) = 0 on mask-multiplicity patterns (5,5), (4,4,1,1),
+  (3,3,2,2) — the exact lift of C=4's (1,-4,9) on (4,4), (3,3,1,1),
+  (2,2,2,2); both live on the two-complementary-pair family
+  {a^(C-k), abar^(C-k), b^k, bbar^k}, k = 0,1,2.  The dense partner has
+  the exact form z_q = kappa_q * ell_q / const with small odd kappa
+  (table `c5_kappa_table.csv`, certified vectors `c5_wvecs.txt`).  The
+  defect is created entirely at the 3->4 transition (rank(U_4) full).
+  Checkable C=6 conjecture with candidate coefficients formulated —
+  if confirmed, two free integrity checksums on the final 63,199
+  vector.
+- **Layer-5 anchored canonizer is worth building**: measured on random
+  5-row states, missing-pair anchoring + L3 colors gives 3.6-4.8x
+  (floor 1.5x) on the 4->5 bucket = 53% of the total budget; low-to-
+  moderate risk; the level must switch canonical form atomically and
+  re-pass all gates.
+- **M_4 hardened**: zero-truncated negative-binomial fit gives
+  M_4 = 9.0e8, 95% [8.87e8, 9.20e8] (C=5 calibration recovers truth
+  +0.96%).  Production cap: 1.3e9 entries (~59 GB on the 125.7 GB box).
+  A 4x probe (k = 58,400, ~19 min) is recommended to convert the
+  estimate into a measurement first.
+- **Checkpoint/restart design approved**: barrier-quiesce at parent-
+  chunk boundaries, exact with no subtraction tricks, 17-34 s per dump
+  (< 1.5% overhead at 40-min periods), ~19 h to implement including
+  kill-loop validation at C=5.
+- **Fresh-eyes verdict**: budget chain sound; realistic wall 8-14 days
+  pre-optimization (4->5 calibration is the honest weak link — fixable
+  to +-1% by a bounded test); a one-day T1-T10 pre-flight battery
+  specified before commitment.
+
+Remaining pre-flight work program (in order): 4x M_4 probe;
+checkpointing; layer-5 anchored canonizer + full regate; bounded 4->5
+calibration from real sampled layer-4 states; T1-T10 battery; then the
+production decision.
+
 ## 9. Honest limits
 
 - Section 5's brackets inherit the history-weighted sampling bias; the

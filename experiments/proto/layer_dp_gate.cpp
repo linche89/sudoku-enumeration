@@ -403,6 +403,13 @@ struct Layer {
         claimed = holes = 0;
     }
     void init_fixed(size_t cap) {
+        // u32 index space: claimed/table entries wrap above ~2^32 and would
+        // silently corrupt instead of aborting (confirmed audit finding)
+        if (cap >= (size_t)UINT32_MAX - 64) {
+            std::fprintf(stderr, "FATAL: fixed cap %zu exceeds u32 index space\n",
+                         cap);
+            std::abort();
+        }
         size_t sz = 64;
         while (sz < cap * 2) sz <<= 1;
         table.assign(sz, 0);
@@ -506,6 +513,11 @@ struct EmitCtx {
     bool countOnly = false;
     int m4window = 0;  // >0: keep only children with top m4window hash bits
                        // zero; accumulate hit counts (T += 1), bypass cache
+    // wide accumulation for the final transition at C >= 6: T_C values reach
+    // ~2.7e24 (> u64), so contributions go into a per-thread u128 vector
+    // merged after the parallel region (confirmed audit finding)
+    bool wideT = false;
+    std::vector<u128> wide;
     // optional sparse row recording (child index -> coeff), for --rank
     std::vector<std::pair<u32, u64>>* row;
     // per-parent raw-child cache: raw multiset -> (next-layer index, K)
@@ -563,7 +575,10 @@ struct EmitCtx {
             if (rcKeys[rcIdx[h]] == ch) {
                 cacheHits++;
                 auto& v = rcVals[rcIdx[h]];
-                if (next->fixedCap)
+                if (wideT) {
+                    if (wide.size() <= v.first) wide.resize(v.first + 1, 0);
+                    wide[v.first] += (u128)parentT * v.second;
+                } else if (next->fixedCap)
                     __atomic_add_fetch(&next->T[v.first], parentT * v.second,
                                        __ATOMIC_RELAXED);
                 else
@@ -585,11 +600,21 @@ struct EmitCtx {
         u32 idx;
         if (next->fixedCap) {
             idx = next->find_or_add_mt(ck, (u32)stab);
-            __atomic_add_fetch(&next->T[idx], parentT * K, __ATOMIC_RELAXED);
+            if (wideT) {
+                if (wide.size() <= idx) wide.resize(idx + 1, 0);
+                wide[idx] += (u128)parentT * K;
+            } else {
+                __atomic_add_fetch(&next->T[idx], parentT * K, __ATOMIC_RELAXED);
+            }
         } else {
             idx = next->find_or_add(ck);
             if (idx == (u32)next->stab.size()) next->stab.push_back((u32)stab);
-            next->T[idx] += parentT * K;
+            if (wideT) {
+                if (wide.size() <= idx) wide.resize(idx + 1, 0);
+                wide[idx] += (u128)parentT * K;
+            } else {
+                next->T[idx] += parentT * K;
+            }
         }
         if (row) row->push_back({idx, K});
         if (rcKeys.size() < RCSIZE / 2) {  // insert unless table crowded
@@ -796,6 +821,7 @@ int main(int argc, char** argv) {
 
     std::vector<u64> emissionsPerT, canonizePerT;
     std::vector<double> timePerT;
+    std::vector<u128> gWide;  // u128 T of the final layer when C >= 6
     // sparse transition rows for --rank: R[t][parent] = vector of (child, K)
     std::vector<std::vector<std::vector<std::pair<u32, u64>>>> Rrows(C);
 
@@ -831,6 +857,10 @@ int main(int argc, char** argv) {
                     size_t i = (size_t)s * stride;
                     while (i < np && L3.is_hole((u32)i)) i++;
                     if (i >= np) continue;
+                    // clamp: never cross into the next stride window (a hole
+                    // run >= stride would otherwise double-count a parent)
+                    if (s + 1 < (long long)take && i >= (size_t)(s + 1) * stride)
+                        continue;
                     ctx.prepare(L3.keys[i], 1);
                     ctx.rec(0, (1u << N2C) - 1);
                 }
@@ -919,6 +949,7 @@ int main(int argc, char** argv) {
                     size_t i = s * stride;
                     while (i < np && lay.is_hole((u32)i)) i++;
                     if (i >= np) continue;
+                    if (s + 1 < take && i >= (s + 1) * stride) continue;
                     ctx.prepare(lay.keys[i], 0);
                     ctx.rec(0, (1u << N2C) - 1);
                     fans.push_back(ctx.emissions - prev);
@@ -964,6 +995,7 @@ int main(int argc, char** argv) {
                 size_t i = s * stride;
                 while (i < np && layers[L].is_hole((u32)i)) i++;
                 if (i >= np) continue;
+                if (s + 1 < take && i >= (s + 1) * stride) continue;
                 double tp1 = now_s();
                 ctx.prepare(layers[L].keys[i], layers[L].T[i]);
                 ctx.rec(0, (1u << N2C) - 1);
@@ -1005,6 +1037,9 @@ int main(int argc, char** argv) {
             ctx.emissions = 0;
             ctx.cacheHits = 0;
             ctx.row = nullptr;
+            ctx.wideT = (L + 1 == C && C >= 6);
+            if (ctx.wideT && layers[L + 1].fixedCap)
+                ctx.wide.assign(layers[L + 1].keys.size(), 0);
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 8)
 #endif
@@ -1030,6 +1065,17 @@ int main(int argc, char** argv) {
             }
             totEmissions += ctx.emissions;
             totHits += ctx.cacheHits;
+            if (ctx.wideT) {
+#ifdef _OPENMP
+#pragma omp critical(wide_merge)
+#endif
+                {
+                    if (gWide.size() < ctx.wide.size())
+                        gWide.resize(ctx.wide.size(), 0);
+                    for (size_t i = 0; i < ctx.wide.size(); i++)
+                        gWide[i] += ctx.wide[i];
+                }
+            }
             flush_canon_counters();
         }
         flush_canon_counters();
@@ -1076,15 +1122,22 @@ int main(int argc, char** argv) {
         if (Gorder % sq) { std::fprintf(stderr, "stab %llu bad\n",
                                         (unsigned long long)sq); return 3; }
         u64 m = Gorder / sq;
-        u64 T = fin.T[i];
-        if (T % m) {
-            std::fprintf(stderr, "T=%llu not divisible by m=%llu\n",
-                         (unsigned long long)T, (unsigned long long)m);
+        u128 Tw = (C >= 6) ? (i < gWide.size() ? gWide[i] : (u128)0)
+                           : (u128)fin.T[i];
+        if (Tw % m) {
+            std::fprintf(stderr, "T=%s not divisible by m=%llu\n",
+                         u128_str(Tw).c_str(), (unsigned long long)m);
             return 3;
         }
-        u64 F = T / m;
-        // fits u128 for C <= 5 (max term ~1e31); C=6 totals would need wider
-        N += (u128)ell * m * F * F;
+        u128 Fw = Tw / m;
+        if (Fw > (u128)UINT64_MAX) {
+            std::fprintf(stderr, "F=%s exceeds u64\n", u128_str(Fw).c_str());
+            return 3;
+        }
+        u64 F = (u64)Fw;
+        // per-term ell*m*F^2 fits u128 for C <= 5 only; at C >= 6 the exact
+        // weighted square sum must be done externally from the --dump CSV
+        if (C < 6) N += (u128)ell * m * F * F;
         sumW += (u128)ell * m;
         classesOut.push_back({q, m, ell, F});
     }
@@ -1099,7 +1152,11 @@ int main(int argc, char** argv) {
     for (u64 e : emissionsPerT) std::printf("%llu ", (unsigned long long)e);
     std::printf("\ncomplete classes = %zu\n", classesOut.size());
     std::printf("sum_w (labelled multiplicity sum) = %s\n", u128_str(sumW).c_str());
-    std::printf("N(%d) = %s\n", C, u128_str(N).c_str());
+    if (C < 6)
+        std::printf("N(%d) = %s\n", C, u128_str(N).c_str());
+    else
+        std::printf("N(%d): per-term overflow of u128; sum the --dump CSV "
+                    "externally (exact per-class m, ell, F written)\n", C);
     flush_canon_counters();
     std::printf("dp_seconds = %.3f  canonize_calls = %llu  avg_nodes = %.2f\n",
                 dp_seconds, (unsigned long long)g_canonize_calls,
