@@ -419,6 +419,58 @@ nullspace + rational reconstruction of the 355-vectors), check support
 and whether the C=4 relation lifts; if the pattern is structural, the
 C=6 relations give two free checksums on the final class vector.
 
+## 8.8 Measured M_4 and the finalized C=6 decision package
+(added later the same day; supersedes the M_4 estimate in 8.7)
+
+**Hash-window distinct sampling** (streaming-statistics transfer): sample
+k strided layer-3 parents, canonize every 3->4 child, but keep only
+children whose canonical-key hash lands in a 2^-w window — memory drops
+2^w-fold while the windowed hit histogram remains a faithful sample of
+the in-degree process.  Estimator calibrated on C=5 against the known
+M_4 = 17,120: at lambda ~ 2.8, Chao1 read 16,830 (-1.7%), converging
+from below as lambda grows.
+
+C=6 run (v5.1, 24 threads, k = 14,600 parents, w = 6, lambda = 2.86,
+288 s probe stage, log `data/logs/layer-dp-m4probe-20260726.txt`):
+
+```text
+kept 39,402,926 of 2,522,319,152 emissions (expected fraction OK)
+distinct in window 12,995,262; hits f1..f4 = 2.48M/3.16M/2.91M/2.11M
+M_4(Chao1)      = 8.941e8
+M_4(PoissonMLE) = 8.823e8
+calibrated      M_4 ~ 9.1e8 (+-few %)
+```
+
+**Pettersen's ">900 million" four-row lookup states is hereby
+independently confirmed**: his objects evidently coincide with the
+four-row coordinate orbits, at ~9.0-9.2e8.
+
+Engine v5.1/v6 same-session updates, all gates green in every mode:
+- thread-local canonize counters (the shared atomic counters were the
+  parallel bottleneck): full 2->3 transition 787.4 s -> **379.5 s
+  (145.7 ns/emission wall on 24 threads)**; C=5 full gate 3.98 s.
+- form-independent referees: scan-check now verifies orbit membership
+  plus directly counted stabilizers (stronger independence than
+  comparing two implementations of the same K-sequence form).
+- WL pair-profile seed partition (--wlseed): cuts search nodes
+  20.2 -> 6.8 at C=5 but its own cost wins only on high-symmetry layers
+  (C=5 4->5: 389 vs 459 ns).  A/B at C=6 2->3: 1,965 (off) vs 2,087
+  (on) ns single-thread -> default off; candidate for per-transition
+  enabling at 4->5 / 5->6.
+
+**Final C=6 budget (all measured or measured-extrapolated):**
+
+```text
+emissions: 5.9e7 + 2.605e9 + 2.136e12 + ~2.38e12 + ~5e9  ~ 4.52e12
+wall      ~7.6 days at 145.7 ns/em on 24 threads (~6 days on 30)
+RAM       layer-4 fixed table at cap 1.0e9: ~45 GB (machine: 125.7 GB)
+checks    772 / 20,338,525 / 2,605,194,602 / M_3 / F6(G1) / F6(G2)
+          in-run, plus CRT cross-prime if run mod several primes
+```
+
+The full 3->4 + 4->5 + 5->6 production run is the remaining resource
+commitment; nothing in it is unmeasured anymore.
+
 ## 9. Honest limits
 
 - Section 5's brackets inherit the history-weighted sampling bias; the

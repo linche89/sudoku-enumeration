@@ -34,6 +34,7 @@
 #include <array>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -126,6 +127,7 @@ static State apply_state(const GElem& g, const State& s) {
 // surviving nodes at a depth share the prefix partition), validated against
 // the full-group scan by --scan-check.  Also counts the group elements
 // attaining the minimum = stabilizer order.
+static bool g_wlseed = false;  // pair-profile initial partition (--wlseed)
 static u32 REP2[13], REP3[13];
 static struct RepInit {
     RepInit() {
@@ -165,9 +167,71 @@ struct Canonizer {
         haveFinal = false;
         minCount = 0;
         nodes = 0;
+        if (!g_wlseed) {
+            u32 groups0[12];
+            groups0[0] = (1u << N2C) - 1;
+            dfs(0, groups0, 1, 0);
+            return;
+        }
+        // WL-1 seed: pairwise profiles.  For masks i, j let u = #shared
+        // boxes and sm = #shared boxes on the same side; both are flip- and
+        // box-permutation-invariant (per-box side occupancy alone is
+        // constant L by row-regularity, so pair structure is the first
+        // non-trivial invariant).  Mask color = hash of the sorted multiset
+        // of (u, sm) over partners; hash collisions only coarsen the seed
+        // partition consistently, never break invariance.
+        u8 bb[12] = {0}, ss[12] = {0};
+        for (int b = 0; b < C; b++) {
+            u32 m2 = z2[b][0], m3 = z3[b][0];
+            u32 t = m2 | m3;
+            while (t) {
+                int i = __builtin_ctz(t);
+                t &= t - 1;
+                bb[i] |= (u8)(1 << b);
+            }
+            t = m3;
+            while (t) {
+                int i = __builtin_ctz(t);
+                t &= t - 1;
+                ss[i] |= (u8)(1 << b);
+            }
+        }
+        u32 color[12];
+        {
+            u8 prof[12][12];
+            for (int i = 0; i < N2C; i++) {
+                int pn = 0;
+                for (int j = 0; j < N2C; j++) {
+                    if (j == i) continue;
+                    u8 shared = (u8)(bb[i] & bb[j]);
+                    u8 diff = (u8)((ss[i] ^ ss[j]) & shared);
+                    int u = __builtin_popcount(shared);
+                    int sm = u - __builtin_popcount(diff);
+                    prof[i][pn++] = (u8)((u << 4) | sm);
+                }
+                std::sort(prof[i], prof[i] + pn);
+                u64 h = 0x9e3779b97f4a7c15ULL;
+                for (int k = 0; k < pn; k++) {
+                    h ^= prof[i][k];
+                    h *= 0xff51afd7ed558ccdULL;
+                }
+                color[i] = (u32)(h ^ (h >> 32));
+            }
+        }
+        u32 cs[12];
+        std::memcpy(cs, color, sizeof(u32) * 12);
+        std::sort(cs, cs + N2C);
         u32 groups[12];
-        groups[0] = (1u << N2C) - 1;
-        dfs(0, groups, 1, 0);
+        int ng = 0;
+        for (int k = 0; k < N2C;) {
+            u32 c = cs[k];
+            u32 gm = 0;
+            for (int i = 0; i < N2C; i++)
+                if (color[i] == c) gm |= 1u << i;
+            groups[ng++] = gm;
+            while (k < N2C && cs[k] == c) k++;
+        }
+        dfs(0, groups, ng, 0);
     }
 
     // signature of column (b,f) under the current group partition
@@ -270,12 +334,21 @@ struct Canonizer {
 
 alignas(64) static u64 g_canonize_calls = 0;
 alignas(64) static u64 g_canonize_nodes = 0;
+static thread_local u64 tl_canon_calls = 0, tl_canon_nodes = 0;
+
+static void flush_canon_counters() {
+    if (tl_canon_calls) {
+        __atomic_add_fetch(&g_canonize_calls, tl_canon_calls, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&g_canonize_nodes, tl_canon_nodes, __ATOMIC_RELAXED);
+        tl_canon_calls = tl_canon_nodes = 0;
+    }
+}
 
 static State canonize(const State& s, u64* stabOut = nullptr) {
     Canonizer cz;
     cz.run(s);
-    __atomic_add_fetch(&g_canonize_calls, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&g_canonize_nodes, cz.nodes, __ATOMIC_RELAXED);
+    tl_canon_calls++;
+    tl_canon_nodes += cz.nodes;
     // apply the winning assignment: position d takes source box path[d]>>1
     GElem g{};
     for (int d = 0; d < C; d++) {
@@ -288,39 +361,19 @@ static State canonize(const State& s, u64* stabOut = nullptr) {
     return k;
 }
 
-// full-|G| reference canonical form: minimal K-sequence by brute force
-static State canonize_scan(const State& s, u64* stabOut = nullptr) {
-    std::vector<u32> bestSeq;
-    State bestState{};
-    u64 count = 0;
-    std::vector<u32> seq(C * 12);
-    for (const GElem& g : GROUP) {
-        u32 pv[12] = {0};
-        for (int d = 0; d < C; d++) {
-            // source box mapping to position d
-            int src = -1;
-            for (int b = 0; b < C; b++)
-                if (g.perm[b] == d) { src = b; break; }
-            for (int i = 0; i < N2C; i++) {
-                int v = fld(s.m[i], src);
-                if (v) v ^= (g.flips >> src) & 1;
-                pv[i] = pv[i] * 4 + (u32)v;
-            }
-            u32 srt[12];
-            std::memcpy(srt, pv, sizeof(u32) * 12);
-            std::sort(srt, srt + N2C);
-            std::memcpy(&seq[d * 12], srt, sizeof(u32) * 12);
-        }
-        if (bestSeq.empty() || seq < bestSeq) {
-            bestSeq = seq;
-            bestState = apply_state(g, s);
-            count = 1;
-        } else if (seq == bestSeq) {
-            count++;
-        }
-    }
-    if (stabOut) *stabOut = count;
-    return bestState;
+// form-independent full-|G| referees: exact stabilizer order, and orbit
+// membership of a claimed canonical representative
+static u64 stab_scan(const State& s) {
+    u64 c = 0;
+    for (const GElem& g : GROUP)
+        if (apply_state(g, s) == s) c++;
+    return c;
+}
+
+static bool orbit_member_scan(const State& s, const State& key) {
+    for (const GElem& g : GROUP)
+        if (apply_state(g, s) == key) return true;
+    return false;
 }
 
 // ------------------------------------------------------------- hash map ----
@@ -451,6 +504,8 @@ struct EmitCtx {
     u64 emissions;
     u64 cacheHits;
     bool countOnly = false;
+    int m4window = 0;  // >0: keep only children with top m4window hash bits
+                       // zero; accumulate hit counts (T += 1), bypass cache
     // optional sparse row recording (child index -> coeff), for --rank
     std::vector<std::pair<u32, u64>>* row;
     // per-parent raw-child cache: raw multiset -> (next-layer index, K)
@@ -494,6 +549,14 @@ struct EmitCtx {
         std::sort(tmp, tmp + N2C);
         State ch{};
         std::memcpy(ch.m.data(), tmp, sizeof(u16) * 12);
+        if (m4window) {  // hash-window distinct sampling with hit counts
+            u64 stabv = 0;
+            State ck = canonize(ch, &stabv);
+            if (state_hash(ck) >> (64 - m4window)) return;
+            u32 idx = next->find_or_add_mt(ck, (u32)stabv);
+            __atomic_add_fetch(&next->T[idx], 1, __ATOMIC_RELAXED);
+            return;
+        }
         // per-parent raw cache probe
         u64 h = state_hash(ch) & (RCSIZE - 1);
         while (rcGen[h] == gen) {
@@ -669,6 +732,9 @@ int main(int argc, char** argv) {
     long fanSample = 0;
     int nthreads = 1;
     std::vector<size_t> caps;  // fixed capacities for child layers 2..C
+    long m4K = 0;              // hash-window M_4 probe: sampled layer-3 parents
+    int m4W = 0;               // window bits (keep fraction 2^-m4W)
+    size_t m4Cap = 0;          // capacity of the windowed child table
     for (int a = 2; a < argc; a++) {
         std::string s = argv[a];
         if (s == "--ref" && a + 1 < argc) refPath = argv[++a];
@@ -684,6 +750,12 @@ int main(int argc, char** argv) {
         else if (s == "--stop-after" && a + 1 < argc) stopAfter = std::atoi(argv[++a]);
         else if (s == "--fan-sample" && a + 1 < argc) fanSample = std::atol(argv[++a]);
         else if (s == "--threads" && a + 1 < argc) nthreads = std::atoi(argv[++a]);
+        else if (s == "--wlseed") g_wlseed = true;
+        else if (s == "--m4probe" && a + 3 < argc) {
+            m4K = std::atol(argv[++a]);
+            m4W = std::atoi(argv[++a]);
+            m4Cap = std::stoull(argv[++a]);
+        }
         else if (s == "--caps" && a + 1 < argc) {
             std::stringstream cs(argv[++a]);
             std::string tok;
@@ -729,6 +801,83 @@ int main(int argc, char** argv) {
 
     double t_all0 = now_s();
     for (int L = 1; L < C; L++) {
+        if (m4K > 0 && L >= 3) {
+            // ---- hash-window M_4 probe: sample layer-3 parents, keep only
+            // ---- children whose canonical hash lands in a 2^-m4W window,
+            // ---- estimate M_4 from the windowed hit histogram.
+            Layer& L3 = layers[3];
+            size_t np = L3.size();
+            size_t take = std::min((size_t)m4K, np);
+            size_t stride = np / take;
+            Layer win;
+            win.init_fixed(m4Cap);
+            u64 totEm = 0;
+            double tp0 = now_s();
+#ifdef _OPENMP
+#pragma omp parallel num_threads(nthreads) if (nthreads > 1) \
+    reduction(+ : totEm)
+#endif
+            {
+                EmitCtx ctx;
+                ctx.next = &win;
+                ctx.emissions = 0;
+                ctx.cacheHits = 0;
+                ctx.row = nullptr;
+                ctx.m4window = m4W;
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic, 4)
+#endif
+                for (long long s = 0; s < (long long)take; s++) {
+                    size_t i = (size_t)s * stride;
+                    while (i < np && L3.is_hole((u32)i)) i++;
+                    if (i >= np) continue;
+                    ctx.prepare(L3.keys[i], 1);
+                    ctx.rec(0, (1u << N2C) - 1);
+                }
+                totEm += ctx.emissions;
+                flush_canon_counters();
+            }
+            double dt = now_s() - tp0;
+            u64 D = 0, H = 0, f[6] = {0, 0, 0, 0, 0, 0};
+            for (u32 i = 0; i < win.size(); i++) {
+                if (win.is_hole(i)) continue;
+                D++;
+                u64 h = win.T[i];
+                H += h;
+                f[h >= 5 ? 5 : h]++;
+            }
+            double mu = D ? (double)H / D : 0.0;
+            double lam = mu > 1.0001 ? mu : 1e-4;
+            for (int it = 0; it < 80 && mu > 1.0001; it++) {
+                double em = 1.0 - std::exp(-lam);
+                double fv = lam / em - mu;
+                double dfv = (em - lam * std::exp(-lam)) / (em * em);
+                lam -= fv / dfv;
+                if (lam < 1e-9) lam = 1e-9;
+            }
+            double scale = std::pow(2.0, m4W);
+            double mle = mu > 1.0001 ? D / (1.0 - std::exp(-lam)) * scale : 0;
+            double chao = f[2] ? (D + 0.5 * (double)f[1] * f[1] / f[2]) * scale
+                               : 0;
+            std::printf("m4probe: parents=%zu/%zu window=2^-%d emissions=%llu "
+                        "kept=%llu (expect ~%.3g) time=%.1fs\n",
+                        take, np, m4W, (unsigned long long)totEm,
+                        (unsigned long long)H, totEm / scale, dt);
+            std::printf("m4probe: distinct_in_window=%llu hits histogram "
+                        "f1=%llu f2=%llu f3=%llu f4=%llu f5+=%llu  mean=%.3f "
+                        "lambda=%.3f\n",
+                        (unsigned long long)D, (unsigned long long)f[1],
+                        (unsigned long long)f[2], (unsigned long long)f[3],
+                        (unsigned long long)f[4], (unsigned long long)f[5],
+                        mu, lam);
+            std::printf("m4probe: M4_naive_lower=%.4g  M4_chao1=%.4g  "
+                        "M4_poisson_mle=%.4g  peak_rss_mb=%.1f\n",
+                        D * scale, chao, mle, peak_rss_bytes() / 1048576.0);
+            std::printf("caveats: strided (non-random) parents; heterogeneous "
+                        "in-degree biases the Poisson MLE low and Chao1 is a "
+                        "lower bound under heterogeneity\n");
+            return 0;
+        }
         if (stopAfter > 0 && L >= stopAfter) {
             // ---- bounded stop: report built layers, masses, fan sample ----
             for (int l = 1; l <= stopAfter; l++) {
@@ -881,7 +1030,9 @@ int main(int argc, char** argv) {
             }
             totEmissions += ctx.emissions;
             totHits += ctx.cacheHits;
+            flush_canon_counters();
         }
+        flush_canon_counters();
         emissionsPerT.push_back(totEmissions);
         canonizePerT.push_back(g_canonize_calls - canon0);
         timePerT.push_back(now_s() - t0);
@@ -921,8 +1072,7 @@ int main(int argc, char** argv) {
         }
         u64 ell = FACT[N2C] / denom;
         if (FACT[N2C] % denom) { std::fprintf(stderr, "ell not integral\n"); return 3; }
-        u64 sq = 0;
-        canonize_scan(q, &sq);
+        u64 sq = stab_scan(q);
         if (Gorder % sq) { std::fprintf(stderr, "stab %llu bad\n",
                                         (unsigned long long)sq); return 3; }
         u64 m = Gorder / sq;
@@ -950,6 +1100,7 @@ int main(int argc, char** argv) {
     std::printf("\ncomplete classes = %zu\n", classesOut.size());
     std::printf("sum_w (labelled multiplicity sum) = %s\n", u128_str(sumW).c_str());
     std::printf("N(%d) = %s\n", C, u128_str(N).c_str());
+    flush_canon_counters();
     std::printf("dp_seconds = %.3f  canonize_calls = %llu  avg_nodes = %.2f\n",
                 dp_seconds, (unsigned long long)g_canonize_calls,
                 g_canonize_calls ? (double)g_canonize_nodes / g_canonize_calls : 0.0);
@@ -998,16 +1149,18 @@ int main(int argc, char** argv) {
             u32 si = (u32)(rng() % lay.size());
             if (lay.is_hole(si)) continue;
             const State& s = lay.keys[si];
-            // scramble then compare both canonizers
+            // scramble; the fast key must lie in the orbit and the fast
+            // stabilizer must equal the directly counted one (both referees
+            // are independent of the canonical-form definition)
             const GElem& g = GROUP[rng() % GROUP.size()];
             State gs = apply_state(g, s);
-            u64 st1 = 0, st2 = 0;
+            u64 st1 = 0;
             State fast = canonize(gs, &st1);
-            State slow = canonize_scan(gs, &st2);
-            if (!(fast == slow) || st1 != st2) bad++;
+            if (!orbit_member_scan(gs, fast) || st1 != stab_scan(gs)) bad++;
             done++;
         }
-        std::printf("scan check (fast vs full-group): %ld samples, %ld failures %s\n",
+        std::printf("scan check (orbit membership + direct stabilizer): "
+                    "%ld samples, %ld failures %s\n",
                     scanCheckN, bad, bad ? "FAIL" : "OK");
         if (bad) return 6;
     }
@@ -1018,9 +1171,7 @@ int main(int argc, char** argv) {
         u128 mass = 0;
         for (u32 i = 0; i < lay.size(); i++) {
             if (lay.is_hole(i)) continue;
-            u64 sq = 0;
-            canonize_scan(lay.keys[i], &sq);
-            mass += Gorder / sq;
+            mass += Gorder / stab_scan(lay.keys[i]);
         }
         std::printf("layer %d orbit mass = %s over %zu orbits\n",
                     layerMassL, u128_str(mass).c_str(), lay.real_size());
