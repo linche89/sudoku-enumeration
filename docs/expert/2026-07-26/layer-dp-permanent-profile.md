@@ -535,6 +535,40 @@ checkpointing; layer-5 anchored canonizer + full regate; bounded 4->5
 calibration from real sampled layer-4 states; T1-T10 battery; then the
 production decision.
 
+## 8.10 Pre-flight execution results (2026-07-27)
+
+All numbers below close the remaining estimate legs of §8.8.  Logs:
+`data/logs/layer-dp-m4probe4x-20260727.txt`, `layer-dp-calib45-20260727.txt`.
+
+- **M_4 = 9.03e8, measurement-grade.**  4x hash-window probe (k = 58,400,
+  lambda = 11.2, saturated coverage): naive 9.021e8 / Chao1 9.029e8 /
+  Poisson-MLE 9.021e8 — the three estimators collapse onto one value;
+  window noise < 0.1%.  The 1x -> 4x drift (+1.0%, converging from
+  below) matches the C=5 calibration pattern, closing test T1's drift
+  criterion.  Production layer-4 cap: 1.1e9 (~48 GB) gives 20% slack.
+- **4->5 fan measured on real layer-4 states**: 150 strided layer-3
+  parents -> 24.8e6 distinct four-row states, 20,000 sampled, count-only
+  fan: mean 2,731 tables/state (median 2,688, range 384..6,912) vs the
+  permanent-profile prediction 2,624 (+4%).  Test T2 / runbook §5.4
+  closed.
+- **Final C=6 budget, every leg measured**:
+  `5.9e7 + 2.605e9 + 2.136e12 + 2.466e12 + ~5.8e9  ~=  4.66e12 emissions`.
+- **(C-1)-row anchored canonizer shipped (engine v7)**: box-color anchor
+  from missing-pair agreement invariants (L1 + one WL round) restricting
+  assignments to color-sorted box orders, plus missing-box-color seeded
+  mask groups.  Flip-forcing was deliberately NOT included: it is not
+  provably coset-safe for stabilizer counting; the box anchor is (box
+  permutations in any stabilizer preserve colors), and scan-check
+  (orbit membership + direct stabilizer, 1,500 samples) passed with 0
+  failures.  Full C=2..5 ladder green.  Clean benchmark (C=5, 8
+  threads, 3 runs): the anchored transition drops 211 -> 128 ns/emission
+  (1.64x, search nodes 20.2 -> 10.9); C=5 total 3.90 -> 2.95 s.
+- **Projection**: with the (C-1) anchor on the 4->5 bucket, C=6 wall
+  ~6.2 days at 24 threads; landing the 4-row (C-2) analog on the 3->4
+  bucket (measured 10.7x eval reduction in the design study, needs
+  agreement invariants beyond edge multiplicities) projects ~4.9 days
+  at 24 threads / ~4 days at 30.
+
 ## 9. Honest limits
 
 - Section 5's brackets inherit the history-weighted sampling bias; the
