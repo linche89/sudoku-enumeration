@@ -51,6 +51,7 @@
 #include <psapi.h>
 #include <io.h>
 #else
+#include <sys/statvfs.h>
 #include <unistd.h>
 #endif
 
@@ -1008,6 +1009,168 @@ static bool ck_path_exists(const std::string& path) {
     return f.good();
 }
 
+// ----------------------------------------------------- resource preflight ---
+// Capacity-worst-case accounting for a staged L->L+1 process.  This includes
+// the resident parent and child hash tables, final-layer wide vectors,
+// per-thread emission caches, cap-reserved in-place resume loading, and the
+// third on-disk image that exists while a new .tmp checkpoint is written
+// beside both A/B generations.
+struct ResourceFootprint {
+    u64 cap = 0;
+    u64 arrays = 0;
+    u64 table = 0;
+    u64 wide = 0;
+    u64 resident = 0;
+    u64 image = 0;
+};
+
+static u64 resource_table_slots(u64 cap) {
+    u64 slots = 64;
+    while (slots < cap * 2) slots <<= 1;
+    return slots;
+}
+
+static ResourceFootprint resource_layer(int layer, u64 cap) {
+    ResourceFootprint r;
+    r.cap = cap;
+    r.arrays = cap * ((u64)sizeof(State) + sizeof(u64) + sizeof(u32));
+    r.table = resource_table_slots(cap) * sizeof(u32);
+    const bool wideLayer =
+        layer == C && (C >= 6 || g_forceWide);
+    r.wide = wideLayer ? cap * sizeof(u128) : 0;
+    r.resident = r.arrays + r.table + r.wide;
+    r.image = sizeof(CkptHeader) + r.arrays + r.wide;
+    return r;
+}
+
+static std::string resource_parent_dir(const std::string& path) {
+    const size_t pos = path.find_last_of("/\\");
+    if (pos == std::string::npos) return ".";
+    if (pos == 0) return path.substr(0, 1);
+    if (pos == 2 && path.size() >= 3 && path[1] == ':')
+        return path.substr(0, 3);
+    return path.substr(0, pos);
+}
+
+static bool resource_host_bytes(const std::string& checkpointBase,
+                                u64& totalRam, u64& availRam, u64& freeDisk,
+                                std::string& diskDir) {
+    diskDir = resource_parent_dir(checkpointBase);
+#ifdef _WIN32
+    MEMORYSTATUSEX ms{};
+    ms.dwLength = sizeof(ms);
+    if (!GlobalMemoryStatusEx(&ms)) return false;
+    totalRam = ms.ullTotalPhys;
+    availRam = ms.ullAvailPhys;
+    ULARGE_INTEGER callerFree{}, totalBytes{}, totalFree{};
+    if (!GetDiskFreeSpaceExA(diskDir.c_str(), &callerFree,
+                             &totalBytes, &totalFree))
+        return false;
+    freeDisk = callerFree.QuadPart;
+#else
+    const long pages = sysconf(_SC_PHYS_PAGES);
+    const long availPages = sysconf(_SC_AVPHYS_PAGES);
+    const long pageSize = sysconf(_SC_PAGESIZE);
+    if (pages <= 0 || availPages < 0 || pageSize <= 0) return false;
+    totalRam = (u64)pages * (u64)pageSize;
+    availRam = (u64)availPages * (u64)pageSize;
+    struct statvfs sv {};
+    if (statvfs(diskDir.c_str(), &sv) != 0) return false;
+    freeDisk = (u64)sv.f_bavail * (u64)sv.f_frsize;
+#endif
+    return true;
+}
+
+static double resource_gib(u64 bytes) {
+    return (double)bytes / (1024.0 * 1024.0 * 1024.0);
+}
+
+static int resource_preflight(int L, int nthreads,
+                              const std::vector<size_t>& caps) {
+    auto capFor = [&](int layer) -> u64 {
+        return layer == 1 ? 1ULL : (u64)caps[(size_t)layer - 2];
+    };
+    const ResourceFootprint parent = resource_layer(L, capFor(L));
+    const ResourceFootprint child = resource_layer(L + 1, capFor(L + 1));
+
+    const u64 rcPerThread =
+        2ULL * (1ULL << 16) * sizeof(u32) +
+        (1ULL << 15) *
+            ((u64)sizeof(State) + sizeof(std::pair<u32, u64>));
+    const u64 threadCaches = rcPerThread * (u64)nthreads;
+    const u64 wideThreadScratch = child.wide * (u64)nthreads;
+    const u64 runtimePeak =
+        parent.resident + child.resident + threadCaches + wideThreadScratch;
+    // ck_read_file reserves the final cap and layer_install moves those
+    // buffers into the child, so the compact serialized payload is not a
+    // second resident copy.  Table construction and arrays coexist here.
+    const u64 resumeLoadPeak = parent.resident + child.resident;
+    const u64 ramPeak = std::max(runtimePeak, resumeLoadPeak);
+    const u64 eightGiB = 8ULL << 30;
+    const u64 ramMargin = std::max(eightGiB, ramPeak / 10);
+    const u64 ramRequired = ramPeak + ramMargin;
+
+    // Retained-chain upper bound: every completed earlier stage keeps two
+    // physical A/B images (its snapshot hard-links one), while the active
+    // stage temporarily has A + B + tmp.
+    u64 retainedDisk = 0;
+    for (int layer = 2; layer <= L; layer++)
+        retainedDisk += 2 * resource_layer(layer, capFor(layer)).image;
+    const u64 diskPeak = retainedDisk + 3 * child.image;
+    const u64 sixteenGiB = 16ULL << 30;
+    const u64 diskMargin = std::max(sixteenGiB, diskPeak / 10);
+    const u64 diskRequired = diskPeak + diskMargin;
+
+    u64 totalRam = 0, availRam = 0, freeDisk = 0;
+    std::string diskDir;
+    if (!resource_host_bytes(g_ckptBase, totalRam, availRam, freeDisk,
+                             diskDir)) {
+        std::fprintf(stderr,
+                     "resource preflight cannot query RAM or checkpoint "
+                     "volume for %s\n", g_ckptBase.c_str());
+        return 2;
+    }
+    const bool totalOk = totalRam >= ramRequired;
+    const bool availOk = availRam >= ramRequired;
+    const bool diskOk = freeDisk >= diskRequired;
+    std::printf("RESOURCE PREFLIGHT C=%d transition %d->%d "
+                "(capacity-worst-case)\n", C, L, L + 1);
+    std::printf("  parent layer %d: cap=%llu resident=%.3f GiB "
+                "(arrays %.3f, table %.3f)\n",
+                L, (unsigned long long)parent.cap,
+                resource_gib(parent.resident),
+                resource_gib(parent.arrays), resource_gib(parent.table));
+    std::printf("  child  layer %d: cap=%llu resident=%.3f GiB "
+                "(arrays %.3f, table %.3f, wide %.3f)\n",
+                L + 1, (unsigned long long)child.cap,
+                resource_gib(child.resident),
+                resource_gib(child.arrays), resource_gib(child.table),
+                resource_gib(child.wide));
+    std::printf("  runtime peak: %.3f GiB (thread caches %.3f, "
+                "wide scratch %.3f)\n",
+                resource_gib(runtimePeak), resource_gib(threadCaches),
+                resource_gib(wideThreadScratch));
+    std::printf("  resume-load peak: %.3f GiB "
+                "(cap-reserved image moved in place)\n",
+                resource_gib(resumeLoadPeak));
+    std::printf("  RAM required with margin: %.3f GiB "
+                "(peak %.3f + margin %.3f)\n",
+                resource_gib(ramRequired), resource_gib(ramPeak),
+                resource_gib(ramMargin));
+    std::printf("  host RAM: total %.3f GiB [%s], available %.3f GiB [%s]\n",
+                resource_gib(totalRam), totalOk ? "OK" : "FAIL",
+                resource_gib(availRam), availOk ? "OK" : "FAIL");
+    std::printf("  retained-chain disk peak: %.3f GiB "
+                "(includes active A+B+tmp)\n", resource_gib(diskPeak));
+    std::printf("  disk required with margin: %.3f GiB; "
+                "available %.3f GiB at %s [%s]\n",
+                resource_gib(diskRequired), resource_gib(freeDisk),
+                diskDir.c_str(), diskOk ? "OK" : "FAIL");
+    const bool ok = totalOk && availOk && diskOk;
+    std::printf("RESOURCE PREFLIGHT %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 13;
+}
+
 static u64 ck_config_hash() {
     const u64 words[] = {
         CK_ALGO_TAG,
@@ -1067,6 +1230,45 @@ static bool ck_header_sane(const CkptHeader& h, u64* expectedBytes = nullptr) {
 #define CK_NOINLINE
 #endif
 
+#ifdef _WIN32
+CK_NOINLINE
+static bool ck_move_replace(const std::string& from,
+                            const std::string& to,
+                            const char* what) {
+    DWORD last = ERROR_SUCCESS;
+    for (int attempt = 0; attempt <= 50; attempt++) {
+        if (MoveFileExA(from.c_str(), to.c_str(),
+                        MOVEFILE_REPLACE_EXISTING |
+                        MOVEFILE_WRITE_THROUGH))
+            return true;
+        last = GetLastError();
+        const bool transient =
+            last == ERROR_ACCESS_DENIED ||
+            last == ERROR_SHARING_VIOLATION ||
+            last == ERROR_LOCK_VIOLATION ||
+            last == ERROR_BUSY ||
+            last == ERROR_USER_MAPPED_FILE;
+        if (!transient || attempt == 50) break;
+        if (attempt == 0)
+            std::fprintf(stderr,
+                         "%s replace temporarily blocked (winerr=%lu); "
+                         "retrying for up to 5 seconds\n",
+                         what, (unsigned long)last);
+        if (attempt == 0) std::fflush(stderr);
+        Sleep(100);
+    }
+    char msg[256] = {};
+    FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM |
+                       FORMAT_MESSAGE_IGNORE_INSERTS,
+                   nullptr, last, 0, msg, sizeof(msg), nullptr);
+    std::fprintf(stderr,
+                 "%s replace failed: %s -> %s (winerr=%lu %s)\n",
+                 what, from.c_str(), to.c_str(),
+                 (unsigned long)last, msg);
+    return false;
+}
+#endif
+
 CK_NOINLINE
 static bool ck_write_file(const std::string& path, CkptHeader h,
                           const State* keys, const u64* T, const u32* stab,
@@ -1107,9 +1309,7 @@ static bool ck_write_file(const std::string& path, CkptHeader h,
     std::fclose(f);
     if (!ok) { std::remove(tmp.c_str()); return false; }
 #ifdef _WIN32
-    if (!MoveFileExA(tmp.c_str(), path.c_str(),
-                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        std::fprintf(stderr, "ckpt rename failed: %s\n", path.c_str());
+    if (!ck_move_replace(tmp, path, "checkpoint")) {
         return false;
     }
 #else
@@ -1137,7 +1337,8 @@ static bool ck_read_header(const std::string& path, CkptHeader& h) {
 }
 
 CK_NOINLINE
-static bool ck_read_file(const std::string& path, CkptImage& im) {
+static bool ck_read_file(const std::string& path, CkptImage& im,
+                         size_t reserveEntries = 0) {
     CkptHeader h;
     if (!ck_read_header(path, h)) return false;
     FILE* f = std::fopen(path.c_str(), "rb");
@@ -1162,9 +1363,20 @@ static bool ck_read_file(const std::string& path, CkptImage& im) {
         std::fclose(f);
         return false;
     }
-    im.keys.resize((size_t)h.nEntries);
-    im.T.resize((size_t)h.nEntries);
-    im.stab.resize((size_t)h.nEntries);
+    const size_t n = (size_t)h.nEntries;
+    const size_t reserveN = std::max(n, reserveEntries);
+    im.keys.clear();
+    im.T.clear();
+    im.stab.clear();
+    im.wide.clear();
+    if (im.keys.capacity() < reserveN) im.keys.reserve(reserveN);
+    if (im.T.capacity() < reserveN) im.T.reserve(reserveN);
+    if (im.stab.capacity() < reserveN) im.stab.reserve(reserveN);
+    if (h.nWide && im.wide.capacity() < reserveN)
+        im.wide.reserve(reserveN);
+    im.keys.resize(n);
+    im.T.resize(n);
+    im.stab.resize(n);
     im.wide.resize((size_t)h.nWide);
     if (ok && h.nEntries) {
         ok = ok && std::fread(im.keys.data(), sizeof(State),
@@ -1204,13 +1416,21 @@ static bool layer_install(Layer& lay, CkptImage& im, size_t fixedCap) {
                                  "cap %zu\n", n, fixedCap);
             return false;
         }
-        if (n == fixedCap) {
-            // Finalized parent snapshots are installed at their exact size.
-            // Move their payload vectors so a large layer-4 resume does not
-            // transiently hold a second 36-byte-per-entry copy.
+        const bool movable =
+            im.keys.capacity() >= fixedCap &&
+            im.T.capacity() >= fixedCap &&
+            im.stab.capacity() >= fixedCap;
+        if (movable) {
+            // Finalized parents use fixedCap == n.  Resumed children are read
+            // with fixedCap reserved up front.  Both can therefore transfer
+            // ownership and grow logically to cap without retaining a second
+            // 36-byte-per-entry image during table construction.
             lay.keys = std::move(im.keys);
             lay.T = std::move(im.T);
             lay.stab = std::move(im.stab);
+            lay.keys.resize(fixedCap);
+            lay.T.resize(fixedCap, 0);
+            lay.stab.resize(fixedCap, 0);
             size_t sz = 64;
             while (sz < fixedCap * 2) sz <<= 1;
             lay.table.assign(sz, 0);
@@ -1285,8 +1505,7 @@ static bool ck_snapshot_link(const std::string& source,
 #ifdef _WIN32
     if (!CreateHardLinkA(tmp.c_str(), source.c_str(), nullptr))
         return false;
-    if (!MoveFileExA(tmp.c_str(), snapshot.c_str(),
-                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    if (!ck_move_replace(tmp, snapshot, "snapshot-link")) {
         std::remove(tmp.c_str());
         return false;
     }
@@ -1343,7 +1562,8 @@ static bool ckpt_write_pair(int L, const Layer& parent, const Layer& child,
 }
 
 CK_NOINLINE
-static bool ckpt_load_newest(const std::string& base, CkptImage& im) {
+static bool ckpt_load_newest(const std::string& base, CkptImage& im,
+                             const std::vector<size_t>* capsHint = nullptr) {
     std::string pa = base + ".a", pb = base + ".b";
     CkptHeader ha, hb;
     bool va = ck_read_header(pa, ha);
@@ -1358,11 +1578,25 @@ static bool ckpt_load_newest(const std::string& base, CkptImage& im) {
     } else if (vb) {
         first = &pb;
     }
-    if (first && ck_read_file(*first, im)) {
+    auto readCandidate = [&](const std::string& path,
+                             const CkptHeader& h) -> bool {
+        size_t reserveEntries = 0;
+        if (capsHint && h.layerIdx >= 2 &&
+            (size_t)h.layerIdx - 2 < capsHint->size()) {
+            const size_t cap = (*capsHint)[(size_t)h.layerIdx - 2];
+            if (cap >= (size_t)h.nEntries) reserveEntries = cap;
+        }
+        return ck_read_file(path, im, reserveEntries);
+    };
+    const CkptHeader* firstHdr =
+        first == &pa ? &ha : first == &pb ? &hb : nullptr;
+    const CkptHeader* secondHdr =
+        second == &pa ? &ha : second == &pb ? &hb : nullptr;
+    if (first && firstHdr && readCandidate(*first, *firstHdr)) {
         g_lastCkptPath = *first;
         return true;   // newest valid gen
     }
-    if (second && ck_read_file(*second, im)) {
+    if (second && secondHdr && readCandidate(*second, *secondHdr)) {
         g_lastCkptPath = *second;
         return true;   // torn-dump fallback
     }
@@ -1370,12 +1604,43 @@ static bool ckpt_load_newest(const std::string& base, CkptImage& im) {
 }
 
 CK_NOINLINE
+static bool ckpt_peek_stage(const std::string& base, int& parentLayer) {
+    CkptHeader ha, hb;
+    const bool va = ck_read_header(base + ".a", ha);
+    const bool vb = ck_read_header(base + ".b", hb);
+    if (!va && !vb) return false;
+    if (va && vb && ha.parentLayer != hb.parentLayer) {
+        std::fprintf(stderr,
+                     "checkpoint generations span different transitions; "
+                     "staged resume requires a fresh base per transition\n");
+        return false;
+    }
+    const CkptHeader& h =
+        !vb || (va && ha.gen >= hb.gen) ? ha : hb;
+    parentLayer = (int)h.parentLayer;
+    return parentLayer >= 1 && parentLayer < C;
+}
+
+CK_NOINLINE
 static bool ckpt_install_child(Layer& child, std::vector<u128>& wideOut,
                                CkptImage& im, size_t fixedCap) {
-    // NOTE: order matters -- read im.wide before layer_install may move from
-    // the other members (it never touches im.wide).
+    if (fixedCap &&
+        (im.keys.capacity() < fixedCap ||
+         im.T.capacity() < fixedCap ||
+         im.stab.capacity() < fixedCap ||
+         (!im.wide.empty() && im.wide.capacity() < fixedCap))) {
+        std::fprintf(stderr,
+                     "FATAL: resumed child was not cap-reserved; refusing "
+                     "a duplicate-payload install\n");
+        return false;
+    }
+    if (!im.wide.empty()) {
+        wideOut = std::move(im.wide);
+        if (fixedCap) wideOut.resize(fixedCap, 0);
+    } else {
+        wideOut.clear();
+    }
     if (!layer_install(child, im, fixedCap)) return false;
-    wideOut.assign(im.wide.begin(), im.wide.end());
     return true;
 }
 
@@ -1400,6 +1665,7 @@ int main(int argc, char** argv) {
                              "file] [--checkpoint base period-min]\n"
                              "        [--ckpt-chunk P] [--resume base] "
                              "[--force-wide]\n"
+                             "  resources: [--resource-preflight L]\n"
                              "  C6 safety: [--bridge-only] [--ack-full-c6]\n",
                      argv[0]);
         return 2;
@@ -1425,6 +1691,7 @@ int main(int argc, char** argv) {
     size_t m4Cap = 0;          // capacity of the windowed child table
     bool bridgeOnly = false;
     bool ackFullC6 = false;
+    int resourcePreflightL = -1;
     for (int a = 2; a < argc; a++) {
         std::string s = argv[a];
         if (s == "--ref" && a + 1 < argc) refPath = argv[++a];
@@ -1464,6 +1731,8 @@ int main(int argc, char** argv) {
         else if (s == "--force-wide") g_forceWide = true;
         else if (s == "--bridge-only") bridgeOnly = true;
         else if (s == "--ack-full-c6") ackFullC6 = true;
+        else if (s == "--resource-preflight" && a + 1 < argc)
+            resourcePreflightL = std::atoi(argv[++a]);
         else if (s == "--caps" && a + 1 < argc) {
             std::stringstream cs(argv[++a]);
             std::string tok;
@@ -1477,6 +1746,10 @@ int main(int argc, char** argv) {
         return 2;
     }
 #endif
+    if (nthreads < 1) {
+        std::fprintf(stderr, "--threads must be positive\n");
+        return 2;
+    }
     if (nthreads > 1 && caps.size() < (size_t)(C - 1)) {
         std::fprintf(stderr, "--threads needs --caps c2,...,c%d (child layer "
                              "capacities)\n", C);
@@ -1486,6 +1759,32 @@ int main(int argc, char** argv) {
         if (!caps[i] || caps[i] >= (size_t)UINT32_MAX - 64) {
             std::fprintf(stderr, "--caps entry %zu is outside 1..2^32-65\n",
                          i + 1);
+            return 2;
+        }
+    }
+    if (resourcePreflightL >= 0) {
+        if (resourcePreflightL < 1 || resourcePreflightL >= C) {
+            std::fprintf(stderr,
+                         "--resource-preflight layer must be in 1..%d\n",
+                         C - 1);
+            return 2;
+        }
+        if (nthreads <= 1 || caps.size() < (size_t)(C - 1) ||
+            g_ckptBase.empty()) {
+            std::fprintf(stderr,
+                         "--resource-preflight requires --threads > 1, "
+                         "complete --caps, and --checkpoint on the target "
+                         "volume\n");
+            return 2;
+        }
+        if (!g_resumeBase.empty() || g_loadLayerIdx || !g_saveLayers.empty() ||
+            doRank || !refPath.empty() || !dumpPath.empty() ||
+            invarianceN || scanCheckN || layerMassL || probeLayer ||
+            m4K || stopAfter || fanSample || bridgeOnly) {
+            std::fprintf(stderr,
+                         "--resource-preflight is a read-only dry run; "
+                         "remove execution, load/resume, and verification "
+                         "modes\n");
             return 2;
         }
     }
@@ -1542,7 +1841,8 @@ int main(int argc, char** argv) {
     }
     if (!g_resumeBase.empty())
         g_ckptBase = g_resumeBase;   // resumed runs keep checkpointing on
-    if (g_resumeBase.empty() && !g_ckptBase.empty()) {
+    if (resourcePreflightL < 0 &&
+        g_resumeBase.empty() && !g_ckptBase.empty()) {
         bool stale = ck_path_exists(g_ckptBase + ".a") ||
                      ck_path_exists(g_ckptBase + ".b");
         for (int L = 2; L <= C && !stale; L++)
@@ -1565,12 +1865,13 @@ int main(int argc, char** argv) {
         return 2;
     }
     const bool boundedC6 =
-        bridgeOnly || m4K > 0 ||
+        bridgeOnly || resourcePreflightL >= 0 || m4K > 0 ||
         (stopAfter > 0 && stopAfter <= 3) ||
         (probeLayer > 0 && probeParents > 0 &&
          (probeLayer <= 3 || g_loadLayerIdx == probeLayer));
     const bool reachesC6Final =
-        C == 6 && !bridgeOnly && !m4K && !probeLayer && !stopAfter;
+        C == 6 && resourcePreflightL < 0 &&
+        !bridgeOnly && !m4K && !probeLayer && !stopAfter;
     const bool buildsLargeC6Layer =
         C == 6 &&
         (reachesC6Final || stopAfter >= 4 ||
@@ -1590,13 +1891,44 @@ int main(int argc, char** argv) {
                          "fixed --caps\n");
             return 2;
         }
+        int stageL = g_loadLayerIdx;
+        if (!g_resumeBase.empty() &&
+            !ckpt_peek_stage(g_resumeBase, stageL)) {
+            std::fprintf(stderr,
+                         "cannot determine the staged transition from the "
+                         "resume checkpoint headers\n");
+            return 12;
+        }
+        if (stageL < 3 || stageL >= C) {
+            std::fprintf(stderr,
+                         "large C=6 work must start from a loaded/resumed "
+                         "layer 3, 4, or 5 snapshot; never run it as a "
+                         "monolith\n");
+            return 2;
+        }
+        const int requiredStop = stageL < C - 1 ? stageL + 1 : 0;
+        if (stopAfter != requiredStop) {
+            std::fprintf(stderr,
+                         "staged C=6 transition %d->%d requires %s; "
+                         "one large transition per process\n",
+                         stageL, stageL + 1,
+                         requiredStop
+                             ? ("--stop-after " +
+                                std::to_string(requiredStop)).c_str()
+                             : "no --stop-after (final stage)");
+            return 2;
+        }
         if (reachesC6Final && dumpPath.empty()) {
             std::fprintf(stderr,
                          "a full C=6 chain requires --dump for external exact "
                          "summation\n");
             return 2;
         }
+        const int resourceRc = resource_preflight(stageL, nthreads, caps);
+        if (resourceRc != 0) return resourceRc;
     }
+    if (resourcePreflightL >= 0)
+        return resource_preflight(resourcePreflightL, nthreads, caps);
 
     build_group();
     const u64 Gorder = GROUP.size();
@@ -1641,7 +1973,9 @@ int main(int argc, char** argv) {
     int startL = 1;
     if (!g_resumeBase.empty()) {
         // ---- resume: newest valid checkpoint of the interrupted transition
-        if (!ckpt_load_newest(g_resumeBase, g_resumeCk)) {
+        const std::vector<size_t>* capsHint =
+            nthreads > 1 ? &caps : nullptr;
+        if (!ckpt_load_newest(g_resumeBase, g_resumeCk, capsHint)) {
             std::fprintf(stderr, "FATAL: no valid checkpoint pair at "
                                  "%s.{a,b}\n", g_resumeBase.c_str());
             return 12;
@@ -1800,6 +2134,10 @@ int main(int argc, char** argv) {
         if (stopAfter > 0 && L >= stopAfter) {
             // ---- bounded stop: report built layers, masses, fan sample ----
             for (int l = 1; l <= stopAfter; l++) {
+                if (layers[l].size() == 0) {
+                    std::printf("layer %d: not loaded in staged process\n", l);
+                    continue;
+                }
                 u128 mass = 0;
                 for (u32 i = 0; i < layers[l].size(); i++)
                     if (layers[l].stab[i])

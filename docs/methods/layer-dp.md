@@ -76,6 +76,18 @@ loads the newest fully valid generation, falls back if it is torn or corrupt,
 loads the exact parent snapshot, verifies its ordered-key hash, rebuilds the
 hash table, and continues at the first unapplied chunk.
 
+On Windows, replacement is retried for at most five seconds only for the
+documented transient access, sharing, lock, busy, or mapped-file errors.
+Other errors fail immediately, and a persistent transient error still fails
+closed.  The gate holds both generations open until the first retry is
+observed, releases them, and then requires the resumed result to match the
+golden class dump.
+
+For a resumed fixed-capacity child, the loader reserves the final cap before
+reading the compact payload.  Ownership of those buffers is moved into the
+live layer and extended in place before its hash table is built.  The compact
+checkpoint arrays therefore do not coexist with a second full-cap copy.
+
 A completed checkpoint is made into the next immutable `.Lk.snap` with an
 atomic hard link when the filesystem supports it.  This avoids rewriting a
 large finalized layer and remains valid after later `.a`/`.b` replacements.
@@ -106,11 +118,14 @@ The gate covers:
 - canonical invariance, full-group stabilizer/orbit checks, separation, and
   histogram differential;
 - layer snapshot round trip and external exact summation;
-- randomized kill/resume, including the forced-wide final transition;
+- randomized kill/resume, including the forced-wide final transition and a
+  deterministic Windows sharing-lock retry;
 - mode mismatch and stale-base refusal;
 - fail-stop checkpoint-write error;
 - corrupt newest-generation fallback;
+- read-only resource accounting and a staged layer-3-to-4 stop;
 - the C=6 G1/G2 representative bridge;
+- refusal of an acknowledged monolithic C=6 large layer;
 - refusal of an unbounded ordinary C=6 invocation.
 
 This gate is also called by `scripts/verify_all.ps1`.
@@ -125,6 +140,11 @@ local guard against accidental launch; it does not replace the repository
 requirements for a recent full gate, external time/RSS bounds, free-space
 review, and checkpoint protection.
 
+Large work is restricted to one transition per process: load or resume layer
+3 and stop at 4, load or resume layer 4 and stop at 5, then load or resume
+layer 5 for the final transition.  The engine runs the resource preflight
+automatically before any such acknowledged stage.
+
 The two independently known complete-class anchors are wired before any
 future final result can be accepted:
 
@@ -136,13 +156,45 @@ F6(G2) = 7053808087203840
 A complete C=6 result must also contain exactly 63,199 classes.  Neither
 condition has been exercised by a full layer-DP run.
 
+## Resource preflight
+
+`--resource-preflight L` is read-only.  It requires the intended thread count,
+all fixed capacities, and a checkpoint base so RAM and the actual target
+volume can be inspected.  It creates no checkpoint files.
+
+The capacity-worst-case model includes:
+
+- parent and child arrays and hash tables;
+- per-thread raw-child caches;
+- per-thread and global `u128` vectors on the final transition;
+- cap-reserved in-place resume loading;
+- retained earlier A/B generations;
+- the active A/B pair plus the third full `.tmp` image present during atomic
+  replacement;
+- an 8 GiB or 10% RAM margin and a 16 GiB or 10% disk margin, whichever is
+  larger.
+
+With the still-provisional capacities
+`2000,14000000,1350000000,250000000,100000`, 24 threads, and the reference
+125.650 GiB host, the measured plan on 2026-07-31 was:
+
+| transition | peak RAM | RAM with margin | retained disk peak | disk with margin |
+|---|---:|---:|---:|---:|
+| 3->4 | 61.898 GiB | 69.898 GiB | 136.726 GiB | 152.726 GiB |
+| 4->5 | 71.685 GiB | 79.685 GiB | 116.609 GiB | 132.609 GiB |
+| 5->6 | 10.465 GiB | 18.465 GiB | 108.242 GiB | 124.242 GiB |
+
+These are capacity bounds, not measured production allocation.  In
+particular, the 1.35-billion and 250-million caps remain contingent on the
+stronger `M_4` and 4-to-5 calibration gates.
+
 ## Remaining preflight work
 
 The route is restart-safe at C=5, but a production decision still requires:
 
 1. a measured C=6 layer-4 capacity bound from stronger `M_4` probes;
 2. an unbiased layer-4-to-layer-5 fan/canonicalization calibration;
-3. explicit RAM, transient-resume RAM, disk, and wall-time preflight;
-4. a bounded staged rehearsal, including deliberate interruption and
+3. a bounded staged allocation/restart rehearsal under the resource guard;
+4. a bounded end-to-end rehearsal, including deliberate interruption and
    external summation;
 5. an owner decision before any multi-day C=6 layer-4 run.

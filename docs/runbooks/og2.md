@@ -54,7 +54,8 @@ raw-expert build line.  The verification script covers C=2..5 totals, all 355
 C=5 class triples, canonical invariance/separation/histogram differentials,
 snapshot round trips, exact external summation, narrow and forced-wide
 kill/resume, corrupt-generation fallback, fail-stop I/O, the G1/G2 bridge,
-and refusal of an unbounded C=6 invocation.
+bounded Windows sharing-lock replacement retry, and refusal of an unbounded
+C=6 invocation.
 
 Checkpointed experiments must use a new base:
 
@@ -91,12 +92,36 @@ For C=6, only the following are routine:
 Any larger bounded probe needs `scripts/watch_rss.ps1` with explicit time and
 memory limits.  `--ack-full-c6` is an accidental-launch interlock, not owner
 authorization.  Before a large stage, follow the writable-C=6 policy below
-and the remaining preflight list in `../methods/layer-dp.md`.  In particular,
-budget restart's transient checkpoint image as well as steady-state parent
-and child tables.
+and the remaining preflight list in `../methods/layer-dp.md`.
+
+Run the read-only resource plan against the intended checkpoint volume before
+allocating a large layer:
+
+```powershell
+$caps = '2000,14000000,1350000000,250000000,100000'
+foreach ($layer in 3,4,5) {
+  .\build\layer_dp_gate.exe 6 --threads 24 --caps $caps `
+    --checkpoint E:\PATH\TO\NEW_STAGE_BASE 0 `
+    --resource-preflight $layer
+}
+```
+
+This creates no files.  It counts fixed arrays and tables, thread caches,
+wide final accumulators, cap-reserved resume, retained generations, and the
+third full `.tmp` image present while A/B is atomically replaced.  The
+provisional cap set above reported RAM-with-margin values
+69.898 / 79.685 / 18.465 GiB and disk-with-margin values
+152.726 / 132.609 / 124.242 GiB for 3->4 / 4->5 / 5->6 on 2026-07-31.
+The caps are planning inputs, not accepted `M_4`/`M_5` bounds.
+
+An acknowledged large run is restricted to one transition per process:
+layer 3->4 must stop at 4, layer 4->5 must stop at 5, and only layer 5 may
+continue to the final CSV.  The engine repeats the resource check
+automatically and refuses a monolithic large-layer invocation.
 
 See `../methods/layer-dp.md` and
-`../reports/og2/layer-dp-checkpoint-gate-20260730.md`.
+`../reports/og2/layer-dp-checkpoint-gate-20260730.md` plus
+`../reports/og2/layer-dp-resource-preflight-20260731.md`.
 
 ## F4-lookup coverage diagnostic
 

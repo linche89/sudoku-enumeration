@@ -401,7 +401,7 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-Updated 2026-07-30.  The global row-incremental layer DP
+Updated 2026-07-31.  The global row-incremental layer DP
 (`experiments/proto/layer_dp_gate.cpp`) is the qualified implementation
 candidate.  It reproduces complete C=2..5 exactly, including all 355 C=5
 triples, and now has explicit canonical invariance, full-group
@@ -427,17 +427,29 @@ key-affecting modes, verifies exact length and hashes, preserves two atomic
 generations, promotes completed images to hard-linked snapshots, fails closed
 on I/O errors, and has passed 20 random kill/resume cycles plus forced-wide,
 mode-mismatch, stale-base, corrupt-generation, and snapshot-round-trip gates
-at C=5.  The G1/G2 native-key bridge is wired with stabilizers 120 and 8.
+at C=5.  Atomic replacement now retries only bounded Windows sharing/access
+faults for at most five seconds; a deterministic locked-generation gate
+exercises that path before verifying the exact resumed output.  The G1/G2
+native-key bridge is wired with stabilizers 120 and 8.
 Evidence and safe commands are in `docs/methods/layer-dp.md` and
 `docs/reports/og2/layer-dp-checkpoint-gate-20260730.md`.
 
-The immediate objective is the remaining bounded preflight: strengthen the
-`M_4` capacity measurement, calibrate the uniform 4->5 fan and depth-5
-canonicalization cost, account explicitly for steady-state and transient
-resume RAM/disk, and execute a guarded staged rehearsal with a deliberate
-restart and external summation.  The earlier `~59 GB` figure is not a
-sufficient restart-memory budget because loading a partial child checkpoint
-temporarily coexists with the fixed-capacity child.
+The resource preflight is now executable and fail-closed.  Resume reserves
+the final child capacity before reading and moves the payload in place,
+removing the previous 45.262-GiB duplicate-image peak at the provisional
+1.35-billion layer-4 cap.  With provisional capacities
+`2000,14000000,1350000000,250000000,100000`, the three large transitions
+require 69.898 / 79.685 / 18.465 GiB RAM including margin and
+152.726 / 132.609 / 124.242 GiB disk including retained generations,
+A/B, the atomic-write temporary, and margin.  Large C=6 work is restricted
+to one loaded/resumed transition per process.  These are capacity-worst-case
+plans, not validated state-count bounds; see
+`docs/reports/og2/layer-dp-resource-preflight-20260731.md`.
+
+The immediate objective is therefore the remaining bounded measurement
+preflight: strengthen `M_4`, calibrate the uniform 4->5 fan and depth-5
+canonicalization cost, then execute guarded allocation/restart and
+end-to-end rehearsals.
 
 No full 63,199-class C=6 run is authorized.  Bounded probes and the
 pre-flight program are within scope.

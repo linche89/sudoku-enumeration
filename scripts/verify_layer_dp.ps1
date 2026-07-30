@@ -93,7 +93,9 @@ function Start-Kill-And-Resume {
         [string]$GoldenDump,
         [switch]$ForceWide,
         [int]$ChunkParents = 500,
-        [int]$ExtraDelayMs = 100
+        [int]$ExtraDelayMs = 100,
+        [switch]$RequireBothGenerations,
+        [int]$LockGenerationMs = 0
     )
     New-Item -ItemType Directory -Path $Dir | Out-Null
     $base = Join-Path $Dir "ck"
@@ -117,8 +119,10 @@ function Start-Kill-And-Resume {
     while ((Get-Date) -lt $deadline) {
         Start-Sleep -Milliseconds 25
         $proc.Refresh()
-        if ((Test-Path -LiteralPath ($base + ".a")) -or
-            (Test-Path -LiteralPath ($base + ".b"))) {
+        $haveA = Test-Path -LiteralPath ($base + ".a")
+        $haveB = Test-Path -LiteralPath ($base + ".b")
+        if (($RequireBothGenerations -and $haveA -and $haveB) -or
+            (!$RequireBothGenerations -and ($haveA -or $haveB))) {
             $sawCheckpoint = $true
             break
         }
@@ -149,13 +153,98 @@ function Start-Kill-And-Resume {
         "--resume", $base
     )
     if ($ForceWide) { $resumeArgs += "--force-wide" }
-    Invoke-Layer "resume layer $LoadLayer" $resumeArgs `
-        (Join-Path $Dir "resume.log")
+    $resumeLog = Join-Path $Dir "resume.log"
+    if ($LockGenerationMs -gt 0) {
+        $locks = @()
+        foreach ($generation in @("$base.a", "$base.b")) {
+            if (Test-Path -LiteralPath $generation) {
+                $locks += [IO.File]::Open(
+                    $generation, [IO.FileMode]::Open,
+                    [IO.FileAccess]::Read, [IO.FileShare]::Read)
+            }
+        }
+        $resumeErr = Join-Path $Dir "resume.err"
+        $retryObserved = $false
+        try {
+            Write-Host "== resume layer $LoadLayer with locked generations =="
+            $resumeProc = Start-Process -FilePath $exe `
+                -ArgumentList $resumeArgs `
+                -RedirectStandardOutput $resumeLog `
+                -RedirectStandardError $resumeErr `
+                -PassThru -WindowStyle Hidden
+            $lockDeadline = (Get-Date).AddMilliseconds($LockGenerationMs)
+            while ((Get-Date) -lt $lockDeadline) {
+                Start-Sleep -Milliseconds 25
+                $resumeProc.Refresh()
+                if ((Test-Path -LiteralPath $resumeErr) -and
+                    (Get-Content -Raw -LiteralPath $resumeErr) -match
+                    "replace temporarily blocked") {
+                    $retryObserved = $true
+                    break
+                }
+                if ($resumeProc.HasExited) { break }
+            }
+        }
+        finally {
+            foreach ($lock in $locks) { $lock.Dispose() }
+        }
+        if (!$retryObserved) {
+            if (!$resumeProc.HasExited) {
+                Stop-Process -Id $resumeProc.Id -Force
+                $resumeProc.WaitForExit()
+            }
+            Get-Content -LiteralPath $resumeLog -ErrorAction SilentlyContinue
+            Get-Content -LiteralPath $resumeErr -ErrorAction SilentlyContinue
+            throw "locked-generation test did not exercise rename retry"
+        }
+        if (!$resumeProc.WaitForExit(60000)) {
+            Stop-Process -Id $resumeProc.Id -Force
+            $resumeProc.WaitForExit()
+            throw "locked-generation resume timed out"
+        }
+        $resumeProc.WaitForExit()
+        $resumeProc.Refresh()
+        $resumeExit = $resumeProc.ExitCode
+        if ($null -ne $resumeExit -and $resumeExit -ne 0) {
+            Get-Content -LiteralPath $resumeLog -ErrorAction SilentlyContinue
+            Get-Content -LiteralPath $resumeErr -ErrorAction SilentlyContinue
+            throw "locked-generation resume failed with exit code $resumeExit"
+        }
+        if ((Get-Content -Raw -LiteralPath $resumeLog) -notmatch
+            "ALL GATES PASSED for C=5") {
+            throw "locked-generation resume did not reach the success marker"
+        }
+    } else {
+        Invoke-Layer "resume layer $LoadLayer" $resumeArgs $resumeLog
+    }
     Assert-FileEqual $GoldenDump $dump "resumed class dump"
     return $base
 }
 
 try {
+    $resourceDir = Join-Path $work "resource"
+    New-Item -ItemType Directory -Path $resourceDir | Out-Null
+    $resourceBase = Join-Path $resourceDir "ck"
+    $resourceLog = Join-Path $resourceDir "preflight.log"
+    Write-Host "== resource preflight dry run =="
+    & $exe "5" "--threads" "$Threads" "--caps" $caps `
+        "--force-wide" "--checkpoint" $resourceBase "0" `
+        "--resource-preflight" "4" *> $resourceLog
+    if ($LASTEXITCODE -notin @(0, 13)) {
+        Get-Content -LiteralPath $resourceLog
+        throw "resource preflight exited $LASTEXITCODE"
+    }
+    $resourceText = Get-Content -Raw -LiteralPath $resourceLog
+    if ($resourceText -notmatch "cap-reserved image moved in place" -or
+        $resourceText -notmatch "active A\+B\+tmp" -or
+        $resourceText -notmatch "RESOURCE PREFLIGHT (PASS|FAIL)") {
+        throw "resource preflight did not report the required RAM/disk model"
+    }
+    if (Get-ChildItem -LiteralPath $resourceDir -Filter "ck*" |
+        Select-Object -First 1) {
+        throw "resource preflight created checkpoint files"
+    }
+
     Invoke-Layer "C=2 exact + canon" `
         @("2", "--scan-check", "200") (Join-Path $work "c2.log")
     Invoke-Layer "C=3 exact + canon" `
@@ -179,6 +268,22 @@ try {
           "--ref", $ref, "--load-layer", "3", $layer3,
           "--dump", $loadedDump) (Join-Path $work "load.log")
     Assert-FileEqual $gold $loadedDump "loaded class dump"
+
+    $stagedDir = Join-Path $work "staged-stop"
+    New-Item -ItemType Directory -Path $stagedDir | Out-Null
+    $stagedBase = Join-Path $stagedDir "ck"
+    $stagedLog = Join-Path $stagedDir "run.log"
+    Invoke-Layer "staged layer 3 to 4 stop" `
+        @("5", "--threads", "$Threads", "--caps", $caps,
+          "--load-layer", "3", $layer3,
+          "--checkpoint", $stagedBase, "0", "--ckpt-chunk", "500",
+          "--stop-after", "4") $stagedLog
+    $stagedText = Get-Content -Raw -LiteralPath $stagedLog
+    if ($stagedText -notmatch "layer 2: not loaded in staged process" -or
+        $stagedText -notmatch "STOPPED AFTER LAYER 4" -or
+        !(Test-Path -LiteralPath ($stagedBase + ".L4.snap"))) {
+        throw "staged stop did not produce a closed layer-4 snapshot"
+    }
 
     Write-Host "== S4 exact summation =="
     & python $s4 $gold "--classes" "355" "--expect-n" $expectedN `
@@ -210,7 +315,8 @@ try {
     Write-Host "== wide checkpoint kill/resume =="
     $wideBase = Start-Kill-And-Resume `
         (Join-Path $work "wide-kill") 4 $layer4Wide $gold `
-        -ForceWide -ChunkParents 100 -ExtraDelayMs 50
+        -ForceWide -ChunkParents 100 -ExtraDelayMs 50 `
+        -RequireBothGenerations -LockGenerationMs 10000
 
     Invoke-ExpectExit "checkpoint mode mismatch refusal" `
         @("5", "--threads", "$Threads", "--caps", $caps, "--ref", $ref,
@@ -261,6 +367,13 @@ try {
     if ($bridge -notmatch "stab=120" -or $bridge -notmatch "stab=8") {
         throw "C=6 bridge stabilizers do not match outer orbit sizes"
     }
+
+    $monolithBase = Join-Path $work "forbidden-monolith"
+    Invoke-ExpectExit "acknowledged C6 monolith refusal" `
+        @("6", "--threads", "$Threads",
+          "--caps", "2000,14000000,20000,20000,100000",
+          "--checkpoint", $monolithBase, "0",
+          "--stop-after", "4", "--ack-full-c6") 2 $work
 
     Invoke-ExpectExit "unbounded C6 refusal" @("6") 2 $work
 
