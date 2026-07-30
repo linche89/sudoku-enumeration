@@ -119,6 +119,22 @@ layer 3->4 must stop at 4, layer 4->5 must stop at 5, and only layer 5 may
 continue to the final CSV.  The engine repeats the resource check
 automatically and refuses a monolithic large-layer invocation.
 
+The retained exact S0 snapshot can feed the measurement-only random M4 and
+uniform 4-to-5 calibration without rebuilding layers 1-to-3:
+
+```powershell
+.\build\layer_dp_gate.exe 6 --threads 24 `
+  --caps 2000,14000000,1,1,1 `
+  --load-layer 3 data\checkpoints\layer_dp_c6_layer3_20260731.snap `
+  --m4probe 58400 6 60000000 --m4-parent-seed 20260731 `
+  --fan-sample 20000 --fan-canon-sample 2000 10000000
+```
+
+Run it only through `scripts/watch_rss.ps1`; the current bound is 12 GiB and
+30 minutes.  A stopped prefix has no accepted M4 or fan estimate.  The
+snapshot and its external-backup hash are recorded in
+`../../data/checkpoints/MANIFEST.md`.
+
 See `../methods/layer-dp.md` and
 `../reports/og2/layer-dp-checkpoint-gate-20260730.md` plus
 `../reports/og2/layer-dp-resource-preflight-20260731.md`.

@@ -446,6 +446,17 @@ to one loaded/resumed transition per process.  These are capacity-worst-case
 plans, not validated state-count bounds; see
 `docs/reports/og2/layer-dp-resource-preflight-20260731.md`.
 
+Bounded S0 has now produced a reusable exact C=6 layer-3 snapshot:
+12,324,872 closed states, one parallel-insertion hole,
+orbit mass 566,455,903,200, and SHA-256
+`1D882DB7B0B18490E981539F7C690FA90227ECEC243817F5B538BEC8DAC865B7`.
+The guarded run took 521.3 seconds and peaked at 661.1 MiB; a read-only
+round trip reproduced the state count and mass.  A canonical-key-hash parent
+sampler and hash-window-uniform 4->5 fan/canonicalization calibration now pass
+the C=5 gate.  The corresponding C=6 M4 probe was deliberately stopped before
+completion and produced no accepted estimate; it remains the next bounded
+measurement.
+
 The immediate objective is therefore the remaining bounded measurement
 preflight: strengthen `M_4`, calibrate the uniform 4->5 fan and depth-5
 canonicalization cost, then execute guarded allocation/restart and

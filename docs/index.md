@@ -34,6 +34,7 @@
 ## Dated evidence
 
 - `reports/og2/layer-dp-resource-preflight-20260731.md`
+- `reports/og2/layer-dp-s0-random-calibration-20260731.md`
 - `reports/og2/layer-dp-checkpoint-gate-20260730.md`
 - `reports/og2/source-target-frontier-lower-bound-20260720.md`
 - `reports/og2/band-kernel-rank-20260719.md`

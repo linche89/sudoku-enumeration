@@ -40,6 +40,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <queue>
 #include <random>
 #include <sstream>
 #include <string>
@@ -690,6 +691,60 @@ struct Layer {
         return UINT32_MAX;
     }
 };
+
+// Deterministic approximately-uniform sampling by canonical key rather than
+// by insertion/table position.  Keeping the k smallest independently mixed
+// key hashes makes the selected set insensitive to parallel insertion order
+// and avoids the structural assumptions of the older strided probes.
+static u64 sample_mix64(u64 x) {
+    x += 0x9e3779b97f4a7c15ULL;
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+    return x ^ (x >> 31);
+}
+
+static std::vector<u32> layer_key_hash_sample(const Layer& lay, size_t take,
+                                              u64 seed) {
+    take = std::min(take, lay.real_size());
+    std::priority_queue<std::pair<u64, u32>> selected;
+    for (u32 i = 0; i < lay.size(); i++) {
+        if (lay.is_hole(i)) continue;
+        const std::pair<u64, u32> candidate = {
+            sample_mix64(state_hash(lay.keys[i]) ^ seed), i
+        };
+        if (selected.size() < take) {
+            selected.push(candidate);
+        } else if (candidate < selected.top()) {
+            selected.pop();
+            selected.push(candidate);
+        }
+    }
+    std::vector<u32> out;
+    out.reserve(selected.size());
+    while (!selected.empty()) {
+        out.push_back(selected.top().second);
+        selected.pop();
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+static std::vector<u32> layer_strided_sample(const Layer& lay, size_t take) {
+    const size_t np = lay.size();
+    take = std::min(take, np);
+    std::vector<u32> out;
+    if (!take) return out;
+    const size_t stride = np / take;
+    out.reserve(take);
+    for (size_t s = 0; s < take; s++) {
+        size_t i = s * stride;
+        while (i < np && lay.is_hole((u32)i)) i++;
+        if (i >= np) continue;
+        if (s + 1 < take && i >= (s + 1) * stride) continue;
+        out.push_back((u32)i);
+    }
+    return out;
+}
 
 // ------------------------------------------------------------ emissions ----
 struct EmitCtx {
@@ -1666,6 +1721,9 @@ int main(int argc, char** argv) {
                              "        [--ckpt-chunk P] [--resume base] "
                              "[--force-wide]\n"
                              "  resources: [--resource-preflight L]\n"
+                             "  probes: [--m4probe K W CAP "
+                             "[--m4-parent-seed S] [--fan-sample N] "
+                             "[--fan-canon-sample N CAP]]\n"
                              "  C6 safety: [--bridge-only] [--ack-full-c6]\n",
                      argv[0]);
         return 2;
@@ -1689,6 +1747,10 @@ int main(int argc, char** argv) {
     long m4K = 0;              // hash-window M_4 probe: sampled layer-3 parents
     int m4W = 0;               // window bits (keep fraction 2^-m4W)
     size_t m4Cap = 0;          // capacity of the windowed child table
+    bool m4ParentSeedSet = false;
+    u64 m4ParentSeed = 0;      // key-hash parent sample instead of table stride
+    long fanCanonSample = 0;   // real canonicalized 4->5 calibration parents
+    size_t fanCanonCap = 0;    // bounded layer-5 table for that calibration
     bool bridgeOnly = false;
     bool ackFullC6 = false;
     int resourcePreflightL = -1;
@@ -1712,6 +1774,14 @@ int main(int argc, char** argv) {
             m4K = std::atol(argv[++a]);
             m4W = std::atoi(argv[++a]);
             m4Cap = std::stoull(argv[++a]);
+        }
+        else if (s == "--m4-parent-seed" && a + 1 < argc) {
+            m4ParentSeedSet = true;
+            m4ParentSeed = std::stoull(argv[++a]);
+        }
+        else if (s == "--fan-canon-sample" && a + 2 < argc) {
+            fanCanonSample = std::atol(argv[++a]);
+            fanCanonCap = std::stoull(argv[++a]);
         }
         else if (s == "--save-layer" && a + 2 < argc) {
             int sl = std::atoi(argv[++a]);
@@ -1748,6 +1818,24 @@ int main(int argc, char** argv) {
 #endif
     if (nthreads < 1) {
         std::fprintf(stderr, "--threads must be positive\n");
+        return 2;
+    }
+    if (m4K < 0 || m4W < 0 || m4W >= 64 ||
+        (m4K > 0 && (!m4W || !m4Cap))) {
+        std::fprintf(stderr,
+                     "--m4probe requires positive K/W/CAP with W < 64\n");
+        return 2;
+    }
+    if ((m4ParentSeedSet || fanCanonSample || fanCanonCap) && !m4K) {
+        std::fprintf(stderr,
+                     "--m4-parent-seed/--fan-canon-sample require "
+                     "--m4probe\n");
+        return 2;
+    }
+    if (fanCanonSample < 0 ||
+        ((fanCanonSample > 0) != (fanCanonCap > 0))) {
+        std::fprintf(stderr,
+                     "--fan-canon-sample requires positive N and CAP\n");
         return 2;
     }
     if (nthreads > 1 && caps.size() < (size_t)(C - 1)) {
@@ -2055,9 +2143,15 @@ int main(int argc, char** argv) {
             // ---- children whose canonical hash lands in a 2^-m4W window,
             // ---- estimate M_4 from the windowed hit histogram.
             Layer& L3 = layers[3];
-            size_t np = L3.size();
-            size_t take = std::min((size_t)m4K, np);
-            size_t stride = np / take;
+            std::vector<u32> parentSample =
+                m4ParentSeedSet
+                    ? layer_key_hash_sample(L3, (size_t)m4K, m4ParentSeed)
+                    : layer_strided_sample(L3, (size_t)m4K);
+            size_t take = parentSample.size();
+            if (!take) {
+                std::fprintf(stderr, "m4probe selected no layer-3 parents\n");
+                return 2;
+            }
             Layer win;
             win.init_fixed(m4Cap);
             u64 totEm = 0;
@@ -2077,13 +2171,7 @@ int main(int argc, char** argv) {
 #pragma omp for schedule(dynamic, 4)
 #endif
                 for (long long s = 0; s < (long long)take; s++) {
-                    size_t i = (size_t)s * stride;
-                    while (i < np && L3.is_hole((u32)i)) i++;
-                    if (i >= np) continue;
-                    // clamp: never cross into the next stride window (a hole
-                    // run >= stride would otherwise double-count a parent)
-                    if (s + 1 < (long long)take && i >= (size_t)(s + 1) * stride)
-                        continue;
+                    size_t i = parentSample[(size_t)s];
                     ctx.prepare(L3.keys[i], 1);
                     ctx.rec(0, (1u << N2C) - 1);
                 }
@@ -2114,8 +2202,14 @@ int main(int argc, char** argv) {
                                : 0;
             std::printf("m4probe: parents=%zu/%zu window=2^-%d emissions=%llu "
                         "kept=%llu (expect ~%.3g) time=%.1fs\n",
-                        take, np, m4W, (unsigned long long)totEm,
+                        take, L3.real_size(), m4W, (unsigned long long)totEm,
                         (unsigned long long)H, totEm / scale, dt);
+            std::printf("m4probe: parent_sample=%s",
+                        m4ParentSeedSet ? "canonical-key-hash" : "strided");
+            if (m4ParentSeedSet)
+                std::printf(" seed=%llu",
+                            (unsigned long long)m4ParentSeed);
+            std::printf("\n");
             std::printf("m4probe: distinct_in_window=%llu hits histogram "
                         "f1=%llu f2=%llu f3=%llu f4=%llu f5+=%llu  mean=%.3f "
                         "lambda=%.3f\n",
@@ -2126,9 +2220,116 @@ int main(int argc, char** argv) {
             std::printf("m4probe: M4_naive_lower=%.4g  M4_chao1=%.4g  "
                         "M4_poisson_mle=%.4g  peak_rss_mb=%.1f\n",
                         D * scale, chao, mle, peak_rss_bytes() / 1048576.0);
-            std::printf("caveats: strided (non-random) parents; heterogeneous "
-                        "in-degree biases the Poisson MLE low and Chao1 is a "
-                        "lower bound under heterogeneity\n");
+            if (fanSample > 0) {
+                const u64 fanSeed =
+                    (m4ParentSeedSet ? m4ParentSeed : 20260731ULL) ^
+                    0xd1b54a32d192ed03ULL;
+                std::vector<u32> fanParents =
+                    layer_key_hash_sample(win, (size_t)fanSample, fanSeed);
+                EmitCtx fctx;
+                fctx.next = nullptr;
+                fctx.emissions = 0;
+                fctx.cacheHits = 0;
+                fctx.countOnly = true;
+                fctx.row = nullptr;
+                std::vector<u64> fans;
+                fans.reserve(fanParents.size());
+                double tf0 = now_s();
+                u64 prev = 0;
+                long double sum = 0, sumSq = 0;
+                for (u32 i : fanParents) {
+                    fctx.prepare(win.keys[i], 0);
+                    fctx.rec(0, (1u << N2C) - 1);
+                    u64 fan = fctx.emissions - prev;
+                    prev = fctx.emissions;
+                    fans.push_back(fan);
+                    sum += fan;
+                    sumSq += (long double)fan * fan;
+                }
+                std::sort(fans.begin(), fans.end());
+                const size_t nf = fans.size();
+                const long double mean = nf ? sum / nf : 0;
+                long double var = 0;
+                if (nf > 1)
+                    var = (sumSq - sum * sum / nf) / (nf - 1);
+                if (var < 0) var = 0;
+                const long double se = nf ? std::sqrt(var / nf) : 0;
+                std::printf("m4probe fan 4->5: sample=canonical-key-hash "
+                            "from captured hash-window states n=%zu/%zu "
+                            "seed=%llu\n",
+                            nf, win.real_size(),
+                            (unsigned long long)fanSeed);
+                std::printf("m4probe fan 4->5: min=%llu p05=%llu med=%llu "
+                            "p95=%llu max=%llu mean=%.3Lf se=%.3Lf "
+                            "normal95=[%.3Lf,%.3Lf] time=%.1fs\n",
+                            nf ? (unsigned long long)fans.front() : 0ULL,
+                            nf ? (unsigned long long)fans[nf / 20] : 0ULL,
+                            nf ? (unsigned long long)fans[nf / 2] : 0ULL,
+                            nf ? (unsigned long long)fans[(nf * 19) / 20]
+                               : 0ULL,
+                            nf ? (unsigned long long)fans.back() : 0ULL,
+                            mean, se, mean - 1.96L * se,
+                            mean + 1.96L * se, now_s() - tf0);
+            }
+            if (fanCanonSample > 0) {
+                const u64 canonSeed =
+                    (m4ParentSeedSet ? m4ParentSeed : 20260731ULL) ^
+                    0x94d049bb133111ebULL;
+                std::vector<u32> canonParents =
+                    layer_key_hash_sample(win, (size_t)fanCanonSample,
+                                          canonSeed);
+                Layer calib;
+                calib.init_fixed(fanCanonCap);
+                u64 calibEm = 0, calibHits = 0;
+                const u64 canon0 = g_canonize_calls;
+                const u64 nodes0 = g_canonize_nodes;
+                const double tc0 = now_s();
+#ifdef _OPENMP
+#pragma omp parallel num_threads(nthreads) if (nthreads > 1) \
+    reduction(+ : calibEm, calibHits)
+#endif
+                {
+                    EmitCtx cctx;
+                    cctx.next = &calib;
+                    cctx.emissions = 0;
+                    cctx.cacheHits = 0;
+                    cctx.row = nullptr;
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic, 4)
+#endif
+                    for (long long s = 0;
+                         s < (long long)canonParents.size(); s++) {
+                        const u32 i = canonParents[(size_t)s];
+                        cctx.prepare(win.keys[i], 1);
+                        cctx.rec(0, (1u << N2C) - 1);
+                    }
+                    calibEm += cctx.emissions;
+                    calibHits += cctx.cacheHits;
+                    flush_canon_counters();
+                }
+                const double tcd = now_s() - tc0;
+                const u64 canonCalls = g_canonize_calls - canon0;
+                const u64 canonNodes = g_canonize_nodes - nodes0;
+                std::printf("m4probe canonical 4->5: "
+                            "sample=canonical-key-hash n=%zu seed=%llu "
+                            "emissions=%llu distinct=%zu holes=%u "
+                            "time=%.3fs ns/em=%.1f cache_hits=%.2f%% "
+                            "canon_calls=%llu avg_nodes=%.2f\n",
+                            canonParents.size(),
+                            (unsigned long long)canonSeed,
+                            (unsigned long long)calibEm, calib.real_size(),
+                            calib.holes, tcd,
+                            calibEm ? tcd * 1e9 / calibEm : 0.0,
+                            calibEm ? 100.0 * calibHits / calibEm : 0.0,
+                            (unsigned long long)canonCalls,
+                            canonCalls ? (double)canonNodes / canonCalls
+                                       : 0.0);
+            }
+            std::printf("caveats: the parent sample covers only part of "
+                        "layer 3; heterogeneous in-degree biases the "
+                        "Poisson value low.  Fan estimates are uniform over "
+                        "captured keys, and become global only as hash-window "
+                        "capture saturates.\n");
             return 0;
         }
         if (stopAfter > 0 && L >= stopAfter) {

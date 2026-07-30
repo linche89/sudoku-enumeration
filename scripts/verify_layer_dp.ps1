@@ -254,6 +254,23 @@ try {
           "--invariance", "1000", "--scan-check", "1000") `
         (Join-Path $work "c4.log")
 
+    $sampleLog = Join-Path $work "m4-random-sample.log"
+    Invoke-Layer "key-hash M4 and 4-to-5 calibration" `
+        @("5", "--threads", "$Threads", "--caps", $caps,
+          "--m4probe", "2000", "2", "6000",
+          "--m4-parent-seed", "20260731",
+          "--fan-sample", "200",
+          "--fan-canon-sample", "50", "5000") $sampleLog
+    $sampleText = Get-Content -Raw -LiteralPath $sampleLog
+    if ($sampleText -notmatch
+            "parent_sample=canonical-key-hash seed=20260731" -or
+        $sampleText -notmatch
+            "m4probe fan 4->5: sample=canonical-key-hash" -or
+        $sampleText -notmatch
+            "m4probe canonical 4->5: sample=canonical-key-hash") {
+        throw "key-hash M4/fan calibration output failed its C=5 gate"
+    }
+
     $gold = Join-Path $work "gold.csv"
     $layer3 = Join-Path $work "clean.L3.snap"
     Invoke-Layer "C=5 full 355-class gate" `

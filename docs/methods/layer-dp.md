@@ -130,6 +130,24 @@ The gate covers:
 
 This gate is also called by `scripts/verify_all.ps1`.
 
+## Uniform bounded calibration
+
+The historical `--probe 3 ... --fan-sample ...` path samples four-row states
+captured from a small set of three-row parents.  It is useful for local work
+but is not a uniform sample of the global four-row orbit layer.
+
+For the production calibration, `--m4-parent-seed S` selects layer-3 parents
+by the smallest independently mixed canonical-key hashes.  When combined
+with a high-capture `--m4probe`, `--fan-sample N` then selects four-row keys
+uniformly from the captured canonical hash window.  Optional
+`--fan-canon-sample N CAP` runs the real canonicalizing 4-to-5 kernel on an
+independent uniform key sample and reports time, emissions, distinct children,
+holes, cache hits, calls, and search nodes.
+
+The fan estimate represents the global layer only when the M4 window is near
+saturation.  The engine prints this limitation and never upgrades a killed
+prefix to a result.
+
 ## C=6 boundary
 
 The engine refuses plain `layer_dp_gate 6`.  Read-only bridge inspection and

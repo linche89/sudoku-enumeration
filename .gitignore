@@ -13,6 +13,7 @@ Thumbs.db
 # generated research artifacts
 data/checkpoints/*.bin
 data/checkpoints/*.chk
+data/checkpoints/*.snap
 data/checkpoints/*.tmp
 data/logs/**
 
