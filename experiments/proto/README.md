@@ -1,13 +1,19 @@
-# Prototype Archive
+# Prototype and Decision Engines
 
-This directory keeps research prototypes and differential tests that still have audit value.
-
-These files are not part of the normal build. They are retained because the
-legacy handoff and source comments cite them as evidence for rejected
-shortcuts, profiling results, or validation of helper identities.
+This directory keeps research prototypes and differential tests that still
+have audit value.  Most are outside the normal build.  The layer-DP candidate
+is the exception: the full repository verification builds and gates it through
+its dedicated scripts, while its source remains here until the C=6 preflight
+is complete.
 
 Highlights:
 
+- `layer_dp_gate.cpp` - the active global row-incremental C=6 candidate.
+  It is exact through C=5 and has a gated, fail-stop checkpoint/restart path,
+  but no full C=6 layer-4 or final count has been run.  Build and verify it
+  only through `../../scripts/build_layer_dp.ps1` and
+  `../../scripts/verify_layer_dp.ps1`; see
+  `../../docs/methods/layer-dp.md`.
 - `source_target_frontier_bound.cpp` - a fast arithmetic certificate for the
   fixed-source target-frontier lower bound.  It derives a reachable C=6
   grade-2 witness, proves its stabilizer is trivial, cross-checks two permanent

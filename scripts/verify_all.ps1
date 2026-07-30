@@ -16,11 +16,29 @@ function Invoke-Checked {
     if ($LASTEXITCODE -ne 0) { throw "$Label failed" }
 }
 
+function Get-Sha256 {
+    param([string]$Path)
+    $stream = [IO.File]::OpenRead($Path)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString(
+            $sha.ComputeHash($stream))).Replace("-", "")
+    }
+    finally {
+        $sha.Dispose()
+        $stream.Dispose()
+    }
+}
+
 & "$PSScriptRoot/build_all.ps1"
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 
 & "$PSScriptRoot/verify_og2.ps1" -CanonTests $CanonTests -HistTests $HistTests
 if ($LASTEXITCODE -ne 0) { throw "OG-2 short gate failed" }
+
+$layerThreads = [Math]::Max(2, [Math]::Min($Threads, 8))
+& "$PSScriptRoot/verify_layer_dp.ps1" -Threads $layerThreads -KillIterations 2
+if ($LASTEXITCODE -ne 0) { throw "layer-DP checkpoint gate failed" }
 
 foreach ($c in 2,3,4,5) {
     Invoke-Checked "factorization C=$c" {
@@ -47,7 +65,7 @@ Invoke-Checked "FJ9 independent combinatorial route" {
 $checkpoint = "data\checkpoints\factorization_orbit_c6_graphmemo.bin"
 if (Test-Path -LiteralPath $checkpoint) {
     $expectedHash = "FE8B68DE6C15592848D7CF69BF43928C000F0B2EE59FC263A094BCA2D376A865"
-    $before = (Get-FileHash -Algorithm SHA256 -LiteralPath $checkpoint).Hash
+    $before = Get-Sha256 $checkpoint
     if ($before -ne $expectedHash) {
         throw "C=6 checkpoint hash does not match data/checkpoints/MANIFEST.md"
     }
@@ -56,7 +74,7 @@ if (Test-Path -LiteralPath $checkpoint) {
             canoncachecap=300000 pivotinner parallelparents rooted4 parentchunk=128 `
             "checkpoint=$checkpoint" checkpointreadonly
     }
-    $after = (Get-FileHash -Algorithm SHA256 -LiteralPath $checkpoint).Hash
+    $after = Get-Sha256 $checkpoint
     if ($after -ne $before) { throw "read-only C=6 gate modified the checkpoint" }
 } else {
     Write-Warning "C=6 checkpoint not present; skipped optional reload gate"

@@ -23,5 +23,8 @@
 - `band.hpp`, `count.hpp`, `reduce.hpp` — FJ9 reproduction.
 - `mpq_sigkey.hpp` — fixed-buffer signature key used by `multiset_q.cpp`.
 
-Superseded prototypes and diagnostic kernels live in `experiments/legacy/`.
-They are not built by the standard scripts.
+Superseded code lives in `experiments/legacy/`; bounded decision engines and
+pre-promotion candidates live in `experiments/proto/`.  The layer-DP candidate
+there has its own build/gate scripts and is called by the full repository
+verification, but it remains outside `src/` until its C=6 preflight is
+complete.

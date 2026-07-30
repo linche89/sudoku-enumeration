@@ -36,6 +36,68 @@ histogram differential tests.
 
 Expected values are listed in `../../STATUS.md`. Any mismatch is a hard stop.
 
+## Global layer-DP candidate
+
+The row-incremental candidate is outside `src/`, but its exactness and
+checkpoint recovery are part of the repository gate:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\build_layer_dp.ps1
+
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\verify_layer_dp.ps1 -Threads 8 -KillIterations 2
+```
+
+The build script deliberately omits `-march=native`; do not copy the obsolete
+raw-expert build line.  The verification script covers C=2..5 totals, all 355
+C=5 class triples, canonical invariance/separation/histogram differentials,
+snapshot round trips, exact external summation, narrow and forced-wide
+kill/resume, corrupt-generation fallback, fail-stop I/O, the G1/G2 bridge,
+and refusal of an unbounded C=6 invocation.
+
+Checkpointed experiments must use a new base:
+
+```powershell
+.\build\layer_dp_gate.exe 5 --threads 8 `
+  --caps 200,20000,20000,600 `
+  --load-layer 3 PATH_TO_LAYER3.snap `
+  --checkpoint NEW_BASE 0 --ckpt-chunk 500
+```
+
+Resume with the same arithmetic/canonicalization mode, chunk size, capacities
+large enough for the stored child, and the same base:
+
+```powershell
+.\build\layer_dp_gate.exe 5 --threads 8 `
+  --caps 200,20000,20000,600 `
+  --checkpoint NEW_BASE 0 --ckpt-chunk 500 `
+  --resume NEW_BASE
+```
+
+Do not delete either generation or its `.Lk.snap` parent.  A completed
+checkpoint may be hard-linked to the snapshot, so identical file identities
+are intentional.  A new run refuses a base that already contains files;
+choose a fresh stage base rather than clearing one casually.
+
+For C=6, only the following are routine:
+
+```powershell
+.\build\layer_dp_gate.exe 6 --bridge-only
+.\build\layer_dp_gate.exe 6 --stop-after 2 --threads 8 `
+  --caps 2000,14000000,1,1,1
+```
+
+Any larger bounded probe needs `scripts/watch_rss.ps1` with explicit time and
+memory limits.  `--ack-full-c6` is an accidental-launch interlock, not owner
+authorization.  Before a large stage, follow the writable-C=6 policy below
+and the remaining preflight list in `../methods/layer-dp.md`.  In particular,
+budget restart's transient checkpoint image as well as steady-state parent
+and child tables.
+
+See `../methods/layer-dp.md` and
+`../reports/og2/layer-dp-checkpoint-gate-20260730.md`.
+
 ## F4-lookup coverage diagnostic
 
 The exact two-level split is part of the short C=4 gate.  It may also be run

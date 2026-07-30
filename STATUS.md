@@ -389,8 +389,9 @@ impossible.
 | rejected implementation | fixed-source target-distinguishing column frontier | A reachable trivial-stabilizer C=6 source forces every fixed `3+3` split to width at least 42,191,464 and has 5,489,549,616 terminal targets; signed permanent reorderings with the same output semantics do not compress it |
 | rejected as primary | one-copy-orbit PSD/Kraus factorization | The identity is exact, but the factor is the already full C=4/C=5 history-to-boundary map; invariant matrices live in the orbital centralizer, not the one-point orbit basis |
 | rejected implementation | full coherent-configuration/orbital materialization | The 38,226 pairs of trivial-stabilizer two-row orbits alone expose 1,761,454,080 relative-placement coordinates; Fourier blocks change basis but do not remove them |
-| open high-upside route | target-only cross-source band transform | Compute the actual orbit vector `y=Kbar*x` while aggregating sources before any source-target pair is represented; no exact circuit or bounded C=5 implementation is known |
-| open high-upside route | common downstream response subspace/global incidence contraction | A specific small response span could still avoid full regular-block or four-row incidence semantics; it has not been constructed or lower-bounded |
+| qualified implementation candidate | global row-incremental layer DP | Aggregates all histories at each canonical row layer; exact through every C=5 class, bounded C=6 scale probes complete, and checkpoint/restart passes repeated kill/corruption gates; full C=6 remains unrun |
+| closed as primary compression target | target-only cross-source band transform | Completion-operator rank defect is exactly 2 at C=4 and C=5, so the measured target-side reduction is only O(1); global aggregation is instead supplied by the layer DP |
+| open optional research, not a production prerequisite | common downstream response subspace/global incidence contraction | A coarser response span is not ruled out, but none is constructed; the retained layer DP no longer depends on finding one |
 
 Several implementation variants are retired rather than separate mathematical
 routes: fixed future-twin row orders, recursive row-adaptive memoization,
@@ -400,16 +401,16 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-Updated 2026-07-27.  A global C=6 route has now passed its scale gates: the
-row-incremental layer DP (`experiments/proto/layer_dp_gate.cpp`) reproduces
-complete C=2..5 exactly (all 355 C=5 triples against `factorization_orbit`,
-every invariance/full-group differential green, C=5 full gate ~4 s on 8
-threads) and has completed bounded C=6 stages: the exact three-row layer
-M_3 = 12,324,872 (with the known 772 / 20,338,525 / 2,605,194,602 values
-reproduced in-run), a measured 3->4 volume of 2.136e12, and a calibrated
-hash-window measurement M_4 = 9.0e8, 95% [8.87e8, 9.20e8] — consistent with
-Pettersen's "more than 900 million".  Mathematics, measurements, and the
-2026-07-26 pre-flight audit are in
+Updated 2026-07-30.  The global row-incremental layer DP
+(`experiments/proto/layer_dp_gate.cpp`) is the qualified implementation
+candidate.  It reproduces complete C=2..5 exactly, including all 355 C=5
+triples, and now has explicit canonical invariance, full-group
+orbit/stabilizer, separation, and histogram differentials.  Its bounded C=6
+evidence remains: exact `M_3 = 12,324,872` (with
+772 / 20,338,525 / 2,605,194,602 reproduced in-run), measured 3->4 volume
+2.136e12, and a hash-window estimate `M_4 = 9.0e8`, 95%
+[8.87e8, 9.20e8].  Those measurements qualify a production candidate; they
+are not a completed C=6 layer or count.  Mathematical provenance remains in
 `docs/expert/2026-07-26/layer-dp-permanent-profile.md`.
 
 The two prior theory targets of this section are resolved by measurement:
@@ -420,12 +421,23 @@ entirely at the 3->4 boundary; certified null vectors in
 change the C=6 scale; the bulk-organization question is answered by the
 layer DP itself.
 
-The immediate objective is now operational: the pre-flight program of
-`docs/expert/2026-07-27/c6-runbook.md` (layer-5 anchored canonizer,
-checkpoint/restart with kill-loop validation, 4x M_4 probe, 4->5
-calibration, T1-T10 battery, 1% dress rehearsal), after which the staged
-production run (~4.5e12 emissions, ~59 GB, days-scale on the 32-thread
-box) awaits an explicit owner decision.
+The `(C-1)`-row anchor and checkpoint/restart portion of the preflight is now
+implemented and retained.  Checkpoint format v2 binds images to
+key-affecting modes, verifies exact length and hashes, preserves two atomic
+generations, promotes completed images to hard-linked snapshots, fails closed
+on I/O errors, and has passed 20 random kill/resume cycles plus forced-wide,
+mode-mismatch, stale-base, corrupt-generation, and snapshot-round-trip gates
+at C=5.  The G1/G2 native-key bridge is wired with stabilizers 120 and 8.
+Evidence and safe commands are in `docs/methods/layer-dp.md` and
+`docs/reports/og2/layer-dp-checkpoint-gate-20260730.md`.
+
+The immediate objective is the remaining bounded preflight: strengthen the
+`M_4` capacity measurement, calibrate the uniform 4->5 fan and depth-5
+canonicalization cost, account explicitly for steady-state and transient
+resume RAM/disk, and execute a guarded staged rehearsal with a deliberate
+restart and external summation.  The earlier `~59 GB` figure is not a
+sufficient restart-memory budget because loading a partial child checkpoint
+temporarily coexists with the fixed-capacity child.
 
 No full 63,199-class C=6 run is authorized.  Bounded probes and the
 pre-flight program are within scope.
@@ -440,7 +452,7 @@ gate cannot rewrite it.
 ## Active implementation tracks
 
 - `layer_dp_gate` (experiments/proto): row-incremental layer DP, the
-  qualified C=6 route; runbook in `docs/expert/2026-07-27/c6-runbook.md`.
+  qualified C=6 candidate; audited runbook in `docs/methods/layer-dp.md`.
 - `factorization_orbit`: primary C=2..5 exact factorization/orbit engine and
   the C=5 oracle for the layer DP.
 - `multiset_q`: independent transfer-kernel research and cross-check route.

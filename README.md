@@ -21,7 +21,8 @@ current results and open problems. The full documentation map is
 - `data/golden/` — small tracked verification data.
 - `data/checkpoints/` — ignored binary checkpoints plus a tracked manifest.
 - `data/logs/` — ignored transient output.
-- `experiments/` — archived prototypes and legacy kernels.
+- `experiments/` — decision prototypes, the preflight-stage layer-DP
+  candidate, and legacy kernels.
 - `reference/` — immutable external material and verification fixtures.
 - `build/` — generated binaries; ignored and safe to recreate.
 
@@ -45,8 +46,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify_all.ps1
 ```
 
 The gate rebuilds active binaries, reproduces the full 9x9 value, checks all
-short independent OG-2 engines, runs the factorization C=2..5 exact gates, and
-optionally verifies the C=6 checkpoint read-only when it is present.
+short independent OG-2 engines, runs the factorization C=2..5 exact gates,
+exercises the layer-DP exact/checkpoint recovery gate, and optionally verifies
+the C=6 checkpoint read-only when it is present.
 
 For a faster inner development loop:
 

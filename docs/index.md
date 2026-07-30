@@ -19,6 +19,9 @@
 - `methods/reverse-gluing.md` — reverse row-block gluing, exact orbit
   normalization, complete C=2..5 gates, exact C=6 two-row inventory, and the
   failed scale gate for immediate pairwise canonicalization.
+- `methods/layer-dp.md` — qualified global row-incremental candidate,
+  exact recurrence, canonicalization gates, checkpoint/restart guarantees,
+  C=6 launch boundary, and remaining production preflight.
 - `../fj9/reproduction.md` — complete FJ05 9x9 reproduction.
 
 ## Current mathematics
@@ -30,6 +33,7 @@
 
 ## Dated evidence
 
+- `reports/og2/layer-dp-checkpoint-gate-20260730.md`
 - `reports/og2/source-target-frontier-lower-bound-20260720.md`
 - `reports/og2/band-kernel-rank-20260719.md`
 - `reports/og2/f4-lookup-coverage-20260719.md`

@@ -21,12 +21,13 @@
 //   2026-07-26); C=5 --ref compares all 355 (m, ell, F) triples against
 //   docs/expert/2026-07-21/native_c5_response_quotient_triples.csv.
 //   --invariance N: canonize(g x) == canonize(x) on N random (state, g).
-//   --scan-check N: fast canonical == full-group-scan canonical on N states.
+//   --scan-check N: orbit/stabilizer referee plus a full-group brute
+//                   separation and (T,stab)-histogram differential.
 //   --layer-mass L: sum of orbit sizes over layer L (C=5, L=4: 62,185,328).
 //   --rank: mod-p ranks of completion operators U_L = R_L...R_{C-1}
 //           (target-only contraction probe).
 //
-// Build: g++ -O2 -march=native -std=c++17 -o layer_dp_gate layer_dp_gate.cpp
+// Build: g++ -O2 -std=c++17 -fopenmp -o layer_dp_gate layer_dp_gate.cpp
 // Usage: layer_dp_gate C [--ref file.csv] [--rank] [--invariance N]
 //                        [--scan-check N] [--layer-mass L] [--dump file.csv]
 
@@ -48,6 +49,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <psapi.h>
+#include <io.h>
+#else
+#include <unistd.h>
 #endif
 
 #ifdef _OPENMP
@@ -82,6 +86,21 @@ static u64 state_hash(const State& s) {
 
 static inline int fld(u16 m, int b) { return (m >> (2 * b)) & 3; }
 
+static inline void sort_masks(u16* a, int n) {
+    // Fixed tiny arrays (n <= 12): explicit insertion sort avoids the
+    // libstdc++ 16-element introsort lookahead warning on State::m and is the
+    // same asymptotic hot-path strategy used by std::sort at this size.
+    for (int i = 1; i < n; i++) {
+        const u16 v = a[i];
+        int j = i;
+        while (j > 0 && v < a[j - 1]) {
+            a[j] = a[j - 1];
+            j--;
+        }
+        a[j] = v;
+    }
+}
+
 // ---------------------------------------------------------------- group ----
 struct GElem {
     u8 perm[6];   // new position of box b
@@ -115,7 +134,7 @@ static inline u16 apply_mask(const GElem& g, u16 m) {
 static State apply_state(const GElem& g, const State& s) {
     State r{};
     for (int i = 0; i < N2C; i++) r.m[i] = apply_mask(g, s.m[i]);
-    std::sort(r.m.begin(), r.m.begin() + N2C);
+    sort_masks(r.m.data(), N2C);
     return r;
 }
 
@@ -149,6 +168,17 @@ struct Canonizer {
     bool haveFinal;
     u64 minCount;
     u64 nodes;
+    // (C-1)-row anchor: every symbol misses exactly one box, every box is
+    // missed by exactly 2.  Boxes get G-invariant colors from missing-pair
+    // agreement invariants (L1 + one WL round); the search assigns boxes in
+    // non-decreasing color order only.  Box permutations in any stabilizer
+    // preserve colors, so the restricted assignment set is a union of full
+    // cosets and minCount still equals the stabilizer order.  Flips remain
+    // unrestricted (a flip-forcing anchor is NOT coset-safe for stab
+    // counting; see 2026-07-27 runbook notes).
+    bool anchored;
+    u32 anchorCol[6];
+    u8 missBoxArr[12];
 
     void run(const State& s) {
         for (int b = 0; b < C; b++) {
@@ -167,6 +197,79 @@ struct Canonizer {
         haveFinal = false;
         minCount = 0;
         nodes = 0;
+        // (C-1)-row anchor setup
+        anchored = false;
+        {
+            int L = 0;
+            for (int b = 0; b < C; b++)
+                if (fld(s.m[0], b)) L++;
+            if (L == C - 1) {
+                int mx[6], my[6];
+                bool ok = true;
+                for (int b = 0; b < C; b++) {
+                    u32 t = z0[b];
+                    if (__builtin_popcount(t) != 2) { ok = false; break; }
+                    mx[b] = __builtin_ctz(t);
+                    t &= t - 1;
+                    my[b] = __builtin_ctz(t);
+                }
+                if (ok) {
+                    for (int b = 0; b < C; b++) {
+                        missBoxArr[mx[b]] = (u8)b;
+                        missBoxArr[my[b]] = (u8)b;
+                    }
+                    auto agree = [&](int x, int y, int c) -> u32 {
+                        return (((z2[c][0] >> x) & (z2[c][0] >> y)) |
+                                ((z3[c][0] >> x) & (z3[c][0] >> y))) & 1u;
+                    };
+                    u32 a[6];
+                    for (int b = 0; b < C; b++) {
+                        a[b] = 0;
+                        for (int c = 0; c < C; c++)
+                            if (c != b) a[b] += agree(mx[b], my[b], c);
+                    }
+                    for (int b = 0; b < C; b++) {
+                        u16 e[6];
+                        int ne = 0;
+                        for (int c = 0; c < C; c++)
+                            if (c != b)
+                                e[ne++] = (u16)((a[c] << 2) |
+                                                (agree(mx[b], my[b], c) << 1) |
+                                                agree(mx[c], my[c], b));
+                        sort_masks(e, ne);
+                        u64 h = 0x9e3779b97f4a7c15ULL ^ (u64)a[b];
+                        for (int k = 0; k < ne; k++) {
+                            h ^= e[k];
+                            h *= 0xff51afd7ed558ccdULL;
+                        }
+                        anchorCol[b] = (u32)(h ^ (h >> 32));
+                    }
+                    anchored = true;
+                }
+            }
+        }
+        if (anchored) {
+            // seed mask groups by missing-box color (G-invariant), groups
+            // ordered by ascending color value
+            // 16 slots avoid libstdc++'s 16-element insertion-sort lookahead
+            // warning while N2C itself remains bounded by 12.
+            u32 mcol[16] = {}, cs[16] = {};
+            for (int i = 0; i < N2C; i++) mcol[i] = anchorCol[missBoxArr[i]];
+            std::memcpy(cs, mcol, sizeof(u32) * (size_t)N2C);
+            std::sort(cs, cs + N2C);
+            u32 groups[12];
+            int ng = 0;
+            for (int k = 0; k < N2C;) {
+                u32 c = cs[k];
+                u32 gm = 0;
+                for (int i = 0; i < N2C; i++)
+                    if (mcol[i] == c) gm |= 1u << i;
+                groups[ng++] = gm;
+                while (k < N2C && cs[k] == c) k++;
+            }
+            dfs(0, groups, ng, 0);
+            return;
+        }
         if (!g_wlseed) {
             u32 groups0[12];
             groups0[0] = (1u << N2C) - 1;
@@ -196,7 +299,7 @@ struct Canonizer {
                 ss[i] |= (u8)(1 << b);
             }
         }
-        u32 color[12];
+        u32 color[16] = {};
         {
             u8 prof[12][12];
             for (int i = 0; i < N2C; i++) {
@@ -218,8 +321,8 @@ struct Canonizer {
                 color[i] = (u32)(h ^ (h >> 32));
             }
         }
-        u32 cs[12];
-        std::memcpy(cs, color, sizeof(u32) * 12);
+        u32 cs[16] = {};
+        std::memcpy(cs, color, sizeof(u32) * (size_t)N2C);
         std::sort(cs, cs + N2C);
         u32 groups[12];
         int ng = 0;
@@ -264,8 +367,15 @@ struct Canonizer {
         u8 cand[12];
         int nc = 0;
         u32 minSig = UINT32_MAX;
+        u32 minCol = UINT32_MAX;
+        if (anchored) {
+            for (int b = 0; b < C; b++)
+                if (!((usedBoxes >> b) & 1) && anchorCol[b] < minCol)
+                    minCol = anchorCol[b];
+        }
         for (int b = 0; b < C; b++) {
             if ((usedBoxes >> b) & 1) continue;
+            if (anchored && anchorCol[b] != minCol) continue;
             for (int f = 0; f < 2; f++) {
                 u32 s = sig_of(b, f, groups, ng);
                 if (s < minSig) {
@@ -306,8 +416,15 @@ struct Canonizer {
             if (nc > 1 && depth + 1 < C) {
                 u32 m = UINT32_MAX;
                 u32 ub = usedBoxes | (1u << b);
+                u32 mc2 = UINT32_MAX;
+                if (anchored) {
+                    for (int b2 = 0; b2 < C; b2++)
+                        if (!((ub >> b2) & 1) && anchorCol[b2] < mc2)
+                            mc2 = anchorCol[b2];
+                }
                 for (int b2 = 0; b2 < C; b2++) {
                     if ((ub >> b2) & 1) continue;
+                    if (anchored && anchorCol[b2] != mc2) continue;
                     for (int f2 = 0; f2 < 2; f2++) {
                         u32 s = sig_of(b2, f2, ngroups[k], w);
                         if (s < m) m = s;
@@ -374,6 +491,83 @@ static bool orbit_member_scan(const State& s, const State& key) {
     for (const GElem& g : GROUP)
         if (apply_state(g, s) == key) return true;
     return false;
+}
+
+static bool state_less(const State& a, const State& b) {
+    return std::lexicographical_compare(
+        a.m.begin(), a.m.begin() + N2C,
+        b.m.begin(), b.m.begin() + N2C);
+}
+
+// Definition-independent brute representative used only by --scan-check.
+// The production canonical form is intentionally not required to equal this
+// lexicographic representative; it must induce exactly the same orbit
+// partition.
+static State canon_scan(const State& s) {
+    State best{};
+    bool have = false;
+    for (const GElem& g : GROUP) {
+        State t = apply_state(g, s);
+        if (!have || state_less(t, best)) {
+            best = t;
+            have = true;
+        }
+    }
+    return best;
+}
+
+// Exact bridge from the factorization_orbit C=6 graph convention to this
+// engine's complete native state.  side0[b] is the 12-bit symbol set in the
+// first slot of box b; its complement occupies the second slot.
+static State complete_state_from_side0(
+    const std::array<u16, 6>& side0) {
+    State s{};
+    for (int b = 0; b < C; b++) {
+        if (__builtin_popcount((u32)side0[b]) != C) {
+            std::fprintf(stderr, "FATAL: malformed known-class side mask\n");
+            std::abort();
+        }
+    }
+    for (int sym = 0; sym < N2C; sym++) {
+        u16 mask = 0;
+        for (int b = 0; b < C; b++) {
+            const int side = ((side0[b] >> sym) & 1u) ? 0 : 1;
+            mask |= (u16)((2u | (u32)side) << (2 * b));
+        }
+        s.m[sym] = mask;
+    }
+    sort_masks(s.m.data(), N2C);
+    return canonize(s);
+}
+
+static std::pair<State, State> known_c6_keys() {
+    if (C != 6) {
+        std::fprintf(stderr, "FATAL: C=6 known-class bridge used at C=%d\n", C);
+        std::abort();
+    }
+    // Transposes of the audited factorization_orbit G1/G2 adjacency rows.
+    const std::array<u16, 6> g1 = {
+        0x95A, 0x4F2, 0x56C, 0x9B4, 0xE38, 0xFC0,
+    };
+    const std::array<u16, 6> g2 = {
+        0x8EA, 0x572, 0x95C, 0xDA4, 0xE38, 0xFC0,
+    };
+    State k1 = complete_state_from_side0(g1);
+    State k2 = complete_state_from_side0(g2);
+    if (k1 == k2) {
+        std::fprintf(stderr, "FATAL: C=6 G1/G2 bridge keys collapsed\n");
+        std::abort();
+    }
+    return {k1, k2};
+}
+
+static void print_complete_words(const State& s) {
+    for (int i = 0; i < N2C; i++) {
+        u32 w = 0;
+        for (int b = 0; b < C; b++)
+            if (fld(s.m[i], b) == 3) w |= 1u << b;
+        std::printf("%s%u", i ? " " : "", w);
+    }
 }
 
 // ------------------------------------------------------------- hash map ----
@@ -558,7 +752,7 @@ struct EmitCtx {
         if (countOnly) return;
         u16 tmp[12];
         std::memcpy(tmp, childbuf, sizeof(u16) * 12);
-        std::sort(tmp, tmp + N2C);
+        sort_masks(tmp, N2C);
         State ch{};
         std::memcpy(ch.m.data(), tmp, sizeof(u16) * 12);
         if (m4window) {  // hash-window distinct sampling with hit counts
@@ -733,11 +927,480 @@ static size_t peak_rss_bytes() {
     return 0;
 }
 
+// ----------------------------------------------------- checkpoint/restart ---
+// Verbatim Layer serialize/deserialize + chunked transition checkpoints
+// (plan of 2026-07-27; design: docs/expert/2026-07-27/checkpoint-restart-spec.md).
+// Images are VERBATIM: keys/T/stab[0..n) including holes, so entry ORDER --
+// and therefore parent chunk indices -- survives a round trip exactly.  The
+// hash table is never dumped; it is rebuilt on load (holes skipped).  Files
+// are written tmp -> fflush -> fsync -> atomic-rename-replace, guarded by
+// magic + version + streamed 64-bit checksums (header and payload).
+
+static const u64 CK_MAGIC = 0x314B434C4A464453ULL;  // "SDFJLCK1"
+static const u32 CK_VERSION = 2;
+static const u64 CK_SEED = 0x5344464A434B3031ULL;
+// Bump whenever State, canonical-key semantics, or transition arithmetic
+// changes incompatibly.  CK_VERSION covers the byte format; this tag covers
+// the mathematical meaning of a stored key/value pair.
+static const u64 CK_ALGO_TAG = 0x4C445043414E3031ULL;  // "LDPCAN01"
+
+static u64 ck_hash64(const void* p, size_t n, u64 seed) {
+    const u8* b = (const u8*)p;
+    u64 h = seed ^ (0x9e3779b97f4a7c15ULL + n);
+    size_t i = 0;
+    for (; i + 8 <= n; i += 8) {
+        u64 w;
+        std::memcpy(&w, b + i, 8);
+        h ^= w;
+        h *= 0xff51afd7ed558ccdULL;
+        h ^= h >> 33;
+    }
+    u64 t = 0;
+    for (size_t k = 0; i < n; i++, k += 8) t |= (u64)b[i] << k;
+    h ^= t;
+    h *= 0xc4ceb9fe1a85ec53ULL;
+    h ^= h >> 33;
+    return h;
+}
+
+struct CkptHeader {           // 128 bytes, naturally packed, little-endian
+    u64 magic;
+    u32 version, cVal;
+    u32 layerIdx;             // layer stored in this file
+    u32 parentLayer;          // transition parent L (0 = plain layer snapshot)
+    u64 configHash;           // algorithm tag + key-affecting runtime modes
+    u64 gen;                  // monotone generation (drives .a/.b alternation)
+    u64 nEntries, holes;      // verbatim entry count INCLUDING holes
+    u64 cursorChunk, nChunks, chunkParents;
+    u64 emissionsSoFar, cacheHitsSoFar;
+    u64 parentKeysHash;       // ck_hash64 over parent keys bytes (0 if none)
+    u64 nWide;                // trailing u128 entries (wide final transition)
+    u64 payloadHash;          // chained ck_hash64 over keys||T||stab||wide
+    u64 headerHash;           // ck_hash64 over header with this field zeroed
+};
+static_assert(sizeof(CkptHeader) == 128, "CkptHeader must be padding-free");
+
+struct CkptImage {
+    CkptHeader h{};
+    std::vector<State> keys;
+    std::vector<u64> T;
+    std::vector<u32> stab;
+    std::vector<u128> wide;
+};
+
+// ---- checkpoint/restart run configuration (set from CLI in main) ----
+static std::string g_ckptBase;          // --checkpoint base path ("" = off)
+static double g_ckptPeriodMin = 0.0;    // <= 0: dump at every chunk barrier
+static u64 g_ckptChunk = 100000;        // parents per chunk (quiesce grain)
+static u64 g_ckptGen = 0;
+static bool g_forceWide = false;        // --force-wide (wide-path test at C<6)
+static int g_loadLayerIdx = 0;
+static std::string g_loadLayerPath;
+static std::string g_resumeBase;
+static std::vector<std::pair<int, std::string>> g_saveLayers;
+static bool g_resumePending = false;    // a --resume image awaits its transition
+static CkptHeader g_resumeHdr{};
+static CkptImage g_resumeCk;
+static std::string g_lastCkptPath;      // newest fully written generation
+
+static bool ck_path_exists(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    return f.good();
+}
+
+static u64 ck_config_hash() {
+    const u64 words[] = {
+        CK_ALGO_TAG,
+        (u64)C,
+        (u64)N2C,
+        (u64)sizeof(State),
+        g_wlseed ? 1ULL : 0ULL,
+        g_forceWide ? 1ULL : 0ULL,
+    };
+    return ck_hash64(words, sizeof(words), CK_SEED);
+}
+
+static bool ck_header_sane(const CkptHeader& h, u64* expectedBytes = nullptr) {
+    if (h.magic != CK_MAGIC || h.version != CK_VERSION ||
+        h.cVal != (u32)C || h.configHash != ck_config_hash())
+        return false;
+    if (h.layerIdx < 1 || h.layerIdx > (u32)C ||
+        h.parentLayer >= (u32)C)
+        return false;
+    if (h.parentLayer && h.layerIdx != h.parentLayer + 1)
+        return false;
+    if (h.nEntries >= (u64)UINT32_MAX - 64 || h.holes > h.nEntries ||
+        h.nWide > h.nEntries)
+        return false;
+    if (h.parentLayer) {
+        if (!h.chunkParents || !h.nChunks || h.cursorChunk > h.nChunks)
+            return false;
+    } else if (h.cursorChunk || h.nChunks || h.chunkParents ||
+               h.parentKeysHash) {
+        return false;
+    }
+    const u64 perEntry =
+        (u64)sizeof(State) + (u64)sizeof(u64) + (u64)sizeof(u32);
+    const u64 bytes = (u64)sizeof(CkptHeader) +
+                      h.nEntries * perEntry + h.nWide * (u64)sizeof(u128);
+    if (expectedBytes) *expectedBytes = bytes;
+    return true;
+}
+
+// NOTE (2026-07-27 apply): the checkpoint file functions are noinline AND
+// compiled without AVX.  GCC 13.2 mingw at -O2 -march=native (znver4)
+// expands 120-byte CkptHeader block copies/zeroing with ALIGNED 32/64-byte
+// vmovdqa(64) stores into stack slots, but mingw-SEH frames are never
+// dynamically realigned beyond the ABI's 16 bytes (GCC PR99234 class), and
+// Windows randomizes the initial rsp, so the stores fault intermittently
+// (SIGSEGV; confirmed by disassembly at three distinct sites: inlined into
+// main, standalone ckpt_write_pair zmm, and layer_save_file ymm; the -O0
+// build is correct, so this is a compiler codegen bug, not a logic bug).
+// no-avx forces struct copies down to 16-byte ops, the only width whose
+// stack alignment mingw-SEH actually guarantees.  These functions are
+// I/O-bound; the ISA restriction costs nothing.
+#if defined(__GNUC__) && defined(__x86_64__)
+#define CK_NOINLINE __attribute__((noinline, target("no-avx")))
+#elif defined(__GNUC__)
+#define CK_NOINLINE __attribute__((noinline))
+#else
+#define CK_NOINLINE
+#endif
+
+CK_NOINLINE
+static bool ck_write_file(const std::string& path, CkptHeader h,
+                          const State* keys, const u64* T, const u32* stab,
+                          const u128* wide) {
+    h.magic = CK_MAGIC;
+    h.version = CK_VERSION;
+    h.cVal = (u32)C;
+    h.configHash = ck_config_hash();
+    u64 ph = CK_SEED;
+    ph = ck_hash64(keys, (size_t)h.nEntries * sizeof(State), ph);
+    ph = ck_hash64(T, (size_t)h.nEntries * sizeof(u64), ph);
+    ph = ck_hash64(stab, (size_t)h.nEntries * sizeof(u32), ph);
+    if (h.nWide) ph = ck_hash64(wide, (size_t)h.nWide * sizeof(u128), ph);
+    h.payloadHash = ph;
+    h.headerHash = 0;
+    h.headerHash = ck_hash64(&h, sizeof(h), CK_SEED);
+    std::string tmp = path + ".tmp";
+    FILE* f = std::fopen(tmp.c_str(), "wb");
+    if (!f) { std::perror(tmp.c_str()); return false; }
+    bool ok = std::fwrite(&h, sizeof(h), 1, f) == 1;
+    if (ok && h.nEntries) {
+        ok = ok && std::fwrite(keys, sizeof(State), (size_t)h.nEntries, f) ==
+                       (size_t)h.nEntries;
+        ok = ok && std::fwrite(T, sizeof(u64), (size_t)h.nEntries, f) ==
+                       (size_t)h.nEntries;
+        ok = ok && std::fwrite(stab, sizeof(u32), (size_t)h.nEntries, f) ==
+                       (size_t)h.nEntries;
+    }
+    if (ok && h.nWide)
+        ok = ok && std::fwrite(wide, sizeof(u128), (size_t)h.nWide, f) ==
+                       (size_t)h.nWide;
+    ok = ok && std::fflush(f) == 0;
+#ifdef _WIN32
+    ok = ok && _commit(_fileno(f)) == 0;
+#else
+    ok = ok && fsync(fileno(f)) == 0;
+#endif
+    std::fclose(f);
+    if (!ok) { std::remove(tmp.c_str()); return false; }
+#ifdef _WIN32
+    if (!MoveFileExA(tmp.c_str(), path.c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        std::fprintf(stderr, "ckpt rename failed: %s\n", path.c_str());
+        return false;
+    }
+#else
+    if (std::rename(tmp.c_str(), path.c_str()) != 0) {
+        std::perror(path.c_str());
+        return false;
+    }
+#endif
+    return true;
+}
+
+CK_NOINLINE
+static bool ck_read_header(const std::string& path, CkptHeader& h) {
+    FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return false;
+    bool ok = std::fread(&h, sizeof(h), 1, f) == 1;
+    std::fclose(f);
+    if (!ok) return false;
+    u64 want = h.headerHash;
+    h.headerHash = 0;
+    if (ck_hash64(&h, sizeof(h), CK_SEED) != want)
+        return false;
+    h.headerHash = want;
+    return ck_header_sane(h);
+}
+
+CK_NOINLINE
+static bool ck_read_file(const std::string& path, CkptImage& im) {
+    CkptHeader h;
+    if (!ck_read_header(path, h)) return false;
+    FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return false;
+    u64 expectedBytes = 0;
+    if (!ck_header_sane(h, &expectedBytes)) {
+        std::fclose(f);
+        return false;
+    }
+#ifdef _WIN32
+    bool ok = _fseeki64(f, 0, SEEK_END) == 0;
+    const __int64 endPos = ok ? _ftelli64(f) : -1;
+    ok = ok && endPos >= 0 && (u64)endPos == expectedBytes &&
+         _fseeki64(f, (__int64)sizeof(CkptHeader), SEEK_SET) == 0;
+#else
+    bool ok = fseeko(f, 0, SEEK_END) == 0;
+    const off_t endPos = ok ? ftello(f) : (off_t)-1;
+    ok = ok && endPos >= 0 && (u64)endPos == expectedBytes &&
+         fseeko(f, (off_t)sizeof(CkptHeader), SEEK_SET) == 0;
+#endif
+    if (!ok) {
+        std::fclose(f);
+        return false;
+    }
+    im.keys.resize((size_t)h.nEntries);
+    im.T.resize((size_t)h.nEntries);
+    im.stab.resize((size_t)h.nEntries);
+    im.wide.resize((size_t)h.nWide);
+    if (ok && h.nEntries) {
+        ok = ok && std::fread(im.keys.data(), sizeof(State),
+                              (size_t)h.nEntries, f) == (size_t)h.nEntries;
+        ok = ok && std::fread(im.T.data(), sizeof(u64), (size_t)h.nEntries,
+                              f) == (size_t)h.nEntries;
+        ok = ok && std::fread(im.stab.data(), sizeof(u32), (size_t)h.nEntries,
+                              f) == (size_t)h.nEntries;
+    }
+    if (ok && h.nWide)
+        ok = ok && std::fread(im.wide.data(), sizeof(u128), (size_t)h.nWide,
+                              f) == (size_t)h.nWide;
+    std::fclose(f);
+    if (!ok) return false;
+    u64 ph = CK_SEED;
+    ph = ck_hash64(im.keys.data(), (size_t)h.nEntries * sizeof(State), ph);
+    ph = ck_hash64(im.T.data(), (size_t)h.nEntries * sizeof(u64), ph);
+    ph = ck_hash64(im.stab.data(), (size_t)h.nEntries * sizeof(u32), ph);
+    if (h.nWide)
+        ph = ck_hash64(im.wide.data(), (size_t)h.nWide * sizeof(u128), ph);
+    if (ph != h.payloadHash) return false;
+    im.h = h;
+    return true;
+}
+
+// install a verbatim image into a Layer, preserving entry order exactly.
+// fixedCap != 0: fixed mode with that capacity (all loaded PARENTS use
+// fixedCap == nEntries; a resumed threaded CHILD uses caps[L-1]).
+// fixedCap == 0: dynamic single-thread child (requires holes == 0, since
+// is_hole() only recognizes holes in fixed mode).
+CK_NOINLINE
+static bool layer_install(Layer& lay, CkptImage& im, size_t fixedCap) {
+    size_t n = im.keys.size();
+    if (fixedCap) {
+        if (n > fixedCap) {
+            std::fprintf(stderr, "FATAL: layer image (%zu entries) exceeds "
+                                 "cap %zu\n", n, fixedCap);
+            return false;
+        }
+        if (n == fixedCap) {
+            // Finalized parent snapshots are installed at their exact size.
+            // Move their payload vectors so a large layer-4 resume does not
+            // transiently hold a second 36-byte-per-entry copy.
+            lay.keys = std::move(im.keys);
+            lay.T = std::move(im.T);
+            lay.stab = std::move(im.stab);
+            size_t sz = 64;
+            while (sz < fixedCap * 2) sz <<= 1;
+            lay.table.assign(sz, 0);
+            lay.mask = sz - 1;
+            lay.fixedCap = true;
+            lay.claimed = lay.holes = 0;
+        } else {
+            lay.init_fixed(fixedCap);
+            std::copy(im.keys.begin(), im.keys.end(), lay.keys.begin());
+            std::copy(im.T.begin(), im.T.end(), lay.T.begin());
+            std::copy(im.stab.begin(), im.stab.end(), lay.stab.begin());
+        }
+        lay.claimed = (u32)n;
+        lay.holes = (u32)im.h.holes;
+    } else {
+        if (im.h.holes != 0) {
+            std::fprintf(stderr, "FATAL: image has holes; loading it needs "
+                                 "--threads > 1 with --caps (fixed mode)\n");
+            return false;
+        }
+        lay.keys = std::move(im.keys);
+        lay.T = std::move(im.T);
+        lay.stab = std::move(im.stab);
+        size_t sz = 64;
+        while (sz < n * 2 + 16) sz <<= 1;
+        lay.table.assign(sz, 0);
+        lay.mask = sz - 1;
+        lay.fixedCap = false;
+        lay.claimed = 0;
+        lay.holes = 0;
+    }
+    for (u32 i = 0; i < (u32)n; i++) {   // rebuild table; skip holes (stab==0)
+        if (lay.stab[i] == 0) continue;
+        u64 h = state_hash(lay.keys[i]) & lay.mask;
+        while (lay.table[h]) h = (h + 1) & lay.mask;
+        lay.table[h] = i + 1;
+    }
+    return true;
+}
+
+CK_NOINLINE
+static bool layer_save_file(const std::string& path, const Layer& lay,
+                            int layerIdx, const std::vector<u128>* wide) {
+    CkptHeader h{};
+    h.layerIdx = (u32)layerIdx;
+    h.parentLayer = 0;
+    h.nEntries = lay.size();
+    h.holes = lay.holes;
+    size_t nw = wide ? std::min(wide->size(), (size_t)h.nEntries) : 0;
+    h.nWide = (u64)nw;
+    bool ok = ck_write_file(path, h, lay.keys.data(), lay.T.data(),
+                            lay.stab.data(), nw ? wide->data() : nullptr);
+    if (ok)
+        std::printf("saved layer %d (%llu entries, %u holes%s) -> %s\n",
+                    layerIdx, (unsigned long long)h.nEntries, lay.holes,
+                    nw ? ", wide" : "", path.c_str());
+    else
+        std::fprintf(stderr, "WARNING: failed to save layer %d to %s\n",
+                     layerIdx, path.c_str());
+    return ok;
+}
+
+// A finalized transition checkpoint already contains a complete, durable
+// layer image.  Preserve it as the next transition's immutable parent
+// snapshot with an atomic hard link instead of writing the 30+ GiB payload a
+// second time.  Replacing base.a/base.b later does not change the linked inode.
+CK_NOINLINE
+static bool ck_snapshot_link(const std::string& source,
+                             const std::string& snapshot) {
+    const std::string tmp = snapshot + ".tmp.link";
+    std::remove(tmp.c_str());
+#ifdef _WIN32
+    if (!CreateHardLinkA(tmp.c_str(), source.c_str(), nullptr))
+        return false;
+    if (!MoveFileExA(tmp.c_str(), snapshot.c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        std::remove(tmp.c_str());
+        return false;
+    }
+#else
+    if (link(source.c_str(), tmp.c_str()) != 0)
+        return false;
+    if (std::rename(tmp.c_str(), snapshot.c_str()) != 0) {
+        std::remove(tmp.c_str());
+        return false;
+    }
+#endif
+    std::printf("linked finalized checkpoint %s -> %s\n",
+                source.c_str(), snapshot.c_str());
+    return true;
+}
+
+CK_NOINLINE
+static bool ckpt_write_pair(int L, const Layer& parent, const Layer& child,
+                            const std::vector<u128>* wide, u64 cursorChunk,
+                            u64 nChunks, u64 chunkParents, u64 em, u64 hits) {
+    double td0 = now_s();
+    CkptHeader h{};
+    h.layerIdx = (u32)(L + 1);
+    h.parentLayer = (u32)L;
+    h.gen = ++g_ckptGen;
+    h.nEntries = child.size();
+    h.holes = child.holes;
+    h.cursorChunk = cursorChunk;
+    h.nChunks = nChunks;
+    h.chunkParents = chunkParents;
+    h.emissionsSoFar = em;
+    h.cacheHitsSoFar = hits;
+    h.parentKeysHash = ck_hash64(parent.keys.data(),
+                                 parent.size() * sizeof(State), CK_SEED);
+    size_t nw = wide ? std::min(wide->size(), (size_t)h.nEntries) : 0;
+    h.nWide = (u64)nw;
+    std::string path = g_ckptBase + ((h.gen & 1) ? ".a" : ".b");
+    bool ok = ck_write_file(path, h, child.keys.data(), child.T.data(),
+                            child.stab.data(), nw ? wide->data() : nullptr);
+    if (!ok)
+        std::fprintf(stderr, "WARNING: checkpoint write failed (%s); "
+                             "stopping with the previous generation intact\n",
+                     path.c_str());
+    else
+        std::printf("checkpoint gen=%llu trans=%d->%d chunk=%llu/%llu "
+                    "entries=%llu -> %s (%.2fs)\n", (unsigned long long)h.gen,
+                    L, L + 1, (unsigned long long)cursorChunk,
+                    (unsigned long long)nChunks,
+                    (unsigned long long)h.nEntries, path.c_str(),
+                     now_s() - td0);
+    if (ok) g_lastCkptPath = path;
+    std::fflush(stdout);
+    return ok;
+}
+
+CK_NOINLINE
+static bool ckpt_load_newest(const std::string& base, CkptImage& im) {
+    std::string pa = base + ".a", pb = base + ".b";
+    CkptHeader ha, hb;
+    bool va = ck_read_header(pa, ha);
+    bool vb = ck_read_header(pb, hb);
+    const std::string* first = nullptr;
+    const std::string* second = nullptr;
+    if (va && vb) {
+        first = (ha.gen >= hb.gen) ? &pa : &pb;
+        second = (ha.gen >= hb.gen) ? &pb : &pa;
+    } else if (va) {
+        first = &pa;
+    } else if (vb) {
+        first = &pb;
+    }
+    if (first && ck_read_file(*first, im)) {
+        g_lastCkptPath = *first;
+        return true;   // newest valid gen
+    }
+    if (second && ck_read_file(*second, im)) {
+        g_lastCkptPath = *second;
+        return true;   // torn-dump fallback
+    }
+    return false;
+}
+
+CK_NOINLINE
+static bool ckpt_install_child(Layer& child, std::vector<u128>& wideOut,
+                               CkptImage& im, size_t fixedCap) {
+    // NOTE: order matters -- read im.wide before layer_install may move from
+    // the other members (it never touches im.wide).
+    if (!layer_install(child, im, fixedCap)) return false;
+    wideOut.assign(im.wide.begin(), im.wide.end());
+    return true;
+}
+
+// release a CkptImage without materializing a CkptImage temporary in the
+// caller's frame (see the CK_NOINLINE compiler-bug note above).
+CK_NOINLINE
+static void ckpt_release(CkptImage& im) {
+    CkptImage tmp;
+    std::swap(tmp.h, im.h);
+    im.keys = std::vector<State>();
+    im.T = std::vector<u64>();
+    im.stab = std::vector<u32>();
+    im.wide = std::vector<u128>();
+}
+
 // ------------------------------------------------------------------ main ---
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr, "usage: %s C [--ref f] [--rank] [--invariance N] "
-                             "[--scan-check N] [--layer-mass L] [--dump f]\n",
+                             "[--scan-check N] [--layer-mass L] [--dump f]\n"
+                             "  ckpt: [--save-layer L file] [--load-layer L "
+                             "file] [--checkpoint base period-min]\n"
+                             "        [--ckpt-chunk P] [--resume base] "
+                             "[--force-wide]\n"
+                             "  C6 safety: [--bridge-only] [--ack-full-c6]\n",
                      argv[0]);
         return 2;
     }
@@ -760,6 +1423,8 @@ int main(int argc, char** argv) {
     long m4K = 0;              // hash-window M_4 probe: sampled layer-3 parents
     int m4W = 0;               // window bits (keep fraction 2^-m4W)
     size_t m4Cap = 0;          // capacity of the windowed child table
+    bool bridgeOnly = false;
+    bool ackFullC6 = false;
     for (int a = 2; a < argc; a++) {
         std::string s = argv[a];
         if (s == "--ref" && a + 1 < argc) refPath = argv[++a];
@@ -781,6 +1446,24 @@ int main(int argc, char** argv) {
             m4W = std::atoi(argv[++a]);
             m4Cap = std::stoull(argv[++a]);
         }
+        else if (s == "--save-layer" && a + 2 < argc) {
+            int sl = std::atoi(argv[++a]);
+            g_saveLayers.push_back({sl, std::string(argv[++a])});
+        }
+        else if (s == "--load-layer" && a + 2 < argc) {
+            g_loadLayerIdx = std::atoi(argv[++a]);
+            g_loadLayerPath = argv[++a];
+        }
+        else if (s == "--checkpoint" && a + 2 < argc) {
+            g_ckptBase = argv[++a];
+            g_ckptPeriodMin = std::atof(argv[++a]);
+        }
+        else if (s == "--ckpt-chunk" && a + 1 < argc)
+            g_ckptChunk = std::stoull(argv[++a]);
+        else if (s == "--resume" && a + 1 < argc) g_resumeBase = argv[++a];
+        else if (s == "--force-wide") g_forceWide = true;
+        else if (s == "--bridge-only") bridgeOnly = true;
+        else if (s == "--ack-full-c6") ackFullC6 = true;
         else if (s == "--caps" && a + 1 < argc) {
             std::stringstream cs(argv[++a]);
             std::string tok;
@@ -799,9 +1482,139 @@ int main(int argc, char** argv) {
                              "capacities)\n", C);
         return 2;
     }
+    for (size_t i = 0; i < caps.size(); i++) {
+        if (!caps[i] || caps[i] >= (size_t)UINT32_MAX - 64) {
+            std::fprintf(stderr, "--caps entry %zu is outside 1..2^32-65\n",
+                         i + 1);
+            return 2;
+        }
+    }
+    // ---- checkpoint/restart preflight (checkpoint-restart-spec.md) ----
+    if (doRank && (!g_ckptBase.empty() || !g_resumeBase.empty() ||
+                   g_loadLayerIdx > 0)) {
+        std::fprintf(stderr, "--rank records full transition rows in memory; "
+                             "it cannot survive checkpoint/restart or a "
+                             "partial layer chain (drop --rank)\n");
+        return 2;
+    }
+    if ((!g_ckptBase.empty() || !g_resumeBase.empty()) &&
+        (probeLayer > 0 || m4K > 0)) {
+        std::fprintf(stderr, "--checkpoint/--resume cover full transitions "
+                             "only; not compatible with --probe/--m4probe\n");
+        return 2;
+    }
+    if ((g_loadLayerIdx > 0 || !g_resumeBase.empty()) &&
+        (invarianceN > 0 || scanCheckN > 0 || layerMassL > 0)) {
+        std::fprintf(stderr, "--invariance/--scan-check/--layer-mass need "
+                             "every layer in memory; not compatible with "
+                             "--load-layer/--resume\n");
+        return 2;
+    }
+    if (g_ckptChunk == 0) {
+        std::fprintf(stderr, "--ckpt-chunk must be > 0\n");
+        return 2;
+    }
+    if (g_loadLayerIdx && !g_resumeBase.empty()) {
+        std::fprintf(stderr, "--load-layer and --resume are mutually exclusive\n");
+        return 2;
+    }
+    if (!g_resumeBase.empty() && !g_ckptBase.empty() &&
+        g_resumeBase != g_ckptBase) {
+        std::fprintf(stderr, "--resume and --checkpoint must name the same "
+                             "base path\n");
+        return 2;
+    }
+    if (g_loadLayerIdx && (g_loadLayerIdx < 2 || g_loadLayerIdx > C)) {
+        std::fprintf(stderr, "--load-layer index must be in 2..%d\n", C);
+        return 2;
+    }
+    for (const auto& sv : g_saveLayers) {
+        if (sv.first < 2 || sv.first > C) {
+            std::fprintf(stderr, "--save-layer index must be in 2..%d\n", C);
+            return 2;
+        }
+    }
+    if (g_loadLayerIdx >= C && C >= 6) {
+        std::fprintf(stderr, "--load-layer %d at C>=6 cannot restore the "
+                             "final wide sums standalone; load layer %d and "
+                             "re-run the last transition\n", C, C - 1);
+        return 2;
+    }
+    if (!g_resumeBase.empty())
+        g_ckptBase = g_resumeBase;   // resumed runs keep checkpointing on
+    if (g_resumeBase.empty() && !g_ckptBase.empty()) {
+        bool stale = ck_path_exists(g_ckptBase + ".a") ||
+                     ck_path_exists(g_ckptBase + ".b");
+        for (int L = 2; L <= C && !stale; L++)
+            stale = ck_path_exists(
+                g_ckptBase + ".L" + std::to_string(L) + ".snap");
+        if (stale) {
+            std::fprintf(stderr,
+                         "checkpoint base already has files; choose a fresh "
+                         "base or use --resume (existing files are never "
+                         "overwritten by a new run)\n");
+            return 2;
+        }
+    }
+    if (bridgeOnly && C != 6) {
+        std::fprintf(stderr, "--bridge-only requires C=6\n");
+        return 2;
+    }
+    if (ackFullC6 && C != 6) {
+        std::fprintf(stderr, "--ack-full-c6 is meaningful only at C=6\n");
+        return 2;
+    }
+    const bool boundedC6 =
+        bridgeOnly || m4K > 0 ||
+        (stopAfter > 0 && stopAfter <= 3) ||
+        (probeLayer > 0 && probeParents > 0 &&
+         (probeLayer <= 3 || g_loadLayerIdx == probeLayer));
+    const bool reachesC6Final =
+        C == 6 && !bridgeOnly && !m4K && !probeLayer && !stopAfter;
+    const bool buildsLargeC6Layer =
+        C == 6 &&
+        (reachesC6Final || stopAfter >= 4 ||
+         (probeLayer >= 4 && g_loadLayerIdx != probeLayer));
+    if (C == 6 && !boundedC6 && !ackFullC6) {
+        std::fprintf(stderr,
+                     "unbounded C=6 transition refused; use a positive "
+                     "--probe/--m4probe, --stop-after <= 3, --bridge-only, "
+                     "or explicit owner-approved --ack-full-c6\n");
+        return 2;
+    }
+    if (buildsLargeC6Layer && ackFullC6) {
+        if (g_ckptBase.empty() || nthreads <= 1 ||
+            caps.size() < (size_t)(C - 1)) {
+            std::fprintf(stderr,
+                         "large C=6 stages require --checkpoint plus threaded "
+                         "fixed --caps\n");
+            return 2;
+        }
+        if (reachesC6Final && dumpPath.empty()) {
+            std::fprintf(stderr,
+                         "a full C=6 chain requires --dump for external exact "
+                         "summation\n");
+            return 2;
+        }
+    }
 
     build_group();
     const u64 Gorder = GROUP.size();
+
+    if (bridgeOnly) {
+        auto kk = known_c6_keys();
+        flush_canon_counters();
+        std::printf("C=6 G1 canonical representative words: ");
+        print_complete_words(kk.first);
+        std::printf("  stab=%llu  expected_F=6986348258918400\n",
+                    (unsigned long long)stab_scan(kk.first));
+        std::printf("C=6 G2 canonical representative words: ");
+        print_complete_words(kk.second);
+        std::printf("  stab=%llu  expected_F=7053808087203840\n",
+                    (unsigned long long)stab_scan(kk.second));
+        std::printf("C=6 known-class bridge: distinct and well-formed OK\n");
+        return 0;
+    }
 
     // layer 1: unique state of singletons
     State x1{};
@@ -809,7 +1622,7 @@ int main(int argc, char** argv) {
         int b = i >> 1, s = i & 1;
         x1.m[i] = (u16)((2u | (u32)s) << (2 * b));
     }
-    std::sort(x1.m.begin(), x1.m.begin() + N2C);
+    sort_masks(x1.m.data(), N2C);
     u64 s1 = 0;
     State x1c = canonize(x1, &s1);
 
@@ -825,8 +1638,84 @@ int main(int argc, char** argv) {
     // sparse transition rows for --rank: R[t][parent] = vector of (child, K)
     std::vector<std::vector<std::vector<std::pair<u32, u64>>>> Rrows(C);
 
+    int startL = 1;
+    if (!g_resumeBase.empty()) {
+        // ---- resume: newest valid checkpoint of the interrupted transition
+        if (!ckpt_load_newest(g_resumeBase, g_resumeCk)) {
+            std::fprintf(stderr, "FATAL: no valid checkpoint pair at "
+                                 "%s.{a,b}\n", g_resumeBase.c_str());
+            return 12;
+        }
+        g_resumeHdr = g_resumeCk.h;
+        g_ckptGen = g_resumeHdr.gen;
+        int P = (int)g_resumeHdr.parentLayer;
+        if (P < 1 || P >= C) {
+            std::fprintf(stderr, "FATAL: checkpoint parent layer %d out of "
+                                 "range for C=%d\n", P, C);
+            return 12;
+        }
+        if (P > 1) {   // layer 1 is rebuilt deterministically above
+            std::string psnap =
+                g_resumeBase + ".L" + std::to_string(P) + ".snap";
+            // heap-backed image: keep the checkpoint header out of main's
+            // stack frame (GCC znver4 codegen bug, see CK_NOINLINE note)
+            std::vector<CkptImage> pimBox(1);
+            CkptImage& pim = pimBox[0];
+            if (!ck_read_file(psnap, pim) || (int)pim.h.layerIdx != P) {
+                std::fprintf(stderr, "FATAL: cannot load parent snapshot %s "
+                                     "(resume must NEVER rebuild parents)\n",
+                             psnap.c_str());
+                return 12;
+            }
+            size_t pn = pim.keys.size();
+            if (!layer_install(layers[P], pim, pn ? pn : 1)) return 12;
+        }
+        startL = P;
+        g_resumePending = true;
+        std::printf("resuming transition %d->%d from %s (gen %llu, cursor "
+                    "%llu/%llu)\n", P, P + 1, g_resumeBase.c_str(),
+                    (unsigned long long)g_resumeHdr.gen,
+                    (unsigned long long)g_resumeHdr.cursorChunk,
+                    (unsigned long long)g_resumeHdr.nChunks);
+    } else if (g_loadLayerIdx > 0) {
+        // heap-backed image: keep the checkpoint header out of main's stack
+        // frame (GCC znver4 codegen bug, see CK_NOINLINE note)
+        std::vector<CkptImage> imBox(1);
+        CkptImage& im = imBox[0];
+        if (!ck_read_file(g_loadLayerPath, im) ||
+            (int)im.h.layerIdx != g_loadLayerIdx) {
+            std::fprintf(stderr, "FATAL: cannot load layer %d from %s\n",
+                         g_loadLayerIdx, g_loadLayerPath.c_str());
+            return 12;
+        }
+        size_t ln = im.keys.size();
+        if (!im.wide.empty())
+            gWide.assign(im.wide.begin(), im.wide.end());
+        if (!layer_install(layers[g_loadLayerIdx], im, ln ? ln : 1))
+            return 12;
+        startL = g_loadLayerIdx;
+        std::printf("loaded layer %d from %s (%zu entries, %u holes)\n",
+                    g_loadLayerIdx, g_loadLayerPath.c_str(),
+                    layers[g_loadLayerIdx].size(),
+                    layers[g_loadLayerIdx].holes);
+        // A transition checkpoint names its immutable parent by
+        // <base>.L<P>.snap.  When a staged run starts from an independently
+        // named snapshot, make the checkpoint set self-contained now rather
+        // than discovering the missing parent only after a crash.
+        if (!g_ckptBase.empty()) {
+            std::string psnap =
+                g_ckptBase + ".L" + std::to_string(g_loadLayerIdx) + ".snap";
+            if (psnap != g_loadLayerPath &&
+                !ck_snapshot_link(g_loadLayerPath, psnap) &&
+                !layer_save_file(psnap, layers[g_loadLayerIdx],
+                                 g_loadLayerIdx,
+                                 gWide.empty() ? nullptr : &gWide)) {
+                return 12;
+            }
+        }
+    }
     double t_all0 = now_s();
-    for (int L = 1; L < C; L++) {
+    for (int L = startL; L < C; L++) {
         if (m4K > 0 && L >= 3) {
             // ---- hash-window M_4 probe: sample layer-3 parents, keep only
             // ---- children whose canonical hash lands in a 2^-m4W window,
@@ -1017,66 +1906,171 @@ int main(int argc, char** argv) {
                         ctx.emissions ? dtp * 1e9 / ctx.emissions : 0.0,
                         ctx.emissions ? 100.0 * ctx.cacheHits / ctx.emissions : 0.0,
                         peak_rss_bytes() / 1048576.0);
+            if (fanSample > 0) {
+                // count-only fan of the REAL (L+1)-layer children just built:
+                // this is the bounded (L+1)->(L+2) calibration (runbook 5.4)
+                Layer& lay = layers[L + 1];
+                size_t cnp = lay.size();
+                size_t ctake = std::min((size_t)fanSample, cnp);
+                size_t cstride = cnp / ctake;
+                EmitCtx fctx;
+                fctx.next = nullptr;
+                fctx.emissions = 0;
+                fctx.cacheHits = 0;
+                fctx.countOnly = true;
+                fctx.row = nullptr;
+                std::vector<u64> fans;
+                fans.reserve(ctake);
+                double tf0 = now_s();
+                u64 prev = 0;
+                for (size_t s = 0; s < ctake; s++) {
+                    size_t i = s * cstride;
+                    while (i < cnp && lay.is_hole((u32)i)) i++;
+                    if (i >= cnp) continue;
+                    if (s + 1 < ctake && i >= (s + 1) * cstride) continue;
+                    fctx.prepare(lay.keys[i], 0);
+                    fctx.rec(0, (1u << N2C) - 1);
+                    fans.push_back(fctx.emissions - prev);
+                    prev = fctx.emissions;
+                }
+                ctake = fans.size();
+                std::sort(fans.begin(), fans.end());
+                u128 tot = 0;
+                for (u64 v : fans) tot += v;
+                double mean = ctake ? (double)(u64)(tot / ctake) : 0.0;
+                std::printf("calib fan %d->%d over %zu real layer-%d states: "
+                            "min=%llu med=%llu mean=%.1f max=%llu  "
+                            "sample_time=%.1fs\n",
+                            L + 1, L + 2, ctake, L + 1,
+                            ctake ? (unsigned long long)fans.front() : 0ULL,
+                            ctake ? (unsigned long long)fans[ctake / 2] : 0ULL,
+                            mean,
+                            ctake ? (unsigned long long)fans.back() : 0ULL,
+                            now_s() - tf0);
+            }
             return 0;
         }
         double t0 = now_s();
         u64 canon0 = g_canonize_calls;
         size_t nParents = layers[L].size();
-        if (nthreads > 1) layers[L + 1].init_fixed(caps[L - 1]);
-        else layers[L + 1].init(nParents * 4 + 64);
         bool record = doRank;
         if (record) Rrows[L].resize(nParents);
         u64 totEmissions = 0, totHits = 0;
+        const bool wideHere = (L + 1 == C && (C >= 6 || g_forceWide));
+        const bool ckptHere = !g_ckptBase.empty();
+        const u64 ckChunk = g_ckptChunk;
+        const u64 nChunks = (u64)(nParents + ckChunk - 1) / ckChunk;
+        u64 ckCursor = 0;
+        if (g_resumePending && g_resumeHdr.parentLayer == (u32)L) {
+            if (g_resumeHdr.chunkParents != ckChunk ||
+                g_resumeHdr.nChunks != nChunks) {
+                std::fprintf(stderr, "FATAL: resume chunking mismatch "
+                                     "(ckpt %llu parents/chunk, %llu chunks; "
+                                     "run %llu, %llu)\n",
+                             (unsigned long long)g_resumeHdr.chunkParents,
+                             (unsigned long long)g_resumeHdr.nChunks,
+                             (unsigned long long)ckChunk,
+                             (unsigned long long)nChunks);
+                return 12;
+            }
+            u64 ph = ck_hash64(layers[L].keys.data(),
+                               layers[L].size() * sizeof(State), CK_SEED);
+            if (ph != g_resumeHdr.parentKeysHash) {
+                std::fprintf(stderr, "FATAL: parent keys hash mismatch on "
+                                     "resume of transition %d->%d (chunk "
+                                     "indices would mis-map)\n", L, L + 1);
+                return 12;
+            }
+            size_t childCap = (nthreads > 1) ? caps[L - 1] : 0;
+            if (!ckpt_install_child(layers[L + 1], gWide, g_resumeCk,
+                                    childCap)) {
+                std::fprintf(stderr, "FATAL: cannot install resumed child\n");
+                return 12;
+            }
+            ckpt_release(g_resumeCk);   // release the image copy
+            ckCursor = g_resumeHdr.cursorChunk;
+            totEmissions = g_resumeHdr.emissionsSoFar;
+            totHits = g_resumeHdr.cacheHitsSoFar;
+            g_resumePending = false;
+            std::printf("resume: transition %d->%d at chunk %llu/%llu "
+                        "(child entries=%zu holes=%u)\n", L, L + 1,
+                        (unsigned long long)ckCursor,
+                        (unsigned long long)nChunks, layers[L + 1].size(),
+                        layers[L + 1].holes);
+            std::fflush(stdout);
+        } else {
+            if (nthreads > 1) layers[L + 1].init_fixed(caps[L - 1]);
+            else layers[L + 1].init(nParents * 4 + 64);
+        }
+        double lastCkT = now_s();
+        for (u64 ckStep = ckCursor; ckStep < nChunks; ckStep++) {
+            const long long lo = (long long)(ckStep * ckChunk);
+            const long long hi = (long long)std::min<u64>(
+                (u64)nParents, (ckStep + 1) * ckChunk);
 #ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads) if (nthreads > 1) \
     reduction(+ : totEmissions, totHits)
 #endif
-        {
-            EmitCtx ctx;
-            ctx.next = &layers[L + 1];
-            ctx.emissions = 0;
-            ctx.cacheHits = 0;
-            ctx.row = nullptr;
-            ctx.wideT = (L + 1 == C && C >= 6);
-            if (ctx.wideT && layers[L + 1].fixedCap)
-                ctx.wide.assign(layers[L + 1].keys.size(), 0);
+            {
+                EmitCtx ctx;
+                ctx.next = &layers[L + 1];
+                ctx.emissions = 0;
+                ctx.cacheHits = 0;
+                ctx.row = nullptr;
+                ctx.wideT = wideHere;
+                if (ctx.wideT && layers[L + 1].fixedCap)
+                    ctx.wide.assign(layers[L + 1].keys.size(), 0);
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 8)
 #endif
-            for (long long i = 0; i < (long long)nParents; i++) {
-                if (layers[L].is_hole((u32)i)) continue;
-                ctx.row = record ? &Rrows[L][i] : nullptr;
-                ctx.prepare(layers[L].keys[i], layers[L].T[i]);
-                ctx.rec(0, (1u << N2C) - 1);
-                if (record) {  // merge duplicate children within the row
-                    auto& r = Rrows[L][i];
-                    std::sort(r.begin(), r.end());
-                    size_t w = 0;
-                    for (size_t j = 0; j < r.size();) {
-                        size_t k = j;
-                        u64 sum = 0;
-                        while (k < r.size() && r[k].first == r[j].first)
-                            sum += r[k++].second;
-                        r[w++] = {r[j].first, sum};
-                        j = k;
+                for (long long i = lo; i < hi; i++) {
+                    if (layers[L].is_hole((u32)i)) continue;
+                    ctx.row = record ? &Rrows[L][i] : nullptr;
+                    ctx.prepare(layers[L].keys[i], layers[L].T[i]);
+                    ctx.rec(0, (1u << N2C) - 1);
+                    if (record) {  // merge duplicate children within the row
+                        auto& r = Rrows[L][i];
+                        std::sort(r.begin(), r.end());
+                        size_t w = 0;
+                        for (size_t j = 0; j < r.size();) {
+                            size_t k = j;
+                            u64 sum = 0;
+                            while (k < r.size() && r[k].first == r[j].first)
+                                sum += r[k++].second;
+                            r[w++] = {r[j].first, sum};
+                            j = k;
+                        }
+                        r.resize(w);
                     }
-                    r.resize(w);
                 }
-            }
-            totEmissions += ctx.emissions;
-            totHits += ctx.cacheHits;
-            if (ctx.wideT) {
+                totEmissions += ctx.emissions;
+                totHits += ctx.cacheHits;
+                if (ctx.wideT) {
 #ifdef _OPENMP
 #pragma omp critical(wide_merge)
 #endif
-                {
-                    if (gWide.size() < ctx.wide.size())
-                        gWide.resize(ctx.wide.size(), 0);
-                    for (size_t i = 0; i < ctx.wide.size(); i++)
-                        gWide[i] += ctx.wide[i];
+                    {
+                        if (gWide.size() < ctx.wide.size())
+                            gWide.resize(ctx.wide.size(), 0);
+                        for (size_t i = 0; i < ctx.wide.size(); i++)
+                            gWide[i] += ctx.wide[i];
+                    }
                 }
+                flush_canon_counters();
             }
-            flush_canon_counters();
+            // QUIESCE: the parallel region above has closed (implicit
+            // barrier + flush).  Every parent in chunks [0, ckStep] is fully
+            // applied to layers[L+1] -- and, in wide mode, merged into gWide
+            // -- and no parent from a later chunk has started.  Safe dump.
+            if (ckptHere &&
+                (ckStep + 1 == nChunks ||
+                 now_s() - lastCkT >= g_ckptPeriodMin * 60.0)) {
+                if (!ckpt_write_pair(L, layers[L], layers[L + 1],
+                                     wideHere ? &gWide : nullptr, ckStep + 1,
+                                     nChunks, ckChunk, totEmissions, totHits))
+                    return 12;
+                lastCkT = now_s();
+            }
         }
         flush_canon_counters();
         emissionsPerT.push_back(totEmissions);
@@ -1091,6 +2085,21 @@ int main(int argc, char** argv) {
                     totEmissions ? timePerT.back() * 1e9 / totEmissions : 0.0,
                     totEmissions ? 100.0 * totHits / totEmissions : 0.0);
         std::fflush(stdout);
+        if (ckptHere) {   // finalized child = next transition's parent snapshot
+            const std::string snap =
+                g_ckptBase + ".L" + std::to_string(L + 1) + ".snap";
+            if ((g_lastCkptPath.empty() ||
+                 !ck_snapshot_link(g_lastCkptPath, snap)) &&
+                !layer_save_file(snap, layers[L + 1], L + 1,
+                                 wideHere ? &gWide : nullptr))
+                return 12;
+        }
+        for (size_t si = 0; si < g_saveLayers.size(); si++)
+            if (g_saveLayers[si].first == L + 1)
+                if (!layer_save_file(g_saveLayers[si].second,
+                                     layers[L + 1], L + 1,
+                                     wideHere ? &gWide : nullptr))
+                    return 12;
     }
     double dp_seconds = now_s() - t_all0;
 
@@ -1122,8 +2131,9 @@ int main(int argc, char** argv) {
         if (Gorder % sq) { std::fprintf(stderr, "stab %llu bad\n",
                                         (unsigned long long)sq); return 3; }
         u64 m = Gorder / sq;
-        u128 Tw = (C >= 6) ? (i < gWide.size() ? gWide[i] : (u128)0)
-                           : (u128)fin.T[i];
+        u128 Tw = (C >= 6 || g_forceWide)
+                      ? (i < gWide.size() ? gWide[i] : (u128)0)
+                      : (u128)fin.T[i];
         if (Tw % m) {
             std::fprintf(stderr, "T=%s not divisible by m=%llu\n",
                          u128_str(Tw).c_str(), (unsigned long long)m);
@@ -1146,6 +2156,33 @@ int main(int argc, char** argv) {
                   return std::memcmp(a.q.m.data(), b.q.m.data(),
                                      sizeof(u16) * 12) < 0;
               });
+    if (C == 6) {
+        if (classesOut.size() != 63199) {
+            std::fprintf(stderr,
+                         "C=6 complete class count %zu != 63199\n",
+                         classesOut.size());
+            return 3;
+        }
+        auto kk = known_c6_keys();
+        const u64 expected[2] = {
+            6986348258918400ULL,
+            7053808087203840ULL,
+        };
+        const State keys[2] = {kk.first, kk.second};
+        for (int k = 0; k < 2; k++) {
+            auto it = std::find_if(
+                classesOut.begin(), classesOut.end(),
+                [&](const ClassOut& c) { return c.q == keys[k]; });
+            if (it == classesOut.end() || it->F != expected[k]) {
+                std::fprintf(stderr,
+                             "C=6 G%d bridge check failed (expected F=%llu)\n",
+                             k + 1, (unsigned long long)expected[k]);
+                return 3;
+            }
+            std::printf("C=6 G%d bridge F=%llu: OK\n", k + 1,
+                        (unsigned long long)it->F);
+        }
+    }
     std::printf("layers (states): ");
     for (int L = 1; L <= C; L++) std::printf("%zu ", layers[L].real_size());
     std::printf("\nemissions: ");
@@ -1220,6 +2257,71 @@ int main(int argc, char** argv) {
                     "%ld samples, %ld failures %s\n",
                     scanCheckN, bad, bad ? "FAIL" : "OK");
         if (bad) return 6;
+
+        // Separation + coefficient-histogram differential against the
+        // definition-independent full-group lexicographic representative.
+        // Orbit membership above rules out over-merging; this comparison
+        // catches a canonicalizer that splits one true orbit into two stored
+        // keys.  The aggregated (T,stab) multiset additionally detects a
+        // partition mismatch even when the number of keys happens to agree.
+        struct SampleRef { int layer; u32 index; };
+        std::vector<SampleRef> sample;
+        const size_t quota =
+            ((size_t)scanCheckN + (size_t)C - 1) / (size_t)C;
+        for (int L = 1; L <= C; L++) {
+            Layer& lay = layers[L];
+            const size_t real = lay.real_size();
+            const size_t take = std::min(quota, real);
+            if (!take) continue;
+            size_t nextRank = 0;
+            size_t seen = 0;
+            size_t picked = 0;
+            for (u32 i = 0; i < (u32)lay.size() && picked < take; i++) {
+                if (lay.is_hole(i)) continue;
+                if (seen == nextRank) {
+                    sample.push_back({L, i});
+                    picked++;
+                    nextRank = (picked * real) / take;
+                }
+                seen++;
+            }
+        }
+        Layer bruteKeys;
+        bruteKeys.init(sample.size() * 2 + 16);
+        std::vector<State> firstFast;
+        std::vector<u32> bruteStab;
+        std::vector<std::pair<u64, u32>> fastHist;
+        size_t conflicts = 0;
+        for (const SampleRef& sr : sample) {
+            Layer& lay = layers[sr.layer];
+            const State& fast = lay.keys[sr.index];
+            State brute = canon_scan(fast);
+            const size_t oldSize = bruteKeys.size();
+            u32 bi = bruteKeys.find_or_add(brute);
+            if ((size_t)bi == oldSize) {
+                firstFast.push_back(fast);
+                bruteStab.push_back(lay.stab[sr.index]);
+            } else if (!(firstFast[bi] == fast)) {
+                conflicts++;
+            }
+            bruteKeys.T[bi] += lay.T[sr.index];
+            fastHist.push_back({lay.T[sr.index], lay.stab[sr.index]});
+        }
+        std::vector<std::pair<u64, u32>> bruteHist;
+        bruteHist.reserve(bruteKeys.size());
+        for (u32 i = 0; i < (u32)bruteKeys.size(); i++)
+            bruteHist.push_back({bruteKeys.T[i], bruteStab[i]});
+        std::sort(fastHist.begin(), fastHist.end());
+        std::sort(bruteHist.begin(), bruteHist.end());
+        const bool sepOk =
+            conflicts == 0 && bruteKeys.size() == sample.size();
+        const bool histOk = fastHist == bruteHist;
+        std::printf("canonical separation/histogram differential: "
+                    "fast=%zu brute=%zu conflicts=%zu histogram=%s %s\n",
+                    sample.size(), bruteKeys.size(), conflicts,
+                    histOk ? "MATCH" : "MISMATCH",
+                    (sepOk && histOk) ? "OK" : "FAIL");
+        if (!sepOk || !histOk) return 6;
     }
 
     // ------------------------------------------------------- layer mass ----
@@ -1262,7 +2364,7 @@ int main(int argc, char** argv) {
                 ref.m[k++] = m;
             }
             if (k != N2C) continue;
-            std::sort(ref.m.begin(), ref.m.begin() + N2C);
+            sort_masks(ref.m.data(), N2C);
             std::stringstream ts(line.substr(q2 + 2));
             std::string fld_;
             u64 rm, rell, rF;
