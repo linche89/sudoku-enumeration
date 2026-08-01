@@ -113,6 +113,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 The gate covers:
 
+- the independent exact penultimate-layer Burnside counts through C=6;
 - exact C=2, C=3, and C=4 totals;
 - all 355 C=5 `(m,ell,F)` triples and exact `N(5)`;
 - canonical invariance, full-group stabilizer/orbit checks, separation, and
@@ -166,6 +167,33 @@ sampling interval and does not include residual capture-model uncertainty;
 the timing does not include production-scale NUMA, table-fill, or checkpoint
 effects.
 
+## Exact penultimate-layer count
+
+The specialized independent Burnside counter
+`experiments/proto/layer_penultimate_burnside.cpp` exploits the fact that at
+layer `C-1` exactly two masks miss each box.  It counts fixed balanced tuples
+of unordered missing-box mask pairs over the signed coordinate conjugacy
+classes.  Regular bipartite 1-factorization proves that every balanced tuple
+is row-reachable.
+
+It reproduces the independently materialized C=2..5 penultimate-layer counts
+
+```text
+1, 5, 54, 17120
+```
+
+and gives the exact C=6 result
+
+```text
+M5 = 96452755
+Burnside numerator = 4444542950400
+group order = 46080
+```
+
+This is now a production boundary anchor: constructing or loading a C=6
+layer-5 snapshot with a different real-state count fails before the final
+transition.  The proof is in `../math/penultimate-layer-burnside.md`.
+
 ## C=6 boundary
 
 The engine refuses plain `layer_dp_gate 6`.  Read-only bridge inspection and
@@ -210,7 +238,7 @@ The capacity-worst-case model includes:
 - an 8 GiB or 10% RAM margin and a 16 GiB or 10% disk margin, whichever is
   larger.
 
-With the still-provisional capacities
+With the retained planning capacities
 `2000,14000000,1350000000,250000000,100000`, 24 threads, and the reference
 125.650 GiB host, the measured plan on 2026-07-31 was:
 
@@ -221,16 +249,17 @@ With the still-provisional capacities
 | 5->6 | 10.465 GiB | 18.465 GiB | 108.242 GiB | 124.242 GiB |
 
 These are capacity bounds, not measured production allocation.  The
-1.35-billion layer-4 cap is now supported by the completed M4/random-fan
-measurement.  The 250-million layer-5 cap remains provisional.
+1.35-billion layer-4 cap is supported by the completed M4/random-fan
+measurement.  The 250-million layer-5 cap is 2.59194 times the exact
+`M5 = 96,452,755`, leaving 153,547,245 entries for insertion holes and
+operational margin.  The staged rehearsal must still measure those effects.
 
 ## Remaining preflight work
 
-The route is restart-safe at C=5, and the M4 plus uniform 4-to-5 measurement
-gates are complete.  A production decision still requires:
+The route is restart-safe at C=5.  The M4, uniform 4-to-5, and exact M5
+capacity gates are complete.  A production decision still requires:
 
-1. a stronger bound or guarded measurement for the provisional layer-5 cap;
-2. a bounded staged allocation/restart rehearsal under the resource guard;
-3. a bounded end-to-end rehearsal, including deliberate interruption and
+1. a bounded staged allocation/restart rehearsal under the resource guard;
+2. a bounded end-to-end rehearsal, including deliberate interruption and
    external summation;
-4. an owner decision before any multi-day C=6 layer-4 run.
+3. an owner decision before any multi-day C=6 layer-4 run.

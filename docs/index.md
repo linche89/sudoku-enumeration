@@ -27,12 +27,15 @@
 ## Current mathematics
 
 - `math/c6-current-bottleneck.md` — audited C=6 mathematical frontier.
+- `math/penultimate-layer-burnside.md` — exact native penultimate-layer
+  Burnside count, including `M_5(6) = 96,452,755` and small-C differentials.
 - `math/og2-band-kernel-lowrank.md` — separate formalized transfer-kernel
   question, completed small-rank gate, fixed-source frontier lower bound, and
   surviving target-only/response-subspace questions.
 
 ## Dated evidence
 
+- `reports/og2/layer-dp-penultimate-burnside-20260801.md`
 - `reports/og2/layer-dp-m4-random-calibration-20260801.md`
 - `reports/og2/layer-dp-resource-preflight-20260731.md`
 - `reports/og2/layer-dp-s0-random-calibration-20260731.md`

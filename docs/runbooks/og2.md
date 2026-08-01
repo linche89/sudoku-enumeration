@@ -98,6 +98,18 @@ Run the read-only resource plan against the intended checkpoint volume before
 allocating a large layer:
 
 ```powershell
+.\build\layer_penultimate_burnside.exe 6
+```
+
+This must report exact `M_5=96452755`.  The production layer-DP engine uses
+the same value as a hard boundary check when constructing or loading layer 5.
+The independent derivation and gate evidence are in
+`../math/penultimate-layer-burnside.md` and
+`../reports/og2/layer-dp-penultimate-burnside-20260801.md`.
+
+Then run the resource plan:
+
+```powershell
 $caps = '2000,14000000,1350000000,250000000,100000'
 foreach ($layer in 3,4,5) {
   .\build\layer_dp_gate.exe 6 --threads 24 --caps $caps `
@@ -112,7 +124,9 @@ third full `.tmp` image present while A/B is atomically replaced.  The
 provisional cap set above reported RAM-with-margin values
 69.898 / 79.685 / 18.465 GiB and disk-with-margin values
 152.726 / 132.609 / 124.242 GiB for 3->4 / 4->5 / 5->6 on 2026-07-31.
-The caps are planning inputs, not accepted `M_4`/`M_5` bounds.
+The layer-4 cap remains measurement-supported.  The 250-million layer-5 cap
+is 2.59194 times the exact 96,452,755 real states; its remaining operational
+risk is parallel insertion holes and production allocation behavior.
 
 An acknowledged large run is restricted to one transition per process:
 layer 3->4 must stop at 4, layer 4->5 must stop at 5, and only layer 5 may

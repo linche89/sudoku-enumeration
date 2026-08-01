@@ -409,9 +409,10 @@ orbit/stabilizer, separation, and histogram differentials.  Its bounded C=6
 evidence includes exact `M_3 = 12,324,872` (with
 772 / 20,338,525 / 2,605,194,602 reproduced in-run), a 58,400-parent random
 3->4 sample projecting 2.13308e12 emissions, and a near-saturated hash-window
-estimate `M_4 = 902.9e6`.  Those measurements qualify a production candidate;
-they are not a completed C=6 layer or count.  Mathematical provenance remains
-in `docs/expert/2026-07-26/layer-dp-permanent-profile.md`.
+estimate `M_4 = 902.9e6`.  An independent exact Burnside calculation now gives
+`M_5 = 96,452,755`.  These results qualify a production candidate; they are
+not a completed C=6 layer or count.  Mathematical provenance remains in
+`docs/expert/2026-07-26/layer-dp-permanent-profile.md`.
 
 The two prior theory targets of this section are resolved by measurement:
 the target-only reduced-kernel question has answer "compression exists but
@@ -443,9 +444,11 @@ require 69.898 / 79.685 / 18.465 GiB RAM including margin and
 152.726 / 132.609 / 124.242 GiB disk including retained generations,
 A/B, the atomic-write temporary, and margin.  Large C=6 work is restricted
 to one loaded/resumed transition per process.  These are capacity-worst-case
-plans rather than exact state-count bounds.  The layer-4 cap is now supported
-by the completed random M4 measurement, while the layer-5 cap remains
-provisional; see
+plans rather than measured production allocation.  The layer-4 cap is
+supported by the completed random M4 measurement.  The 250-million layer-5
+cap is 2.59194 times the exact `M_5`, leaving 153,547,245 entries for parallel
+insertion holes and operational margin; see
+`docs/reports/og2/layer-dp-penultimate-burnside-20260801.md` and
 `docs/reports/og2/layer-dp-resource-preflight-20260731.md`.
 
 Bounded S0 has now produced a reusable exact C=6 layer-3 snapshot:
@@ -464,9 +467,17 @@ estimate fixed gives 2.36323e12 projected 4->5 emissions.  A separate real
 96.7 ns/emission wall on 24 threads with mean 7.47 search nodes.  This is a
 bounded kernel calibration, not a production-duration guarantee.
 
-The M4 and uniform 4->5 measurement gates are therefore closed.  The immediate
-objective is to validate the provisional layer-5 capacity and execute guarded
-allocation/restart and bounded end-to-end rehearsals.
+The penultimate-layer Burnside counter independently reproduces the complete
+C=2..5 sequence 1 / 5 / 54 / 17,120 and gives exact C=6
+`M_5 = 96,452,755` in 2.070 seconds.  Its Burnside numerator is
+4,444,542,950,400 over the 46,080-element coordinate group.  The production
+engine now hard-checks this real-state count when it constructs or loads layer
+5, providing an independent boundary anchor before the final transition.
+
+The M4, uniform 4->5, and exact M5 capacity gates are therefore closed.  The
+immediate objective is the guarded allocation/checkpoint/restart rehearsal,
+followed by the bounded interrupted end-to-end rehearsal.  These must measure
+parallel insertion holes and production-scale resource behavior.
 
 No full 63,199-class C=6 run is authorized.  Bounded probes and the
 pre-flight program are within scope.
