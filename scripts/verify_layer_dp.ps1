@@ -30,6 +30,8 @@ function Get-Sha256 {
 if ($LASTEXITCODE -ne 0) { throw "layer-DP build failed" }
 
 $exe = (Resolve-Path -LiteralPath "build/layer_dp_gate.exe").Path
+$penultimateExe = (Resolve-Path -LiteralPath `
+    "build/layer_penultimate_burnside.exe").Path
 $ref = (Resolve-Path -LiteralPath `
     "docs/expert/2026-07-21/native_c5_response_quotient_triples.csv").Path
 $expectedRefHash = "D2FDEB354ED4C1443E9870B5727CE35C88BA6B392C6DAA32CD92D2601BCDB1F5"
@@ -222,6 +224,25 @@ function Start-Kill-And-Resume {
 }
 
 try {
+    Write-Host "== exact penultimate-layer Burnside count =="
+    $penultimateLog = Join-Path $work "penultimate-burnside.log"
+    & $penultimateExe *> $penultimateLog
+    if ($LASTEXITCODE -ne 0) {
+        Get-Content -LiteralPath $penultimateLog
+        throw "penultimate-layer Burnside counter failed"
+    }
+    $penultimateText = Get-Content -Raw -LiteralPath $penultimateLog
+    if ($penultimateText -notmatch "M_1=1 expected=1 \[OK\]" -or
+        $penultimateText -notmatch "M_2=5 expected=5 \[OK\]" -or
+        $penultimateText -notmatch "M_3=54 expected=54 \[OK\]" -or
+        $penultimateText -notmatch "M_4=17120 expected=17120 \[OK\]" -or
+        $penultimateText -notmatch "M_5=96452755" -or
+        $penultimateText -notmatch
+            "PENULTIMATE-LAYER BURNSIDE GATES PASSED") {
+        Get-Content -LiteralPath $penultimateLog
+        throw "penultimate-layer Burnside output failed its exact gate"
+    }
+
     $resourceDir = Join-Path $work "resource"
     New-Item -ItemType Directory -Path $resourceDir | Out-Null
     $resourceBase = Join-Path $resourceDir "ck"
