@@ -133,6 +133,23 @@ layer 3->4 must stop at 4, layer 4->5 must stop at 5, and only layer 5 may
 continue to the final CSV.  The engine repeats the resource check
 automatically and refuses a monolithic large-layer invocation.
 
+The production-cap 3-to-4 allocation/restart rehearsal passed on 2026-08-01:
+
+```text
+cap=1,350,000,000
+peak RSS=61.810 GiB under a 75 GiB guard
+forced stop at gen/cursor 91
+successful reloads at gen/cursor 91, 146, and 170
+latest retained rehearsal image: 21,993,609 entries, 0 holes
+```
+
+Its forensic checkpoint is under
+`data/logs/layer-dp-c6-allocation-rehearsal-20260801`; it is not an active
+production checkpoint.  Do not start it as a production continuation without
+the owner decision and a production checkpoint-period review.  Detailed
+evidence is in
+`../reports/og2/layer-dp-c6-allocation-restart-rehearsal-20260801.md`.
+
 The retained exact S0 snapshot can feed the measurement-only random M4 and
 uniform 4-to-5 calibration without rebuilding layers 1-to-3:
 

@@ -252,14 +252,36 @@ These are capacity bounds, not measured production allocation.  The
 1.35-billion layer-4 cap is supported by the completed M4/random-fan
 measurement.  The 250-million layer-5 cap is 2.59194 times the exact
 `M5 = 96,452,755`, leaving 153,547,245 entries for insertion holes and
-operational margin.  The staged rehearsal must still measure those effects.
+operational margin.  The production-cap rehearsal below found zero holes in
+its retained prefix; long-run table-fill behavior remains unmeasured.
+
+## Production-cap allocation/restart rehearsal
+
+The bounded C=6 layer-3-to-layer-4 rehearsal allocated the intended
+1.35-billion child cap and ran on real parents from the exact layer-3
+snapshot.  Four externally guarded process windows exercised initial
+allocation, forced termination, resume, later-generation writes, and a final
+readback that did not replace A/B.
+
+```text
+modeled runtime peak = 61.898 GiB
+measured peak RSS    = 61.810 GiB
+RSS guard            = 75 GiB
+latest readback      = gen 170, cursor 170, entries 21993609, holes 0
+```
+
+The resume path fully validated and loaded generations 91, 146, and 170.
+The final A/B hashes were unchanged by the last readback, all engine stderr
+files were empty, and the active checkpoints plus external backups remained
+unchanged.  See
+`../reports/og2/layer-dp-c6-allocation-restart-rehearsal-20260801.md`.
 
 ## Remaining preflight work
 
-The route is restart-safe at C=5.  The M4, uniform 4-to-5, and exact M5
-capacity gates are complete.  A production decision still requires:
+The route is restart-safe at C=5 and now has a production-cap C=6 3-to-4
+allocation/restart rehearsal.  The M4, uniform 4-to-5, and exact M5 capacity
+gates are complete.  A production decision still requires:
 
-1. a bounded staged allocation/restart rehearsal under the resource guard;
-2. a bounded end-to-end rehearsal, including deliberate interruption and
+1. a bounded end-to-end rehearsal, including deliberate interruption and
    external summation;
-3. an owner decision before any multi-day C=6 layer-4 run.
+2. an owner decision before any multi-day C=6 layer-4 run.

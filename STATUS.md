@@ -475,9 +475,18 @@ engine now hard-checks this real-state count when it constructs or loads layer
 5, providing an independent boundary anchor before the final transition.
 
 The M4, uniform 4->5, and exact M5 capacity gates are therefore closed.  The
-immediate objective is the guarded allocation/checkpoint/restart rehearsal,
-followed by the bounded interrupted end-to-end rehearsal.  These must measure
-parallel insertion holes and production-scale resource behavior.
+production-cap allocation/checkpoint/restart rehearsal is also complete.  It
+allocated the 1.35-billion layer-4 table on real C=6 parents, measured
+61.810 GiB peak RSS against the 61.898-GiB model, deliberately stopped at
+generation/cursor 91, and then fully reloaded generations 91, 146, and 170.
+The final readback restored 21,993,609 entries with zero holes and did not
+modify A/B.  Active checkpoints and external backups remained unchanged.
+
+The immediate objective is therefore the bounded interrupted end-to-end
+rehearsal, followed by an owner decision before any multi-day production
+stage.  The production checkpoint period must be reviewed; the rehearsal's
+one-parent chunks and checkpoint-every-chunk setting were intentionally
+pathological and are not throughput settings.
 
 No full 63,199-class C=6 run is authorized.  Bounded probes and the
 pre-flight program are within scope.

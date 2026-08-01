@@ -35,6 +35,7 @@
 
 ## Dated evidence
 
+- `reports/og2/layer-dp-c6-allocation-restart-rehearsal-20260801.md`
 - `reports/og2/layer-dp-penultimate-burnside-20260801.md`
 - `reports/og2/layer-dp-m4-random-calibration-20260801.md`
 - `reports/og2/layer-dp-resource-preflight-20260731.md`
