@@ -69,6 +69,17 @@ using u128 = unsigned __int128;
 static int C, N2C;          // C boxes, 2C slots/symbols
 static u64 FACT[13];
 
+static u64 exact_penultimate_states(int c) {
+    switch (c) {
+        case 2: return 1;
+        case 3: return 5;
+        case 4: return 54;
+        case 5: return 17120;
+        case 6: return 96452755;
+        default: return 0;
+    }
+}
+
 struct State {
     std::array<u16, 12> m{};  // sorted ascending over first N2C entries
     bool operator==(const State& o) const {
@@ -2136,6 +2147,21 @@ int main(int argc, char** argv) {
             }
         }
     }
+    auto checkPenultimateLayer = [&](int layer) {
+        if (layer != C - 1) return true;
+        const u64 expected = exact_penultimate_states(C);
+        const size_t observed = layers[layer].real_size();
+        const bool ok = observed == expected;
+        std::printf("penultimate layer %d states=%zu expected=%llu [%s]\n",
+                    layer, observed, (unsigned long long)expected,
+                    ok ? "OK" : "MISMATCH");
+        if (!ok)
+            std::fprintf(stderr,
+                         "FATAL: exact penultimate-layer state-count anchor "
+                         "failed\n");
+        return ok;
+    };
+    if (!checkPenultimateLayer(startL)) return 9;
     double t_all0 = now_s();
     for (int L = startL; L < C; L++) {
         if (m4K > 0 && L >= 3) {
@@ -2624,6 +2650,7 @@ int main(int argc, char** argv) {
                     totEmissions ? timePerT.back() * 1e9 / totEmissions : 0.0,
                     totEmissions ? 100.0 * totHits / totEmissions : 0.0);
         std::fflush(stdout);
+        if (!checkPenultimateLayer(L + 1)) return 9;
         if (ckptHere) {   // finalized child = next transition's parent snapshot
             const std::string snap =
                 g_ckptBase + ".L" + std::to_string(L + 1) + ".snap";
