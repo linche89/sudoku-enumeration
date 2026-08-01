@@ -135,6 +135,20 @@ Run it only through `scripts/watch_rss.ps1`; the current bound is 12 GiB and
 snapshot and its external-backup hash are recorded in
 `../../data/checkpoints/MANIFEST.md`.
 
+The completed 2026-08-01 run reported:
+
+```text
+M4 naive / Chao1       = 902080896 / 902863734
+uniform 4->5 fan       = 2617.482 mean, 4.408 SE (n=20000)
+4->5 projected work    = 2.36323e12 emissions
+canonical sample       = 5260480 emissions, 96.7 ns/emission
+peak observed RSS      = 3.068 GiB
+```
+
+Treat the timing as a bounded kernel measurement, not a production wall-time
+promise.  The retained detailed evidence is in
+`../reports/og2/layer-dp-m4-random-calibration-20260801.md`.
+
 See `../methods/layer-dp.md` and
 `../reports/og2/layer-dp-checkpoint-gate-20260730.md` plus
 `../reports/og2/layer-dp-resource-preflight-20260731.md`.

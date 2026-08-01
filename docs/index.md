@@ -33,6 +33,7 @@
 
 ## Dated evidence
 
+- `reports/og2/layer-dp-m4-random-calibration-20260801.md`
 - `reports/og2/layer-dp-resource-preflight-20260731.md`
 - `reports/og2/layer-dp-s0-random-calibration-20260731.md`
 - `reports/og2/layer-dp-checkpoint-gate-20260730.md`

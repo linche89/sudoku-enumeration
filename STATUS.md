@@ -401,17 +401,17 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-Updated 2026-07-31.  The global row-incremental layer DP
+Updated 2026-08-01.  The global row-incremental layer DP
 (`experiments/proto/layer_dp_gate.cpp`) is the qualified implementation
 candidate.  It reproduces complete C=2..5 exactly, including all 355 C=5
 triples, and now has explicit canonical invariance, full-group
 orbit/stabilizer, separation, and histogram differentials.  Its bounded C=6
-evidence remains: exact `M_3 = 12,324,872` (with
-772 / 20,338,525 / 2,605,194,602 reproduced in-run), measured 3->4 volume
-2.136e12, and a hash-window estimate `M_4 = 9.0e8`, 95%
-[8.87e8, 9.20e8].  Those measurements qualify a production candidate; they
-are not a completed C=6 layer or count.  Mathematical provenance remains in
-`docs/expert/2026-07-26/layer-dp-permanent-profile.md`.
+evidence includes exact `M_3 = 12,324,872` (with
+772 / 20,338,525 / 2,605,194,602 reproduced in-run), a 58,400-parent random
+3->4 sample projecting 2.13308e12 emissions, and a near-saturated hash-window
+estimate `M_4 = 902.9e6`.  Those measurements qualify a production candidate;
+they are not a completed C=6 layer or count.  Mathematical provenance remains
+in `docs/expert/2026-07-26/layer-dp-permanent-profile.md`.
 
 The two prior theory targets of this section are resolved by measurement:
 the target-only reduced-kernel question has answer "compression exists but
@@ -443,7 +443,9 @@ require 69.898 / 79.685 / 18.465 GiB RAM including margin and
 152.726 / 132.609 / 124.242 GiB disk including retained generations,
 A/B, the atomic-write temporary, and margin.  Large C=6 work is restricted
 to one loaded/resumed transition per process.  These are capacity-worst-case
-plans, not validated state-count bounds; see
+plans rather than exact state-count bounds.  The layer-4 cap is now supported
+by the completed random M4 measurement, while the layer-5 cap remains
+provisional; see
 `docs/reports/og2/layer-dp-resource-preflight-20260731.md`.
 
 Bounded S0 has now produced a reusable exact C=6 layer-3 snapshot:
@@ -453,14 +455,18 @@ orbit mass 566,455,903,200, and SHA-256
 The guarded run took 521.3 seconds and peaked at 661.1 MiB; a read-only
 round trip reproduced the state count and mass.  A canonical-key-hash parent
 sampler and hash-window-uniform 4->5 fan/canonicalization calibration now pass
-the C=5 gate.  The corresponding C=6 M4 probe was deliberately stopped before
-completion and produced no accepted estimate; it remains the next bounded
-measurement.
+the C=5 gate.  The complete C=6 random probe then independently reproduced the
+older strided M4 window within 41 observed keys out of 14,095,055.  Its uniform
+20,000-state 4->5 sample found mean fan 2,617.482 (sampling SE 4.408), revising
+the biased local-sample mean 2,731 downward by 4.16%.  Holding the Chao M4
+estimate fixed gives 2.36323e12 projected 4->5 emissions.  A separate real
+2,000-parent canonicalizing sample processed 5,260,480 emissions at
+96.7 ns/emission wall on 24 threads with mean 7.47 search nodes.  This is a
+bounded kernel calibration, not a production-duration guarantee.
 
-The immediate objective is therefore the remaining bounded measurement
-preflight: strengthen `M_4`, calibrate the uniform 4->5 fan and depth-5
-canonicalization cost, then execute guarded allocation/restart and
-end-to-end rehearsals.
+The M4 and uniform 4->5 measurement gates are therefore closed.  The immediate
+objective is to validate the provisional layer-5 capacity and execute guarded
+allocation/restart and bounded end-to-end rehearsals.
 
 No full 63,199-class C=6 run is authorized.  Bounded probes and the
 pre-flight program are within scope.

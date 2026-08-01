@@ -148,6 +148,24 @@ The fan estimate represents the global layer only when the M4 window is near
 saturation.  The engine prints this limitation and never upgrades a killed
 prefix to a result.
 
+The completed C=6 run used 58,400 canonical-key-hash parents and captured
+99.9133% of the estimated window population under Chao1.  It found:
+
+```text
+M4 observed-window lower estimate = 902080896
+M4 Chao1 estimate                = 902863734
+uniform 4->5 fan mean / SE       = 2617.482 / 4.408
+projected 4->5 emissions         = 2.36323e12
+canonical 4->5 sample            = 5260480 emissions at 96.7 ns/emission
+```
+
+The random and historical strided windows differed by only 41 observed keys
+out of about 14.1 million, removing the material stride-bias concern.  M4 is
+still an estimate rather than an exact layer count.  The fan interval is a
+sampling interval and does not include residual capture-model uncertainty;
+the timing does not include production-scale NUMA, table-fill, or checkpoint
+effects.
+
 ## C=6 boundary
 
 The engine refuses plain `layer_dp_gate 6`.  Read-only bridge inspection and
@@ -202,17 +220,17 @@ With the still-provisional capacities
 | 4->5 | 71.685 GiB | 79.685 GiB | 116.609 GiB | 132.609 GiB |
 | 5->6 | 10.465 GiB | 18.465 GiB | 108.242 GiB | 124.242 GiB |
 
-These are capacity bounds, not measured production allocation.  In
-particular, the 1.35-billion and 250-million caps remain contingent on the
-stronger `M_4` and 4-to-5 calibration gates.
+These are capacity bounds, not measured production allocation.  The
+1.35-billion layer-4 cap is now supported by the completed M4/random-fan
+measurement.  The 250-million layer-5 cap remains provisional.
 
 ## Remaining preflight work
 
-The route is restart-safe at C=5, but a production decision still requires:
+The route is restart-safe at C=5, and the M4 plus uniform 4-to-5 measurement
+gates are complete.  A production decision still requires:
 
-1. a measured C=6 layer-4 capacity bound from stronger `M_4` probes;
-2. an unbiased layer-4-to-layer-5 fan/canonicalization calibration;
-3. a bounded staged allocation/restart rehearsal under the resource guard;
-4. a bounded end-to-end rehearsal, including deliberate interruption and
+1. a stronger bound or guarded measurement for the provisional layer-5 cap;
+2. a bounded staged allocation/restart rehearsal under the resource guard;
+3. a bounded end-to-end rehearsal, including deliberate interruption and
    external summation;
-5. an owner decision before any multi-day C=6 layer-4 run.
+4. an owner decision before any multi-day C=6 layer-4 run.
