@@ -194,14 +194,22 @@ function Invoke-LoggedProcess {
         [Parameter(Mandatory = $true)][string]$FilePath,
         [string[]]$Arguments = @(),
         [Parameter(Mandatory = $true)][string]$StdoutPath,
-        [Parameter(Mandatory = $true)][string]$StderrPath
+        [Parameter(Mandatory = $true)][string]$StderrPath,
+        [string]$NullExitSuccessPattern = ""
     )
     $child = Start-Process -FilePath $FilePath -ArgumentList $Arguments `
         -RedirectStandardOutput $StdoutPath `
         -RedirectStandardError $StderrPath -PassThru -WindowStyle Hidden
     $child.WaitForExit()
     $child.Refresh()
-    if ($null -eq $child.ExitCode) { return 97 }
+    if ($null -eq $child.ExitCode) {
+        if ($NullExitSuccessPattern -and
+            (Get-Content -Raw -LiteralPath $StdoutPath) -match
+                $NullExitSuccessPattern) {
+            return 0
+        }
+        return 97
+    }
     return [int]$child.ExitCode
 }
 
@@ -265,7 +273,7 @@ $gateArgs = @(
     (Join-Path $PSScriptRoot "verify_all.ps1")
 )
 $gateCode = Invoke-LoggedProcess "powershell.exe" $gateArgs $gateLog `
-    $gateErrorLog
+    $gateErrorLog "ALL REPOSITORY CHECKS PASSED"
 if ($gateCode -ne 0) {
     Get-Content -LiteralPath $gateLog -Tail 100
     Get-Content -LiteralPath $gateErrorLog -Tail 100
@@ -279,7 +287,7 @@ $buildArgs = @(
     (Join-Path $PSScriptRoot "build_layer_dp.ps1")
 )
 $buildCode = Invoke-LoggedProcess "powershell.exe" $buildArgs $buildLog `
-    $buildErrorLog
+    $buildErrorLog "built layer-DP gate engine and penultimate-layer counter"
 if ($buildCode -ne 0) {
     Get-Content -LiteralPath $buildLog -Tail 100
     Get-Content -LiteralPath $buildErrorLog -Tail 100
@@ -326,7 +334,7 @@ $preflightArgs = @(
 )
 $preflightErrorLog = Join-Path $sessionDir "resource-preflight.stderr.log"
 $preflightCode = Invoke-LoggedProcess $exe $preflightArgs $preflightLog `
-    $preflightErrorLog
+    $preflightErrorLog "RESOURCE PREFLIGHT PASS"
 if ($preflightCode -ne 0) {
     Get-Content -LiteralPath $preflightLog
     Get-Content -LiteralPath $preflightErrorLog
