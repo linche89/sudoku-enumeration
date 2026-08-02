@@ -2627,6 +2627,7 @@ int main(int argc, char** argv) {
         const u64 ckChunk = g_ckptChunk;
         const u64 nChunks = (u64)(nParents + ckChunk - 1) / ckChunk;
         u64 ckCursor = 0;
+        u64 priorEmissions = 0;
         if (g_resumePending && g_resumeHdr.parentLayer == (u32)L) {
             if (g_resumeHdr.chunkParents != ckChunk ||
                 g_resumeHdr.nChunks != nChunks) {
@@ -2657,6 +2658,7 @@ int main(int argc, char** argv) {
             ckCursor = g_resumeHdr.cursorChunk;
             totEmissions = g_resumeHdr.emissionsSoFar;
             totHits = g_resumeHdr.cacheHitsSoFar;
+            priorEmissions = totEmissions;
             if (rehearsalMode) {
                 const u64 prefix = std::min<u64>(
                     (u64)nParents, ckCursor * ckChunk);
@@ -2754,14 +2756,23 @@ int main(int argc, char** argv) {
         emissionsPerT.push_back(totEmissions);
         canonizePerT.push_back(g_canonize_calls - canon0);
         timePerT.push_back(now_s() - t0);
+        const u64 invocationEmissions = totEmissions - priorEmissions;
         std::printf("transition %d->%d: emissions=%llu children=%zu "
                     "(holes=%u) time=%.3fs  (%.1f ns/emission, %.1f%% cache "
                     "hits)\n",
                     L, L + 1, (unsigned long long)totEmissions,
                     layers[L + 1].real_size(), layers[L + 1].holes,
                     timePerT.back(),
-                    totEmissions ? timePerT.back() * 1e9 / totEmissions : 0.0,
+                    invocationEmissions
+                        ? timePerT.back() * 1e9 / invocationEmissions
+                        : 0.0,
                     totEmissions ? 100.0 * totHits / totEmissions : 0.0);
+        if (priorEmissions)
+            std::printf("resume emission accounting %d->%d: prior=%llu "
+                        "this_process=%llu cumulative=%llu\n",
+                        L, L + 1, (unsigned long long)priorEmissions,
+                        (unsigned long long)invocationEmissions,
+                        (unsigned long long)totEmissions);
         if (rehearsalMode)
             std::printf("rehearsal parent selection %d->%d: %llu/%zu "
                         "canonical parents (hash fraction 1/%llu)\n",

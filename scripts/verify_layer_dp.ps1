@@ -219,6 +219,10 @@ function Start-Kill-And-Resume {
     } else {
         Invoke-Layer "resume layer $LoadLayer" $resumeArgs $resumeLog
     }
+    if ((Get-Content -Raw -LiteralPath $resumeLog) -notmatch
+        "resume emission accounting") {
+        throw "resume log omitted per-invocation emission accounting"
+    }
     Assert-FileEqual $GoldenDump $dump "resumed class dump"
     return $base
 }
