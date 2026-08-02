@@ -323,6 +323,103 @@ try {
         throw "staged stop did not produce a closed layer-4 snapshot"
     }
 
+    # Production-shaped sparse-lineage rehearsal.  Layer 3 is an exact
+    # import; all descendants are watermarked by the checkpoint fingerprint,
+    # deliberately interrupted, and forbidden to load in production mode.
+    Write-Host "== watermarked rehearsal stage 3->4 kill/resume =="
+    $reh34Dir = Join-Path $work "rehearsal-34"
+    New-Item -ItemType Directory -Path $reh34Dir | Out-Null
+    $reh34Base = Join-Path $reh34Dir "ck"
+    $reh34Out = Join-Path $reh34Dir "killed.out"
+    $reh34Err = Join-Path $reh34Dir "killed.err"
+    $reh34Args = @(
+        "5", "--threads", "$Threads", "--caps", $caps,
+        "--rehearsal-denom", "2",
+        "--load-layer", "3", $layer3,
+        "--checkpoint", $reh34Base, "0", "--ckpt-chunk", "500",
+        "--stop-after", "4"
+    )
+    $reh34Proc = Start-Process -FilePath $exe -ArgumentList $reh34Args `
+        -RedirectStandardOutput $reh34Out `
+        -RedirectStandardError $reh34Err `
+        -PassThru -WindowStyle Hidden
+    $rehDeadline = (Get-Date).AddSeconds(30)
+    while ((Get-Date) -lt $rehDeadline -and
+           !(Test-Path -LiteralPath ($reh34Base + ".a")) -and
+           !(Test-Path -LiteralPath ($reh34Base + ".b"))) {
+        Start-Sleep -Milliseconds 25
+        $reh34Proc.Refresh()
+        if ($reh34Proc.HasExited) { break }
+    }
+    $reh34Proc.Refresh()
+    if ($reh34Proc.HasExited -or
+        (!(Test-Path -LiteralPath ($reh34Base + ".a")) -and
+         !(Test-Path -LiteralPath ($reh34Base + ".b")))) {
+        Get-Content -LiteralPath $reh34Out -ErrorAction SilentlyContinue
+        Get-Content -LiteralPath $reh34Err -ErrorAction SilentlyContinue
+        throw "rehearsal stage completed or failed before forced kill"
+    }
+    Stop-Process -Id $reh34Proc.Id -Force
+    Wait-Process -Id $reh34Proc.Id -Timeout 10 -ErrorAction SilentlyContinue
+    $reh34Resume = @(
+        "5", "--threads", "$Threads", "--caps", $caps,
+        "--rehearsal-denom", "2",
+        "--checkpoint", $reh34Base, "0", "--ckpt-chunk", "500",
+        "--resume", $reh34Base, "--stop-after", "4"
+    )
+    $reh34ResumeLog = Join-Path $reh34Dir "resume.log"
+    Invoke-Layer "watermarked rehearsal resume" `
+        $reh34Resume $reh34ResumeLog
+    $reh4 = $reh34Base + ".L4.snap"
+    $reh34Text = Get-Content -Raw -LiteralPath $reh34ResumeLog
+    if (!(Test-Path -LiteralPath $reh4) -or
+        $reh34Text -notmatch "BOUNDED REHEARSAL lineage" -or
+        $reh34Text -notmatch "STOPPED AFTER LAYER 4") {
+        throw "watermarked rehearsal resume did not close layer 4"
+    }
+
+    Invoke-ExpectExit "rehearsal production-lineage refusal" `
+        @("5", "--threads", "$Threads", "--caps", $caps,
+          "--load-layer", "4", $reh4,
+          "--dump", (Join-Path $reh34Dir "forbidden.csv")) 12 $work
+    Invoke-ExpectExit "rehearsal denominator mismatch refusal" `
+        @("5", "--threads", "$Threads", "--caps", $caps,
+          "--rehearsal-denom", "3",
+          "--load-layer", "4", $reh4,
+          "--checkpoint", (Join-Path $reh34Dir "wrong-ck"), "0",
+          "--dump", (Join-Path $reh34Dir "wrong.csv")) 12 $work
+
+    $reh45Dir = Join-Path $work "rehearsal-45"
+    New-Item -ItemType Directory -Path $reh45Dir | Out-Null
+    $rehDump = Join-Path $reh45Dir "rehearsal.csv"
+    $reh45Args = @(
+        "5", "--threads", "$Threads", "--caps", $caps,
+        "--rehearsal-denom", "2", "--load-layer", "4", $reh4,
+        "--checkpoint", (Join-Path $reh45Dir "ck"), "0",
+        "--ckpt-chunk", "500", "--dump", $rehDump
+    )
+    Invoke-Layer "watermarked rehearsal final stage" `
+        $reh45Args (Join-Path $reh45Dir "run.log")
+    $reh45ReplayDir = Join-Path $work "rehearsal-45-replay"
+    New-Item -ItemType Directory -Path $reh45ReplayDir | Out-Null
+    $rehReplay = Join-Path $reh45ReplayDir "rehearsal.csv"
+    $rehReplayArgs = @(
+        "5", "--threads", "$Threads", "--caps", $caps,
+        "--rehearsal-denom", "2", "--load-layer", "4", $reh4,
+        "--checkpoint", (Join-Path $reh45ReplayDir "ck"), "0",
+        "--ckpt-chunk", "500", "--dump", $rehReplay
+    )
+    Invoke-Layer "watermarked rehearsal final replay" `
+        $rehReplayArgs (Join-Path $reh45ReplayDir "run.log")
+    Assert-FileEqual $rehDump $rehReplay "rehearsal final replay"
+    & python $s4 $rehDump "--classes" "354" "--rehearsal" `
+        "--expect-n" "119726523775193340292890624000" `
+        *> (Join-Path $reh45Dir "external-checksum.log")
+    if ($LASTEXITCODE -ne 0) {
+        Get-Content -LiteralPath (Join-Path $reh45Dir "external-checksum.log")
+        throw "watermarked rehearsal external checksum failed"
+    }
+
     Write-Host "== S4 exact summation =="
     & python $s4 $gold "--classes" "355" "--expect-n" $expectedN `
         *> (Join-Path $work "s4.log")

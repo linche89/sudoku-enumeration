@@ -21,6 +21,12 @@ Integrity gates, all evaluated BEFORE the total is printed:
 If ``--expect-n`` is given, the computed N is compared against it and the
 script prints ``PASS``/``FAIL`` accordingly.
 
+``--rehearsal`` instead requires the visibly watermarked last column
+``F_rehearsal`` and labels the result as a mechanical checksum, never N(C).
+The optional class count still gates against truncation, while labelled mass
+is required to be no larger than the complete mass (a sparse chain need not
+reach every final class).
+
 Exit codes:
   0  all integrity gates (and the optional N comparison) passed
   1  usage or I/O error (bad CSV structure, unreadable file, bad flags)
@@ -54,16 +60,21 @@ def parse_args(argv):
         description="Exact external summation N = sum m*ell*F^2 over a "
                     "layer_dp_gate per-class dump CSV, with integrity gates.")
     p.add_argument("dump", help="per-class dump CSV (from --dump)")
-    p.add_argument("--classes", type=int, required=True,
+    p.add_argument("--classes", type=int, required=False,
                    help="expected number of data rows (complete classes)")
     p.add_argument("--expect-f", default=None, metavar="F1,F2,...",
                    help="comma-separated F values that must appear in the "
                         "F column")
     p.add_argument("--expect-n", type=int, default=None, metavar="N",
                    help="expected exact value of N; PASS/FAIL is printed")
+    p.add_argument("--rehearsal", action="store_true",
+                   help="require F_rehearsal input and print a non-N "
+                        "mechanical checksum")
     args = p.parse_args(argv)
-    if args.classes <= 0:
+    if args.classes is not None and args.classes <= 0:
         p.error("--classes must be positive")
+    if args.classes is None and not args.rehearsal:
+        p.error("--classes is required outside --rehearsal mode")
     if args.expect_f is not None:
         try:
             args.expect_f = [int(t) for t in args.expect_f.split(",") if t]
@@ -74,7 +85,7 @@ def parse_args(argv):
     return args
 
 
-def read_dump(path):
+def read_dump(path, rehearsal=False):
     """Return (rows, C) where rows is a list of (m, ell, F) ints."""
     rows = []
     words_per_row = None
@@ -87,8 +98,13 @@ def read_dump(path):
         header = next(reader, None)
         if header is None:
             fail(1, "%s: empty file" % path)
+        final_column_ok = False
+        if len(header) == 5:
+            final_column_ok = (
+                header[4] == "F_rehearsal" if rehearsal else
+                F_COLUMN_RE.fullmatch(header[4]) is not None)
         if (len(header) != 5 or header[:4] != EXPECTED_HEADER
-                or not F_COLUMN_RE.fullmatch(header[4])):
+                or not final_column_ok):
             fail(1, "%s: unexpected header %r" % (path, header))
         for lineno, rec in enumerate(reader, start=2):
             if not rec:
@@ -97,6 +113,7 @@ def read_dump(path):
                 fail(1, "%s:%d: expected 5 fields, got %d"
                      % (path, lineno, len(rec)))
             try:
+                qid = int(rec[0])
                 words = [int(w) for w in rec[1].split()]
                 m, ell, F = int(rec[2]), int(rec[3]), int(rec[4])
             except ValueError as e:
@@ -112,6 +129,9 @@ def read_dump(path):
             if m <= 0 or ell <= 0 or F < 0:
                 fail(1, "%s:%d: non-positive m/ell or negative F"
                      % (path, lineno))
+            if qid != len(rows):
+                fail(1, "%s:%d: qid %d is not the expected contiguous %d"
+                     % (path, lineno, qid, len(rows)))
             rows.append((m, ell, F))
     if not rows:
         fail(1, "%s: no data rows" % path)
@@ -120,23 +140,37 @@ def read_dump(path):
 
 def main(argv=None):
     args = parse_args(argv)
-    rows, C = read_dump(args.dump)
+    rows, C = read_dump(args.dump, args.rehearsal)
 
     # --- integrity gates (all BEFORE N is printed) -----------------------
     print("dump = %s" % args.dump)
     print("C = %d  (2C = %d words per representative)" % (C, 2 * C))
+    if args.rehearsal:
+        print("mode = BOUNDED REHEARSAL (watermarked; result is NOT N(%d))" % C)
 
-    if len(rows) != args.classes:
-        fail(2, "class count %d != expected %d" % (len(rows), args.classes))
-    print("classes = %d  OK (expected %d)" % (len(rows), args.classes))
+    if args.classes is not None:
+        if len(rows) != args.classes:
+            fail(2, "class count %d != expected %d"
+                 % (len(rows), args.classes))
+        print("classes = %d  OK (expected %d)"
+              % (len(rows), args.classes))
+    else:
+        print("classes = %d  OK (contiguous qids)" % len(rows))
 
     mass = sum(m * ell for m, ell, _ in rows)
     expected_mass = math.comb(2 * C, C) ** C
-    if mass != expected_mass:
-        fail(2, "sum(m*ell) = %d != binomial(%d,%d)^%d = %d"
-             % (mass, 2 * C, C, C, expected_mass))
-    print("sum(m*ell) = %d  OK (== binomial(%d,%d)^%d)"
-          % (mass, 2 * C, C, C))
+    if args.rehearsal:
+        if mass > expected_mass:
+            fail(2, "captured sum(m*ell) = %d exceeds complete mass %d"
+                 % (mass, expected_mass))
+        print("captured sum(m*ell) = %d <= complete mass %d  OK"
+              % (mass, expected_mass))
+    else:
+        if mass != expected_mass:
+            fail(2, "sum(m*ell) = %d != binomial(%d,%d)^%d = %d"
+                 % (mass, 2 * C, C, C, expected_mass))
+        print("sum(m*ell) = %d  OK (== binomial(%d,%d)^%d)"
+              % (mass, 2 * C, C, C))
 
     if args.expect_f is not None:
         present = {F for _, _, F in rows}
@@ -149,13 +183,18 @@ def main(argv=None):
 
     # --- exact total -----------------------------------------------------
     N = sum(m * ell * F * F for m, ell, F in rows)
-    print("N(%d) = %d" % (C, N))
+    if args.rehearsal:
+        print("rehearsal_checksum(%d) = %d  (NOT N(%d))" % (C, N, C))
+    else:
+        print("N(%d) = %d" % (C, N))
 
     if args.expect_n is not None:
         if N == args.expect_n:
-            print("N check vs expected %d: PASS" % args.expect_n)
+            label = "rehearsal checksum" if args.rehearsal else "N"
+            print("%s check vs expected %d: PASS" % (label, args.expect_n))
         else:
-            print("N check vs expected %d: FAIL" % args.expect_n)
+            label = "rehearsal checksum" if args.rehearsal else "N"
+            print("%s check vs expected %d: FAIL" % (label, args.expect_n))
             sys.exit(3)
     sys.exit(0)
 

@@ -68,6 +68,12 @@ using u128 = unsigned __int128;
 
 static int C, N2C;          // C boxes, 2C slots/symbols
 static u64 FACT[13];
+// A bounded rehearsal applies a deterministic sparse parent operator from
+// layer 3 onward.  Its descendants are exact for that artificial operator,
+// but are NOT production C=6 memo values.  Checkpoint fingerprints and CSV
+// headers keep the lineage fail-closed and visibly distinct.
+static u64 g_rehearsalDenom = 0;  // 0 = production; D >= 2 keeps about 1/D
+static const u64 REHEARSAL_SEED = 0x5245484541525331ULL;  // "REHEARS1"
 
 static u64 exact_penultimate_states(int c) {
     switch (c) {
@@ -714,6 +720,13 @@ static u64 sample_mix64(u64 x) {
     return x ^ (x >> 31);
 }
 
+static bool rehearsal_parent_selected(const State& key, int parentLayer) {
+    if (!g_rehearsalDenom || parentLayer < 3) return true;
+    const u64 domain =
+        REHEARSAL_SEED ^ ((u64)parentLayer * 0xd6e8feb86659fd93ULL);
+    return sample_mix64(state_hash(key) ^ domain) % g_rehearsalDenom == 0;
+}
+
 static std::vector<u32> layer_key_hash_sample(const Layer& lay, size_t take,
                                               u64 seed) {
     take = std::min(take, lay.real_size());
@@ -1237,8 +1250,13 @@ static int resource_preflight(int L, int nthreads,
     return ok ? 0 : 13;
 }
 
-static u64 ck_config_hash() {
-    const u64 words[] = {
+static u64 ck_config_hash(u32 layerIdx) {
+    // Layers 1..3 remain the complete exact production seed and can be
+    // imported read-only into a rehearsal.  Every descendant from layer 4
+    // onward is bound to the rehearsal denominator and cannot be opened by a
+    // production invocation (or by a rehearsal with a different fraction).
+    const bool sparseLineage = g_rehearsalDenom && layerIdx >= 4;
+    const u64 baseWords[] = {
         CK_ALGO_TAG,
         (u64)C,
         (u64)N2C,
@@ -1246,12 +1264,15 @@ static u64 ck_config_hash() {
         g_wlseed ? 1ULL : 0ULL,
         g_forceWide ? 1ULL : 0ULL,
     };
-    return ck_hash64(words, sizeof(words), CK_SEED);
+    const u64 base = ck_hash64(baseWords, sizeof(baseWords), CK_SEED);
+    if (!sparseLineage) return base;  // byte-compatible with production v2
+    const u64 lineageWords[] = {REHEARSAL_SEED, g_rehearsalDenom};
+    return ck_hash64(lineageWords, sizeof(lineageWords), base);
 }
 
 static bool ck_header_sane(const CkptHeader& h, u64* expectedBytes = nullptr) {
     if (h.magic != CK_MAGIC || h.version != CK_VERSION ||
-        h.cVal != (u32)C || h.configHash != ck_config_hash())
+        h.cVal != (u32)C || h.configHash != ck_config_hash(h.layerIdx))
         return false;
     if (h.layerIdx < 1 || h.layerIdx > (u32)C ||
         h.parentLayer >= (u32)C)
@@ -1342,7 +1363,7 @@ static bool ck_write_file(const std::string& path, CkptHeader h,
     h.magic = CK_MAGIC;
     h.version = CK_VERSION;
     h.cVal = (u32)C;
-    h.configHash = ck_config_hash();
+    h.configHash = ck_config_hash(h.layerIdx);
     u64 ph = CK_SEED;
     ph = ck_hash64(keys, (size_t)h.nEntries * sizeof(State), ph);
     ph = ck_hash64(T, (size_t)h.nEntries * sizeof(u64), ph);
@@ -1735,7 +1756,8 @@ int main(int argc, char** argv) {
                              "  probes: [--m4probe K W CAP "
                              "[--m4-parent-seed S] [--fan-sample N] "
                              "[--fan-canon-sample N CAP]]\n"
-                             "  C6 safety: [--bridge-only] [--ack-full-c6]\n",
+                             "  C6 safety: [--bridge-only] [--ack-full-c6]\n"
+                             "  dress rehearsal: [--rehearsal-denom D]\n",
                      argv[0]);
         return 2;
     }
@@ -1810,6 +1832,8 @@ int main(int argc, char** argv) {
             g_ckptChunk = std::stoull(argv[++a]);
         else if (s == "--resume" && a + 1 < argc) g_resumeBase = argv[++a];
         else if (s == "--force-wide") g_forceWide = true;
+        else if (s == "--rehearsal-denom" && a + 1 < argc)
+            g_rehearsalDenom = std::stoull(argv[++a]);
         else if (s == "--bridge-only") bridgeOnly = true;
         else if (s == "--ack-full-c6") ackFullC6 = true;
         else if (s == "--resource-preflight" && a + 1 < argc)
@@ -1829,6 +1853,16 @@ int main(int argc, char** argv) {
 #endif
     if (nthreads < 1) {
         std::fprintf(stderr, "--threads must be positive\n");
+        return 2;
+    }
+    if (g_rehearsalDenom == 1) {
+        std::fprintf(stderr, "--rehearsal-denom must be 0/off or >= 2\n");
+        return 2;
+    }
+    const bool rehearsalMode = g_rehearsalDenom >= 2;
+    if (rehearsalMode && C < 5) {
+        std::fprintf(stderr,
+                     "--rehearsal-denom is supported at C=5 (gate) or C=6\n");
         return 2;
     }
     if (m4K < 0 || m4W < 0 || m4W >= 64 ||
@@ -1963,8 +1997,67 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "--ack-full-c6 is meaningful only at C=6\n");
         return 2;
     }
+    if (rehearsalMode) {
+        if (ackFullC6 || bridgeOnly || resourcePreflightL >= 0 || m4K ||
+            probeLayer || doRank || !refPath.empty() || invarianceN ||
+            scanCheckN || layerMassL || fanSample) {
+            std::fprintf(stderr,
+                         "--rehearsal-denom is an isolated staged mode; "
+                         "remove production authorization, probes, refs, "
+                         "rank, and whole-chain verification flags\n");
+            return 2;
+        }
+        if (g_ckptBase.empty() || nthreads <= 1 ||
+            caps.size() < (size_t)(C - 1) ||
+            (g_loadLayerIdx == 0 && g_resumeBase.empty())) {
+            std::fprintf(stderr,
+                         "bounded rehearsal requires --checkpoint, --threads "
+                         "> 1, complete --caps, and a loaded/resumed layer\n");
+            return 2;
+        }
+        int stageL = g_loadLayerIdx;
+        if (!g_resumeBase.empty() &&
+            !ckpt_peek_stage(g_resumeBase, stageL)) {
+            std::fprintf(stderr,
+                         "cannot determine rehearsal stage from checkpoint "
+                         "headers\n");
+            return 12;
+        }
+        if (stageL < 3 || stageL >= C) {
+            std::fprintf(stderr,
+                         "bounded rehearsal must start from layer 3..%d\n",
+                         C - 1);
+            return 2;
+        }
+        const int requiredStop = stageL < C - 1 ? stageL + 1 : 0;
+        if (stopAfter != requiredStop) {
+            std::fprintf(stderr,
+                         "rehearsal transition %d->%d requires %s; one "
+                         "transition per process\n",
+                         stageL, stageL + 1,
+                         requiredStop
+                             ? ("--stop-after " +
+                                std::to_string(requiredStop)).c_str()
+                             : "no --stop-after (final stage)");
+            return 2;
+        }
+        if (!requiredStop && dumpPath.empty()) {
+            std::fprintf(stderr,
+                         "final rehearsal stage requires --dump for external "
+                         "checksum\n");
+            return 2;
+        }
+        if (C == 6) {
+            const int resourceRc = resource_preflight(stageL, nthreads, caps);
+            if (resourceRc != 0) return resourceRc;
+        }
+        std::printf("BOUNDED REHEARSAL lineage: keep canonical-key hash "
+                    "1/%llu from each parent layer >= 3; outputs are NOT "
+                    "production memo values\n",
+                    (unsigned long long)g_rehearsalDenom);
+    }
     const bool boundedC6 =
-        bridgeOnly || resourcePreflightL >= 0 || m4K > 0 ||
+        rehearsalMode || bridgeOnly || resourcePreflightL >= 0 || m4K > 0 ||
         (stopAfter > 0 && stopAfter <= 3) ||
         (probeLayer > 0 && probeParents > 0 &&
          (probeLayer <= 3 || g_loadLayerIdx == probeLayer));
@@ -2149,6 +2242,13 @@ int main(int argc, char** argv) {
     }
     auto checkPenultimateLayer = [&](int layer) {
         if (layer != C - 1) return true;
+        if (rehearsalMode) {
+            std::printf("REHEARSAL: penultimate layer %d has %zu sparse-"
+                        "lineage states; production M_%d anchor intentionally "
+                        "not applied\n",
+                        layer, layers[layer].real_size(), layer);
+            return true;
+        }
         const u64 expected = exact_penultimate_states(C);
         const size_t observed = layers[layer].real_size();
         const bool ok = observed == expected;
@@ -2521,6 +2621,7 @@ int main(int argc, char** argv) {
         bool record = doRank;
         if (record) Rrows[L].resize(nParents);
         u64 totEmissions = 0, totHits = 0;
+        u64 rehearsalSelected = 0;
         const bool wideHere = (L + 1 == C && (C >= 6 || g_forceWide));
         const bool ckptHere = !g_ckptBase.empty();
         const u64 ckChunk = g_ckptChunk;
@@ -2556,6 +2657,14 @@ int main(int argc, char** argv) {
             ckCursor = g_resumeHdr.cursorChunk;
             totEmissions = g_resumeHdr.emissionsSoFar;
             totHits = g_resumeHdr.cacheHitsSoFar;
+            if (rehearsalMode) {
+                const u64 prefix = std::min<u64>(
+                    (u64)nParents, ckCursor * ckChunk);
+                for (u64 i = 0; i < prefix; i++)
+                    if (!layers[L].is_hole((u32)i) &&
+                        rehearsal_parent_selected(layers[L].keys[i], L))
+                        rehearsalSelected++;
+            }
             g_resumePending = false;
             std::printf("resume: transition %d->%d at chunk %llu/%llu "
                         "(child entries=%zu holes=%u)\n", L, L + 1,
@@ -2574,7 +2683,7 @@ int main(int argc, char** argv) {
                 (u64)nParents, (ckStep + 1) * ckChunk);
 #ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads) if (nthreads > 1) \
-    reduction(+ : totEmissions, totHits)
+    reduction(+ : totEmissions, totHits, rehearsalSelected)
 #endif
             {
                 EmitCtx ctx;
@@ -2590,6 +2699,10 @@ int main(int argc, char** argv) {
 #endif
                 for (long long i = lo; i < hi; i++) {
                     if (layers[L].is_hole((u32)i)) continue;
+                    if (rehearsalMode &&
+                        !rehearsal_parent_selected(layers[L].keys[i], L))
+                        continue;
+                    if (rehearsalMode) rehearsalSelected++;
                     ctx.row = record ? &Rrows[L][i] : nullptr;
                     ctx.prepare(layers[L].keys[i], layers[L].T[i]);
                     ctx.rec(0, (1u << N2C) - 1);
@@ -2649,6 +2762,13 @@ int main(int argc, char** argv) {
                     timePerT.back(),
                     totEmissions ? timePerT.back() * 1e9 / totEmissions : 0.0,
                     totEmissions ? 100.0 * totHits / totEmissions : 0.0);
+        if (rehearsalMode)
+            std::printf("rehearsal parent selection %d->%d: %llu/%zu "
+                        "canonical parents (hash fraction 1/%llu)\n",
+                        L, L + 1,
+                        (unsigned long long)rehearsalSelected,
+                        layers[L].real_size(),
+                        (unsigned long long)g_rehearsalDenom);
         std::fflush(stdout);
         if (!checkPenultimateLayer(L + 1)) return 9;
         if (ckptHere) {   // finalized child = next transition's parent snapshot
@@ -2722,7 +2842,7 @@ int main(int argc, char** argv) {
                   return std::memcmp(a.q.m.data(), b.q.m.data(),
                                      sizeof(u16) * 12) < 0;
               });
-    if (C == 6) {
+    if (C == 6 && !rehearsalMode) {
         if (classesOut.size() != 63199) {
             std::fprintf(stderr,
                          "C=6 complete class count %zu != 63199\n",
@@ -2755,7 +2875,13 @@ int main(int argc, char** argv) {
     for (u64 e : emissionsPerT) std::printf("%llu ", (unsigned long long)e);
     std::printf("\ncomplete classes = %zu\n", classesOut.size());
     std::printf("sum_w (labelled multiplicity sum) = %s\n", u128_str(sumW).c_str());
-    if (C < 6)
+    if (rehearsalMode && C < 6)
+        std::printf("rehearsal weighted-square checksum = %s "
+                    "(NOT N(%d))\n", u128_str(N).c_str(), C);
+    else if (rehearsalMode)
+        std::printf("rehearsal weighted-square checksum: sum the watermarked "
+                    "--dump CSV externally (NOT N(%d))\n", C);
+    else if (C < 6)
         std::printf("N(%d) = %s\n", C, u128_str(N).c_str());
     else
         std::printf("N(%d): per-term overflow of u128; sum the --dump CSV "
@@ -2768,7 +2894,8 @@ int main(int argc, char** argv) {
 
     // built-in expectations
     struct Expect { const char* N; std::vector<u64> em; std::vector<size_t> st; };
-    if (C == 2 || C == 3 || C == 4 || C == 5) {
+    if (!rehearsalMode &&
+        (C == 2 || C == 3 || C == 4 || C == 5)) {
         const char* expN =
             C == 2 ? "288" :
             C == 3 ? "28200960" :
@@ -2960,7 +3087,8 @@ int main(int argc, char** argv) {
     if (!dumpPath.empty()) {
         std::ofstream f(dumpPath);
         f << "qid,representative_words,coordinate_orbit_size,"
-             "labelled_multiplicity,F\n";
+             "labelled_multiplicity,"
+          << (rehearsalMode ? "F_rehearsal" : "F") << "\n";
         for (size_t i = 0; i < classesOut.size(); i++) {
             const ClassOut& c = classesOut[i];
             f << i << ",\"";
@@ -3015,6 +3143,10 @@ int main(int argc, char** argv) {
         }
     }
 
-    std::printf("ALL GATES PASSED for C=%d\n", C);
+    if (rehearsalMode)
+        std::printf("BOUNDED REHEARSAL COMPLETED for C=%d (NOT N(%d))\n",
+                    C, C);
+    else
+        std::printf("ALL GATES PASSED for C=%d\n", C);
     return 0;
 }
