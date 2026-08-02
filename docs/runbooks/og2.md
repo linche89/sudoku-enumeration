@@ -134,6 +134,35 @@ layer 3->4 must stop at 4, layer 4->5 must stop at 5, and only layer 5 may
 continue to the final CSV.  The engine repeats the resource check
 automatically and refuses a monolithic large-layer invocation.
 
+The owner-authorized production S1 work uses bounded daily windows through
+the dedicated controller.  The first window is:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\run_layer_dp_c6_s1_window.ps1 `
+  -AuthorizeFullC6 -WindowHours 8 -HardMaxHours 10
+```
+
+The controller reruns the complete repository gate, verifies both retained
+L3 hashes, performs the target-volume resource preflight, enforces an
+85-GiB RSS bound and an 8-GiB minimum-available-RAM bound, and starts only a
+staged `3->4 --stop-after 4` process.  At eight hours it waits for the next
+durable checkpoint marker and then stops the process.  Ten hours is an
+absolute process bound.  It copies the newest durable generation to the D:
+external backup directory and verifies SHA-256 before returning.
+
+Continue the same S1 namespace on a later day with the identical defaults
+plus:
+
+```powershell
+-ContinueExisting
+```
+
+A killed current chunk is deliberately not accepted as progress; resume
+loads the newest verified generation and recomputes only work after its
+stored cursor.  Do not rename, clear, or mix the production namespace with
+the rehearsal directories.
+
 The production-cap 3-to-4 allocation/restart rehearsal passed on 2026-08-01:
 
 ```text

@@ -503,8 +503,12 @@ overhead and a roughly 40-minute recomputation window.  The immediate
 objective is now the repository owner's explicit decision before any
 multi-day production S1 stage, including that checkpoint-period choice.
 
-No full 63,199-class C=6 run is authorized.  Bounded probes and the
-pre-flight program are within scope.
+No full 63,199-class C=6 result is yet authorized as one open-ended run.
+On 2026-08-02 the repository owner authorized the first production S1
+window only: target eight hours, hard stop at ten hours, 85-GiB RSS guard,
+and pause after the first durable checkpoint following the target.  The
+window uses the exact retained L3 seed and a fresh production namespace;
+later windows and S2/S3 remain separate decisions.
 
 ## Current checkpoint
 

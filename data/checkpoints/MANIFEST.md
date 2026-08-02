@@ -64,3 +64,29 @@ D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_layer3_20260731.snap
 ```
 
 Source and backup had the SHA-256 value above after copying.
+
+## layer_dp_c6_s1_prod_20260802 (active production namespace)
+
+The repository owner authorized one bounded production S1 (`3->4`) window
+on 2026-08-02.  Its target duration is eight hours, its hard process bound is
+ten hours, and its RSS bound is 85 GiB.  This is partial resumable work, not a
+closed layer or a C=6 result.
+
+```text
+checkpoint base:
+E:\Code\sudoku_FJ\data\checkpoints\layer_dp_c6_s1_prod_20260802
+
+external backup directory:
+D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_s1_prod_20260802
+
+controller:
+scripts\run_layer_dp_c6_s1_window.ps1
+```
+
+The immutable parent is `layer_dp_c6_layer3_20260731.snap` with the SHA-256
+recorded above.  Before every resume, the controller requires an external
+SHA-256-verified copy of the newest durable generation.  After every bounded
+window it copies the newest successful A/B generation (or closed L4
+snapshot) to the external directory and writes a receipt.  The latest
+closed-window cursor and hash must be distilled here before handoff; runtime
+details remain under `data/logs/layer_dp_c6_s1_prod_20260802/`.
