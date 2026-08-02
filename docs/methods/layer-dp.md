@@ -121,6 +121,8 @@ The gate covers:
 - layer snapshot round trip and external exact summation;
 - randomized kill/resume, including the forced-wide final transition and a
   deterministic Windows sharing-lock retry;
+- watermarked sparse-lineage kill/resume, production/mismatched-lineage
+  refusal, deterministic final replay, and external rehearsal checksum;
 - mode mismatch and stale-base refusal;
 - fail-stop checkpoint-write error;
 - corrupt newest-generation fallback;
@@ -276,12 +278,52 @@ files were empty, and the active checkpoints plus external backups remained
 unchanged.  See
 `../reports/og2/layer-dp-c6-allocation-restart-rehearsal-20260801.md`.
 
-## Remaining preflight work
+## Bounded end-to-end rehearsal
 
-The route is restart-safe at C=5 and now has a production-cap C=6 3-to-4
-allocation/restart rehearsal.  The M4, uniform 4-to-5, and exact M5 capacity
-gates are complete.  A production decision still requires:
+`--rehearsal-denom D` implements a deterministic sparse operator for staged
+mechanical rehearsal.  Starting at layer 3, it keeps a canonical parent when
+the fixed, layer-domain-separated key hash is zero modulo `D`.  Exact layers
+through L3 retain the ordinary version-2 fingerprint; every L4-or-later image
+binds the rehearsal seed and denominator into its configuration fingerprint.
+Production mode and a different denominator therefore reject those images.
 
-1. a bounded end-to-end rehearsal, including deliberate interruption and
-   external summation;
-2. an owner decision before any multi-day C=6 layer-4 run.
+The mode is restricted to one loaded/resumed transition per process.  It
+skips production-only complete-layer anchors, labels its CSV column
+`F_rehearsal`, and never prints `N(6)`.  The external helper requires
+`--rehearsal`, checks contiguous qids and captured labelled mass, and labels
+the arbitrary-precision result as a checksum rather than a band count.
+
+The C=5 gate covers deliberate kill/resume, lineage and denominator mismatch
+refusals, final-stage replay, and a fixed external checksum.  The complete
+C=6 denominator-100 rehearsal then passed on 2026-08-02:
+
+```text
+S1: 123571 parents, 21387180240 emissions, 903346741 L4 states
+S2: 9029054 parents, 23637232504 emissions, 96452753 L5 states
+S3: 964867 parents, 55653192 emissions, 63117 captured classes
+CSV SHA-256: B247C170370D7936D3406E485BF4A50E27198BB2AD86F16CDE32B19F87038A96
+external checksum: 38528041484076505706899541562753024000 (NOT N(6))
+```
+
+S1 was forcibly stopped after a durable 29.68-GiB generation at cursor
+23/124 and resumed without rebuilding its prefix.  Its peak was 61.861 GiB;
+S2 peaked at 48.703 GiB.  The two S3 executions had different harmless hole
+counts but byte-identical sorted CSVs.  L5 was two states short of the exact
+Burnside value and the final vector was 82 classes short of 63,199, positively
+confirming that the sparse lineage is not a production result.
+
+Ten-minute rehearsal checkpoints took 22.69-35.00 seconds in S1 and
+6.30-8.36 seconds in S2.  For a multi-day production run, a 40-minute period
+is the current recommendation: it keeps measured steady-state S1 overhead
+below about 1% with a roughly 40-minute maximum recomputation window.  The
+owner must still choose the production period explicitly.
+
+See
+`../reports/og2/layer-dp-c6-bounded-end-to-end-rehearsal-20260802.md`.
+
+## Remaining production decision
+
+The M4, uniform 4-to-5, exact M5 capacity, allocation/restart, and bounded
+end-to-end gates are complete.  The remaining prerequisite is an explicit
+repository-owner decision before committing the multi-day C=6 S1 run and its
+checkpoint period.  No complete C=6 run is authorized by the rehearsal.

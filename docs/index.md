@@ -21,7 +21,7 @@
   failed scale gate for immediate pairwise canonicalization.
 - `methods/layer-dp.md` — qualified global row-incremental candidate,
   exact recurrence, canonicalization gates, checkpoint/restart guarantees,
-  C=6 launch boundary, and remaining production preflight.
+  completed bounded C=6 preflight, and owner-controlled launch boundary.
 - `../fj9/reproduction.md` — complete FJ05 9x9 reproduction.
 
 ## Current mathematics
@@ -35,6 +35,7 @@
 
 ## Dated evidence
 
+- `reports/og2/layer-dp-c6-bounded-end-to-end-rehearsal-20260802.md`
 - `reports/og2/layer-dp-c6-allocation-restart-rehearsal-20260801.md`
 - `reports/og2/layer-dp-penultimate-burnside-20260801.md`
 - `reports/og2/layer-dp-m4-random-calibration-20260801.md`

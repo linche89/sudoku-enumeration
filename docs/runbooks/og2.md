@@ -92,7 +92,8 @@ For C=6, only the following are routine:
 Any larger bounded probe needs `scripts/watch_rss.ps1` with explicit time and
 memory limits.  `--ack-full-c6` is an accidental-launch interlock, not owner
 authorization.  Before a large stage, follow the writable-C=6 policy below
-and the remaining preflight list in `../methods/layer-dp.md`.
+and the completed-preflight/owner-decision boundary in
+`../methods/layer-dp.md`.
 
 Run the read-only resource plan against the intended checkpoint volume before
 allocating a large layer:
@@ -145,10 +146,51 @@ latest retained rehearsal image: 21,993,609 entries, 0 holes
 
 Its forensic checkpoint is under
 `data/logs/layer-dp-c6-allocation-rehearsal-20260801`; it is not an active
-production checkpoint.  Do not start it as a production continuation without
-the owner decision and a production checkpoint-period review.  Detailed
+production checkpoint.  Do not start it as a production continuation; the
+owner decision applies to a fresh production checkpoint namespace.  Detailed
 evidence is in
 `../reports/og2/layer-dp-c6-allocation-restart-rehearsal-20260801.md`.
+
+The complete bounded interrupted rehearsal passed on 2026-08-02.  Run only
+through the watermarked driver; do not reproduce it with ordinary production
+checkpoints or `--ack-full-c6`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\rehearse_layer_dp_c6.ps1 `
+  -Threads 24 -Denom 100 `
+  -CheckpointMinutes 10 -ChunkParents 100000 `
+  -RssLimitGB 85 -MaxStageMinutes 240 `
+  -RunDir data/logs/layer-dp-c6-e2e-rehearsal-YYYYMMDD-1pct
+```
+
+The driver verifies the authoritative L3 snapshot and D: backup hashes,
+binds every L4-or-later image to a rehearsal-only configuration fingerprint,
+forces one S1 interruption after a durable checkpoint, waits for Windows to
+reclaim RAM, resumes, runs S2/S3 in fresh processes, replays S3, and invokes
+the external arbitrary-precision checksum.  If the driver itself is stopped,
+resume its retained chain with exactly the same parameters plus:
+
+```powershell
+-ContinueExisting
+```
+
+The retained denominator-100 run reported:
+
+```text
+S1 peak / emissions / L4 = 61.861 GiB / 21387180240 / 903346741
+S2 peak / emissions / L5 = 48.703 GiB / 23637232504 / 96452753
+S3 emissions / classes   = 55653192 / 63117
+CSV SHA-256              = B247C170370D7936D3406E485BF4A50E27198BB2AD86F16CDE32B19F87038A96
+checksum                 = 38528041484076505706899541562753024000 (NOT N(6))
+```
+
+The 10-minute test period produced 22.69-35.00-second S1 writes and
+6.30-8.36-second S2 writes.  The current production recommendation is 40
+minutes, reducing measured steady-state S1 checkpoint overhead below about
+1% while bounding recomputation to roughly 40 minutes.  This remains an
+owner choice, not a default or authorization.  Detailed evidence is in
+`../reports/og2/layer-dp-c6-bounded-end-to-end-rehearsal-20260802.md`.
 
 The retained exact S0 snapshot can feed the measurement-only random M4 and
 uniform 4-to-5 calibration without rebuilding layers 1-to-3:

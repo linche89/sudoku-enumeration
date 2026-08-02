@@ -401,7 +401,7 @@ not invalidate the retained pair-tail and half-kernel components.
 
 ## Immediate objective
 
-Updated 2026-08-01.  The global row-incremental layer DP
+Updated 2026-08-02.  The global row-incremental layer DP
 (`experiments/proto/layer_dp_gate.cpp`) is the qualified implementation
 candidate.  It reproduces complete C=2..5 exactly, including all 355 C=5
 triples, and now has explicit canonical invariance, full-group
@@ -482,11 +482,26 @@ generation/cursor 91, and then fully reloaded generations 91, 146, and 170.
 The final readback restored 21,993,609 entries with zero holes and did not
 modify A/B.  Active checkpoints and external backups remained unchanged.
 
-The immediate objective is therefore the bounded interrupted end-to-end
-rehearsal, followed by an owner decision before any multi-day production
-stage.  The production checkpoint period must be reviewed; the rehearsal's
-one-parent chunks and checkpoint-every-chunk setting were intentionally
-pathological and are not throughput settings.
+The bounded interrupted end-to-end rehearsal is also complete.  A
+rehearsal-only, configuration-fingerprinted 1/100 canonical-key parent chain
+was deliberately killed after a durable 29.68-GiB S1 checkpoint, resumed at
+cursor 23/124, and carried through fresh S2/S3 processes, a byte-identical S3
+replay, and external arbitrary-precision summation.  It processed
+21,387,180,240 / 23,637,232,504 / 55,653,192 emissions in the three stages,
+captured 63,117 final classes, and produced CSV SHA-256
+`B247C170370D7936D3406E485BF4A50E27198BB2AD86F16CDE32B19F87038A96`.
+The watermarked checksum is
+`38528041484076505706899541562753024000`; it is explicitly not `N(6)`.
+L5 was two states short of the independent complete value and the final
+vector was 82 classes short, confirming that rehearsal images cannot be
+mistaken for complete layers.
+
+Ten-minute rehearsal checkpoints took 22.69-35.00 seconds at S1 and
+6.30-8.36 seconds at S2.  The current production recommendation is a
+40-minute period, for below-about-1% measured steady-state S1 checkpoint
+overhead and a roughly 40-minute recomputation window.  The immediate
+objective is now the repository owner's explicit decision before any
+multi-day production S1 stage, including that checkpoint-period choice.
 
 No full 63,199-class C=6 run is authorized.  Bounded probes and the
 pre-flight program are within scope.
