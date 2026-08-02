@@ -189,6 +189,22 @@ function Get-CheckpointMarkers {
     }
 }
 
+function Invoke-LoggedProcess {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$Arguments = @(),
+        [Parameter(Mandatory = $true)][string]$StdoutPath,
+        [Parameter(Mandatory = $true)][string]$StderrPath
+    )
+    $child = Start-Process -FilePath $FilePath -ArgumentList $Arguments `
+        -RedirectStandardOutput $StdoutPath `
+        -RedirectStandardError $StderrPath -PassThru -WindowStyle Hidden
+    $child.WaitForExit()
+    $child.Refresh()
+    if ($null -eq $child.ExitCode) { return 97 }
+    return [int]$child.ExitCode
+}
+
 $checkpointRoot = Join-Path $root "data/checkpoints"
 $logParent = Join-Path $root "data/logs"
 $checkpointBasePath = Assert-PathUnder $CheckpointBase $checkpointRoot `
@@ -241,18 +257,34 @@ while (Test-Path -LiteralPath (Join-Path $logRootPath (
 $sessionDir = Join-Path $logRootPath ("session-{0:D3}" -f $sessionNumber)
 New-Item -ItemType Directory -Path $sessionDir | Out-Null
 
-$gateLog = Join-Path $sessionDir "verify_all.log"
+$gateLog = Join-Path $sessionDir "verify_all.stdout.log"
+$gateErrorLog = Join-Path $sessionDir "verify_all.stderr.log"
 Write-Host "running the mandatory complete gate"
-& powershell.exe -NoProfile -ExecutionPolicy Bypass `
-    -File (Join-Path $PSScriptRoot "verify_all.ps1") *> $gateLog
-if ($LASTEXITCODE -ne 0) {
+$gateArgs = @(
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+    (Join-Path $PSScriptRoot "verify_all.ps1")
+)
+$gateCode = Invoke-LoggedProcess "powershell.exe" $gateArgs $gateLog `
+    $gateErrorLog
+if ($gateCode -ne 0) {
     Get-Content -LiteralPath $gateLog -Tail 100
+    Get-Content -LiteralPath $gateErrorLog -Tail 100
     throw "complete repository gate failed"
 }
 
 $buildLog = Join-Path $sessionDir "build.log"
-& (Join-Path $PSScriptRoot "build_layer_dp.ps1") *> $buildLog
-if ($LASTEXITCODE -ne 0) { throw "layer-DP build failed" }
+$buildErrorLog = Join-Path $sessionDir "build.stderr.log"
+$buildArgs = @(
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+    (Join-Path $PSScriptRoot "build_layer_dp.ps1")
+)
+$buildCode = Invoke-LoggedProcess "powershell.exe" $buildArgs $buildLog `
+    $buildErrorLog
+if ($buildCode -ne 0) {
+    Get-Content -LiteralPath $buildLog -Tail 100
+    Get-Content -LiteralPath $buildErrorLog -Tail 100
+    throw "layer-DP build failed"
+}
 $exe = (Resolve-Path -LiteralPath "build/layer_dp_gate.exe").Path
 
 $existing = @(
@@ -292,9 +324,12 @@ $preflightArgs = @(
     "--checkpoint", $checkpointBasePath, "$CheckpointMinutes",
     "--resource-preflight", "3"
 )
-& $exe @preflightArgs *> $preflightLog
-if ($LASTEXITCODE -ne 0) {
+$preflightErrorLog = Join-Path $sessionDir "resource-preflight.stderr.log"
+$preflightCode = Invoke-LoggedProcess $exe $preflightArgs $preflightLog `
+    $preflightErrorLog
+if ($preflightCode -ne 0) {
     Get-Content -LiteralPath $preflightLog
+    Get-Content -LiteralPath $preflightErrorLog
     throw "C=6 S1 resource preflight failed"
 }
 
