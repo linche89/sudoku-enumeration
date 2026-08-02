@@ -7,10 +7,12 @@ param(
     [double]$CheckpointMinutes = 10.0,
     [int]$RssLimitGB = 85,
     [int]$MaxStageMinutes = 240,
+    [int]$ResumeAvailableGB = 80,
     [string]$Layer3 = "data/checkpoints/layer_dp_c6_layer3_20260731.snap",
     [string]$Layer3Backup = `
         "D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_layer3_20260731.snap",
-    [string]$RunDir = ""
+    [string]$RunDir = "",
+    [switch]$ContinueExisting
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,6 +26,30 @@ if ($CheckpointMinutes -le 0) {
 }
 if ($RssLimitGB -lt 1 -or $MaxStageMinutes -lt 1) {
     throw "RSS and time guards must be positive"
+}
+if ($ResumeAvailableGB -lt 1) {
+    throw "ResumeAvailableGB must be positive"
+}
+
+function Wait-MemoryHeadroom {
+    param([string]$Label)
+    $deadline = (Get-Date).AddMinutes(5)
+    while ($true) {
+        $os = Get-CimInstance Win32_OperatingSystem
+        $available = [Int64]$os.FreePhysicalMemory * 1KB
+        $availableGiB = [Math]::Round($available / 1GB, 3)
+        if ($available -ge ([Int64]$ResumeAvailableGB * 1GB)) {
+            Write-Host "${Label}: available RAM ${availableGiB} GiB [READY]"
+            return
+        }
+        if ((Get-Date) -ge $deadline) {
+            throw "${Label}: available RAM ${availableGiB} GiB did not recover " +
+                  "to ${ResumeAvailableGB} GiB within five minutes"
+        }
+        Write-Host "${Label}: waiting for RAM reclamation " +
+                   "(${availableGiB}/${ResumeAvailableGB} GiB)"
+        Start-Sleep -Seconds 5
+    }
 }
 
 function Get-Sha256 {
@@ -135,10 +161,20 @@ function Invoke-GuardedLayer {
     $proc.Refresh()
     $exitCode = $proc.ExitCode
     # Windows PowerShell can expose a null ExitCode after a redirected child
-    # has already been reaped.  This is the same benign case handled by
-    # watch_rss.ps1; non-empty stderr and required downstream artifacts still
-    # fail closed.
-    if ($null -eq $exitCode) { $exitCode = 0 }
+    # has already been reaped.  Accept that case only when the engine itself
+    # printed a terminal success marker; resource-preflight refusals and other
+    # early exits therefore remain fail-closed.
+    if ($null -eq $exitCode) {
+        $terminalText = Get-Content -Raw -LiteralPath $stdout
+        if ($terminalText -match "STOPPED AFTER LAYER [45]" -or
+            $terminalText -match
+                "BOUNDED REHEARSAL COMPLETED for C=6 \(NOT N\(6\)\)") {
+            $exitCode = 0
+        }
+        else {
+            $exitCode = 97
+        }
+    }
     if ($exitCode -ne 0) {
         Get-Content -LiteralPath $stdout -ErrorAction SilentlyContinue
         Get-Content -LiteralPath $stderr -ErrorAction SilentlyContinue
@@ -183,55 +219,116 @@ if (!$runPath.StartsWith($logRoot, [StringComparison]::OrdinalIgnoreCase)) {
     throw "RunDir must stay under data/logs"
 }
 if (Test-Path -LiteralPath $runPath) {
-    throw "RunDir already exists: $runPath"
+    if (!$ContinueExisting) {
+        throw "RunDir already exists: $runPath (use -ContinueExisting only " +
+              "for this script's retained checkpoint chain)"
+    }
 }
-New-Item -ItemType Directory -Path $runPath | Out-Null
+else {
+    if ($ContinueExisting) {
+        throw "-ContinueExisting requested but RunDir does not exist: $runPath"
+    }
+    New-Item -ItemType Directory -Path $runPath | Out-Null
+}
+if (Get-Process -Name "layer_dp_gate" -ErrorAction SilentlyContinue) {
+    throw "another layer_dp_gate process is already running"
+}
 
 $common = @(
     "6", "--threads", "$Threads", "--caps", $Caps,
     "--rehearsal-denom", "$Denom",
     "--ckpt-chunk", "$ChunkParents"
 )
+$emptyResult = [pscustomobject]@{
+    Forced = $false
+    ExitCode = 0
+    PeakGiB = 0
+    Minutes = 0
+    Stdout = "continued/skipped"
+}
 
 # S1: start from the immutable exact L3 seed, wait for one durable timed
 # checkpoint, kill the process, then resume the same transition to closure.
 $s1Dir = Join-Path $runPath "s1-3to4"
 $s1Base = Join-Path $s1Dir "ck"
-$s1FreshArgs = $common + @(
-    "--load-layer", "3", $layer3Path,
-    "--checkpoint", $s1Base, "$CheckpointMinutes",
-    "--stop-after", "4"
-)
-$s1Killed = Invoke-GuardedLayer "S1 3->4 deliberate interruption" `
-    $s1FreshArgs (Join-Path $s1Dir "killed") $s1Base
-if (!$s1Killed.Forced) { throw "S1 was not deliberately interrupted" }
-if (!(Test-Path -LiteralPath ($s1Base + ".L3.snap"))) {
-    throw "S1 checkpoint set is missing its immutable L3 parent snapshot"
-}
-$s1ResumeArgs = $common + @(
-    "--checkpoint", $s1Base, "$CheckpointMinutes",
-    "--resume", $s1Base, "--stop-after", "4"
-)
-$s1Resumed = Invoke-GuardedLayer "S1 3->4 resume to closed rehearsal L4" `
-    $s1ResumeArgs (Join-Path $s1Dir "resumed")
 $layer4 = $s1Base + ".L4.snap"
+$s1Killed = $emptyResult
+$s1Resumed = $emptyResult
 if (!(Test-Path -LiteralPath $layer4)) {
-    throw "S1 resume did not produce the closed rehearsal L4 snapshot"
+    $haveS1Generation =
+        (Test-Path -LiteralPath ($s1Base + ".a")) -or
+        (Test-Path -LiteralPath ($s1Base + ".b"))
+    if (!$haveS1Generation) {
+        if ($ContinueExisting) {
+            throw "continued RunDir has neither a closed L4 nor S1 generation"
+        }
+        Wait-MemoryHeadroom "S1 fresh start"
+        $s1FreshArgs = $common + @(
+            "--load-layer", "3", $layer3Path,
+            "--checkpoint", $s1Base, "$CheckpointMinutes",
+            "--stop-after", "4"
+        )
+        $s1Killed = Invoke-GuardedLayer "S1 3->4 deliberate interruption" `
+            $s1FreshArgs (Join-Path $s1Dir "killed") $s1Base
+        if (!$s1Killed.Forced) { throw "S1 was not deliberately interrupted" }
+        $haveS1Generation = $true
+    }
+    if (!(Test-Path -LiteralPath ($s1Base + ".L3.snap"))) {
+        throw "S1 checkpoint set is missing its immutable L3 parent snapshot"
+    }
+    Wait-MemoryHeadroom "S1 resume"
+    $s1ResumeArgs = $common + @(
+        "--checkpoint", $s1Base, "$CheckpointMinutes",
+        "--resume", $s1Base, "--stop-after", "4"
+    )
+    $resumeOrdinal =
+        (Get-ChildItem $s1Dir -Directory -Filter "resumed-*" `
+            -ErrorAction SilentlyContinue | Measure-Object).Count + 1
+    $s1Resumed = Invoke-GuardedLayer "S1 3->4 resume to closed rehearsal L4" `
+        $s1ResumeArgs (Join-Path $s1Dir "resumed-$resumeOrdinal")
+    if (!(Test-Path -LiteralPath $layer4)) {
+        throw "S1 resume did not produce the closed rehearsal L4 snapshot"
+    }
+}
+else {
+    Write-Host "S1 already closed at $layer4; continuing"
 }
 
-# S2: a fresh checkpoint namespace and one process for 4->5.
+# S2: a fresh checkpoint namespace and one process for 4->5; if an external
+# interruption left a generation, continue it rather than rebuilding L4.
 $s2Dir = Join-Path $runPath "s2-4to5"
 $s2Base = Join-Path $s2Dir "ck"
-$s2Args = $common + @(
-    "--load-layer", "4", $layer4,
-    "--checkpoint", $s2Base, "$CheckpointMinutes",
-    "--stop-after", "5"
-)
-$s2 = Invoke-GuardedLayer "S2 4->5 closed rehearsal L5" `
-    $s2Args $s2Dir
 $layer5 = $s2Base + ".L5.snap"
+$s2 = $emptyResult
 if (!(Test-Path -LiteralPath $layer5)) {
-    throw "S2 did not produce the closed rehearsal L5 snapshot"
+    Wait-MemoryHeadroom "S2 start/resume"
+    $haveS2Generation =
+        (Test-Path -LiteralPath ($s2Base + ".a")) -or
+        (Test-Path -LiteralPath ($s2Base + ".b"))
+    if ($haveS2Generation) {
+        $s2Args = $common + @(
+            "--checkpoint", $s2Base, "$CheckpointMinutes",
+            "--resume", $s2Base, "--stop-after", "5"
+        )
+    }
+    else {
+        $s2Args = $common + @(
+            "--load-layer", "4", $layer4,
+            "--checkpoint", $s2Base, "$CheckpointMinutes",
+            "--stop-after", "5"
+        )
+    }
+    $s2Ordinal =
+        (Get-ChildItem $s2Dir -Directory -Filter "attempt-*" `
+            -ErrorAction SilentlyContinue | Measure-Object).Count + 1
+    $s2 = Invoke-GuardedLayer "S2 4->5 closed rehearsal L5" `
+        $s2Args (Join-Path $s2Dir "attempt-$s2Ordinal")
+    if (!(Test-Path -LiteralPath $layer5)) {
+        throw "S2 did not produce the closed rehearsal L5 snapshot"
+    }
+}
+else {
+    Write-Host "S2 already closed at $layer5; continuing"
 }
 
 # S3: final sparse contraction and a second independent replay from the same
@@ -239,23 +336,46 @@ if (!(Test-Path -LiteralPath $layer5)) {
 $s3Dir = Join-Path $runPath "s3-5to6"
 $s3Base = Join-Path $s3Dir "ck"
 $dump = Join-Path $s3Dir "rehearsal.csv"
-$s3Args = $common + @(
-    "--load-layer", "5", $layer5,
-    "--checkpoint", $s3Base, "$CheckpointMinutes",
-    "--dump", $dump
-)
-$s3 = Invoke-GuardedLayer "S3 5->6 rehearsal contraction" $s3Args $s3Dir
+$s3 = $emptyResult
+if (!(Test-Path -LiteralPath $dump)) {
+    Wait-MemoryHeadroom "S3 start/resume"
+    $haveS3Generation =
+        (Test-Path -LiteralPath ($s3Base + ".a")) -or
+        (Test-Path -LiteralPath ($s3Base + ".b"))
+    if ($haveS3Generation) {
+        $s3Args = $common + @(
+            "--checkpoint", $s3Base, "$CheckpointMinutes",
+            "--resume", $s3Base, "--dump", $dump
+        )
+    }
+    else {
+        $s3Args = $common + @(
+            "--load-layer", "5", $layer5,
+            "--checkpoint", $s3Base, "$CheckpointMinutes",
+            "--dump", $dump
+        )
+    }
+    $s3 = Invoke-GuardedLayer "S3 5->6 rehearsal contraction" `
+        $s3Args (Join-Path $s3Dir "attempt")
+}
+else {
+    Write-Host "S3 dump already exists; continuing to replay"
+}
 
 $replayDir = Join-Path $runPath "s3-replay"
 $replayBase = Join-Path $replayDir "ck"
 $replayDump = Join-Path $replayDir "rehearsal.csv"
-$replayArgs = $common + @(
-    "--load-layer", "5", $layer5,
-    "--checkpoint", $replayBase, "$CheckpointMinutes",
-    "--dump", $replayDump
-)
-$replay = Invoke-GuardedLayer "S3 deterministic replay" `
-    $replayArgs $replayDir
+$replay = $emptyResult
+if (!(Test-Path -LiteralPath $replayDump)) {
+    Wait-MemoryHeadroom "S3 replay"
+    $replayArgs = $common + @(
+        "--load-layer", "5", $layer5,
+        "--checkpoint", $replayBase, "$CheckpointMinutes",
+        "--dump", $replayDump
+    )
+    $replay = Invoke-GuardedLayer "S3 deterministic replay" `
+        $replayArgs $replayDir
+}
 $dumpHash = Get-Sha256 $dump
 $replayHash = Get-Sha256 $replayDump
 if ($dumpHash -ne $replayHash) {
