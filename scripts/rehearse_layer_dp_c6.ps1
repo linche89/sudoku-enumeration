@@ -66,6 +66,25 @@ function Get-Sha256 {
     }
 }
 
+function Get-RssMetrics {
+    param([string]$Path)
+    if (!(Test-Path -LiteralPath $Path)) {
+        return [pscustomobject]@{ Minutes = 0; PeakGiB = 0 }
+    }
+    $samples = @(Import-Csv -LiteralPath $Path)
+    if (!$samples.Count) {
+        return [pscustomobject]@{ Minutes = 0; PeakGiB = 0 }
+    }
+    $first = [datetimeoffset]$samples[0].timestamp
+    $last = [datetimeoffset]$samples[-1].timestamp
+    $peak = ($samples | Measure-Object rss_gib -Maximum).Maximum
+    return [pscustomobject]@{
+        # Sampling begins after the first two-second watcher interval.
+        Minutes = [Math]::Round(($last - $first).TotalMinutes + 2.0 / 60, 3)
+        PeakGiB = [Math]::Round([double]$peak, 3)
+    }
+}
+
 function Invoke-GuardedLayer {
     param(
         [string]$Label,
@@ -408,6 +427,20 @@ if (Get-Process -Name "layer_dp_gate" -ErrorAction SilentlyContinue) {
     throw "a layer_dp_gate process remains after the rehearsal"
 }
 
+$s1KilledMetric = Get-RssMetrics (Join-Path $s1Dir "killed\rss.csv")
+$latestS1Resume = Get-ChildItem $s1Dir -Directory -Filter "resumed-*" |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$s1ResumeMetric = if ($latestS1Resume) {
+    Get-RssMetrics (Join-Path $latestS1Resume.FullName "rss.csv")
+} else { $emptyResult }
+$latestS2Attempt = Get-ChildItem $s2Dir -Directory -Filter "attempt-*" |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$s2Metric = if ($latestS2Attempt) {
+    Get-RssMetrics (Join-Path $latestS2Attempt.FullName "rss.csv")
+} else { $emptyResult }
+$s3Metric = Get-RssMetrics (Join-Path $s3Dir "attempt\rss.csv")
+$replayMetric = Get-RssMetrics (Join-Path $replayDir "rss.csv")
+
 $summary = @"
 mode=BOUNDED_REHEARSAL_NOT_N6
 denominator=$Denom
@@ -421,16 +454,16 @@ layer3_sha256_before=$beforeLayer3Hash
 layer3_sha256_after=$afterLayer3Hash
 backup_sha256_before=$beforeBackupHash
 backup_sha256_after=$afterBackupHash
-s1_killed_minutes=$($s1Killed.Minutes)
-s1_killed_peak_gib=$($s1Killed.PeakGiB)
-s1_resume_minutes=$($s1Resumed.Minutes)
-s1_resume_peak_gib=$($s1Resumed.PeakGiB)
-s2_minutes=$($s2.Minutes)
-s2_peak_gib=$($s2.PeakGiB)
-s3_minutes=$($s3.Minutes)
-s3_peak_gib=$($s3.PeakGiB)
-s3_replay_minutes=$($replay.Minutes)
-s3_replay_peak_gib=$($replay.PeakGiB)
+s1_killed_minutes=$($s1KilledMetric.Minutes)
+s1_killed_peak_gib=$($s1KilledMetric.PeakGiB)
+s1_resume_minutes=$($s1ResumeMetric.Minutes)
+s1_resume_peak_gib=$($s1ResumeMetric.PeakGiB)
+s2_minutes=$($s2Metric.Minutes)
+s2_peak_gib=$($s2Metric.PeakGiB)
+s3_minutes=$($s3Metric.Minutes)
+s3_peak_gib=$($s3Metric.PeakGiB)
+s3_replay_minutes=$($replayMetric.Minutes)
+s3_replay_peak_gib=$($replayMetric.PeakGiB)
 classes_captured=$rows
 csv_sha256=$dumpHash
 replay_csv_sha256=$replayHash
