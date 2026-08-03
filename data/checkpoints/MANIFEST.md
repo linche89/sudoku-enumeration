@@ -90,3 +90,34 @@ window it copies the newest successful A/B generation (or closed L4
 snapshot) to the external directory and writes a receipt.  The latest
 closed-window cursor and hash must be distilled here before handoff; runtime
 details remain under `data/logs/layer_dp_c6_s1_prod_20260802/`.
+
+First-window state after workstation sleep and recovery review:
+
+```text
+status: partial S1, safe to resume; NOT a closed L4
+generation: 5 (.a)
+cursor: 5/124 chunks, chunkParents=100000
+emissionsSoFar: 92717503648
+claimed entries: 903363975
+parallel insertion holes: 18
+real states: 903363957
+local bytes: 32521103228
+local SHA-256: 357ACEF8F257FAB819D53BB11E1E0AF2FBA882406F4A5196805895C9BD51274A
+external SHA-256: 357ACEF8F257FAB819D53BB11E1E0AF2FBA882406F4A5196805895C9BD51274A
+```
+
+The external image and receipt are:
+
+```text
+D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_s1_prod_20260802\
+  session-004-recovered-gen5-layer_dp_c6_s1_prod_20260802.a
+D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_s1_prod_20260802\
+  session-004-recovered-gen5-layer_dp_c6_s1_prod_20260802.a.sha256.txt
+```
+
+The original controller failed to select A/B because PowerShell parsed the
+unparenthesized path-suffix array as one concatenated element.  Commit
+`bfbfe4e` parenthesizes every candidate, ignores generated `.a/.b` images,
+and fixes progress formatting.  A subsequent complete repository gate plus
+`-PrepareOnly -ContinueExisting` recognized the local generation and its
+external receipt, passed resource preflight, and wrote no checkpoint.

@@ -163,6 +163,26 @@ loads the newest verified generation and recomputes only work after its
 stored cursor.  Do not rename, clear, or mix the production namespace with
 the rehearsal directories.
 
+The first production window was interrupted by workstation sleep and closed
+on the hard wall-time guard after wake.  It retained generation 5 at cursor
+5/124 with 92,717,503,648 emissions and 903,363,957 real child states.  No L4
+snapshot was claimed.  The local and D: backup SHA-256 is
+`357ACEF8F257FAB819D53BB11E1E0AF2FBA882406F4A5196805895C9BD51274A`.
+
+That session exposed and fixed an A/B path-array parsing error in the
+controller.  Before any resume, require commit `bfbfe4e` or later and run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\run_layer_dp_c6_s1_window.ps1 `
+  -AuthorizeFullC6 -PrepareOnly -ContinueExisting
+```
+
+It must report that the external backup already covers the local generation,
+then end with `PRODUCTION S1 PREPARATION PASSED`; it must not start an engine.
+The retained evidence is in
+`../reports/og2/layer-dp-c6-production-s1-window1-20260803.md`.
+
 The production-cap 3-to-4 allocation/restart rehearsal passed on 2026-08-01:
 
 ```text

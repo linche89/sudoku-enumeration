@@ -508,7 +508,16 @@ On 2026-08-02 the repository owner authorized the first production S1
 window only: target eight hours, hard stop at ten hours, 85-GiB RSS guard,
 and pause after the first durable checkpoint following the target.  The
 window uses the exact retained L3 seed and a fresh production namespace;
-later windows and S2/S3 remain separate decisions.
+later windows and S2/S3 remain separate decisions.  Two workstation
+sleep/login interruptions carried wall time past the hard limit, so the
+controller stopped on wake rather than closing S1.  The newest exact image is
+generation 5 at cursor 5/124: 92,717,503,648 emissions, 903,363,975 claimed
+entries, 18 holes, and 903,363,957 real states.  Its local and D: backup
+SHA-256 is
+`357ACEF8F257FAB819D53BB11E1E0AF2FBA882406F4A5196805895C9BD51274A`.
+No L4 snapshot exists yet.  The controller's initial A/B discovery bug is
+fixed, and a read-only `-PrepareOnly -ContinueExisting` recovery gate passed
+without changing the checkpoint.  A further S1 window is not yet authorized.
 
 ## Current checkpoint
 
