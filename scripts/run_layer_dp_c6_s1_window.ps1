@@ -102,9 +102,9 @@ function Wait-StartMemory {
 
 function Get-LatestDurableImage {
     $candidates = @(
-        $checkpointBasePath + ".L4.snap",
-        $checkpointBasePath + ".a",
-        $checkpointBasePath + ".b"
+        ($checkpointBasePath + ".L4.snap"),
+        ($checkpointBasePath + ".a"),
+        ($checkpointBasePath + ".b")
     ) | Where-Object { Test-Path -LiteralPath $_ }
     if (!$candidates.Count) { return $null }
     return $candidates |
@@ -296,11 +296,11 @@ if ($buildCode -ne 0) {
 $exe = (Resolve-Path -LiteralPath "build/layer_dp_gate.exe").Path
 
 $existing = @(
-    $checkpointBasePath + ".a",
-    $checkpointBasePath + ".b",
-    $checkpointBasePath + ".L3.snap",
-    $checkpointBasePath + ".L4.snap",
-    $checkpointBasePath + ".tmp"
+    ($checkpointBasePath + ".a"),
+    ($checkpointBasePath + ".b"),
+    ($checkpointBasePath + ".L3.snap"),
+    ($checkpointBasePath + ".L4.snap"),
+    ($checkpointBasePath + ".tmp")
 ) | Where-Object { Test-Path -LiteralPath $_ }
 if ($ContinueExisting) {
     if (!(Test-Path -LiteralPath ($checkpointBasePath + ".a")) -and
@@ -367,8 +367,8 @@ else {
 }
 
 Write-Host "starting production S1 window"
-Write-Host "target: $WindowHours h; hard bound: $HardMaxHours h; " +
-    "RSS bound: $RssLimitGB GiB"
+Write-Host ("target: {0} h; hard bound: {1} h; RSS bound: {2} GiB" -f `
+    $WindowHours, $HardMaxHours, $RssLimitGB)
 Write-Host "engine: $exe $($engineArgs -join ' ')"
 $proc = Start-Process -FilePath $exe -ArgumentList $engineArgs `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
@@ -397,8 +397,8 @@ try {
 
         if (((Get-Date) - $lastReport).TotalMinutes -ge 5) {
             $markers = Get-CheckpointMarkers $stdout
-            Write-Host ("S1 elapsed={0:N2} h rss={1:N3} GiB " +
-                "available={2:N3} GiB checkpoints={3}" -f `
+            Write-Host (("S1 elapsed={0:N2} h rss={1:N3} GiB " +
+                "available={2:N3} GiB checkpoints={3}") -f `
                 $elapsedHours, $rssGiB, $availableGiB, $markers.Count)
             $lastReport = Get-Date
         }
@@ -490,6 +490,8 @@ $summary = @(
     "mode=C6_PRODUCTION_S1_WINDOW",
     "git_head=$gitHead",
     "session=$sessionNumber",
+    "controller_pid=$PID",
+    "engine_pid=$($proc.Id)",
     "continued=$ContinueExisting",
     "started=$($started.ToString('o'))",
     "ended=$($ended.ToString('o'))",
