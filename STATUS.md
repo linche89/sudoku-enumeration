@@ -509,15 +509,15 @@ window only: target eight hours, hard stop at ten hours, 85-GiB RSS guard,
 and pause after the first durable checkpoint following the target.  The
 window uses the exact retained L3 seed and a fresh production namespace;
 later windows and S2/S3 remain separate decisions.  Two workstation
-sleep/login interruptions carried wall time past the hard limit, so the
-controller stopped on wake rather than closing S1.  The newest exact image is
-generation 5 at cursor 5/124: 92,717,503,648 emissions, 903,363,975 claimed
-entries, 18 holes, and 903,363,957 real states.  Its local and D: backup
-SHA-256 is
-`357ACEF8F257FAB819D53BB11E1E0AF2FBA882406F4A5196805895C9BD51274A`.
-No L4 snapshot exists yet.  The controller's initial A/B discovery bug is
-fixed, and a read-only `-PrepareOnly -ContinueExisting` recovery gate passed
-without changing the checkpoint.  A further S1 window is not yet authorized.
+sleep/login interruptions carried wall time past the first window's hard
+limit, so it stopped safely at generation 5 / cursor 5/124.  After fixing its
+A/B discovery bug and passing a read-only recovery gate, a second authorized
+window resumed that exact image and stopped normally at the first post-target
+checkpoint.  The newest image is generation 15 at cursor 15/124:
+280,014,646,848 emissions, 903,398,591 claimed entries, 18 holes, and
+903,398,573 real states.  Its local and D: backup SHA-256 is
+`99C2203AE846EC78627EA8C3774340E12C3F99C2C5DA6817C92217A7600218C8`.
+No L4 snapshot exists yet.  A further S1 window is not yet authorized.
 
 ## Current checkpoint
 

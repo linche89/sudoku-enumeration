@@ -183,6 +183,15 @@ then end with `PRODUCTION S1 PREPARATION PASSED`; it must not start an engine.
 The retained evidence is in
 `../reports/og2/layer-dp-c6-production-s1-window1-20260803.md`.
 
+The corrected second window resumed generation 5 / cursor 5/124 and ran for
+8.0241 hours.  It stopped normally on generation 15 / cursor 15/124, after
+the first durable checkpoint following the eight-hour target.  The current
+image contains 280,014,646,848 emissions and 903,398,573 real child states;
+its verified local/external SHA-256 is
+`99C2203AE846EC78627EA8C3774340E12C3F99C2C5DA6817C92217A7600218C8`.
+There is still no closed L4 snapshot.  See
+`../reports/og2/layer-dp-c6-production-s1-window2-20260803.md`.
+
 The production-cap 3-to-4 allocation/restart rehearsal passed on 2026-08-01:
 
 ```text
