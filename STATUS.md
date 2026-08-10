@@ -1,6 +1,6 @@
 # Current Project Status
 
-Last updated: 2026-07-27
+Last updated: 2026-08-10
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.
@@ -515,9 +515,15 @@ A/B discovery bug and passing a read-only recovery gate, a second authorized
 window resumed that exact image and stopped normally at the first post-target
 checkpoint.  The newest image is generation 15 at cursor 15/124:
 280,014,646,848 emissions, 903,398,591 claimed entries, 18 holes, and
-903,398,573 real states.  Its local and D: backup SHA-256 is
-`99C2203AE846EC78627EA8C3774340E12C3F99C2C5DA6817C92217A7600218C8`.
-No L4 snapshot exists yet.  A further S1 window is not yet authorized.
+903,398,573 real states.  A third bounded window resumed that exact image and
+stopped normally at generation 26 / cursor 26/124.  The current image contains
+485,060,060,720 emissions, 903,398,613 claimed entries, 18 holes, and
+903,398,595 real states.  Its local and D: backup SHA-256 is
+`D652E023F52F3E58EDFB35FA8E23195E1950B53CE7C9CBE7394FEA926E6795BF`.
+No L4 snapshot exists yet.  On 2026-08-10 the repository owner authorized
+another continuation with the same eight-hour target, ten-hour hard bound,
+85-GiB RSS guard, and 40-minute checkpoint period; S2/S3 remain separate
+decisions.
 
 ## Current checkpoint
 

@@ -122,32 +122,32 @@ and fixes progress formatting.  A subsequent complete repository gate plus
 `-PrepareOnly -ContinueExisting` recognized the local generation and its
 external receipt, passed resource preflight, and wrote no checkpoint.
 
-Current authoritative state after production window 2:
+Current authoritative state after production window 3:
 
 ```text
 status: partial S1, safe to resume; NOT a closed L4
-generation: 15 (.a)
-cursor: 15/124 chunks, chunkParents=100000
-emissionsSoFar: 280014646848
-cacheHitsSoFar: 12576350
-claimed entries: 903398591
+generation: 26 (.b)
+cursor: 26/124 chunks, chunkParents=100000
+emissionsSoFar: 485060060720
+cacheHitsSoFar: 21049049
+claimed entries: 903398613
 parallel insertion holes: 18
-real states: 903398573
-local bytes: 32522349404
-local SHA-256: 99C2203AE846EC78627EA8C3774340E12C3F99C2C5DA6817C92217A7600218C8
-external SHA-256: 99C2203AE846EC78627EA8C3774340E12C3F99C2C5DA6817C92217A7600218C8
+real states: 903398595
+local bytes: 32522350196
+local SHA-256: D652E023F52F3E58EDFB35FA8E23195E1950B53CE7C9CBE7394FEA926E6795BF
+external SHA-256: D652E023F52F3E58EDFB35FA8E23195E1950B53CE7C9CBE7394FEA926E6795BF
 ```
 
 The current external image and receipt are:
 
 ```text
 D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_s1_prod_20260802\
-  session-006-20260803-163112-layer_dp_c6_s1_prod_20260802.a
+  session-007-20260809-224925-layer_dp_c6_s1_prod_20260802.b
 D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_s1_prod_20260802\
-  session-006-20260803-163112-layer_dp_c6_s1_prod_20260802.a.sha256.txt
+  session-007-20260809-224925-layer_dp_c6_s1_prod_20260802.b.sha256.txt
 ```
 
-Window 2 ran for 8.0241 hours, peaked at 61.853 GiB RSS, stopped at
+Window 3 ran for 8.0682 hours, peaked at 61.854 GiB RSS, stopped at
 `target_window_checkpoint`, verified the external copy, and left no engine or
 controller process.  Detailed evidence is in
-`docs/reports/og2/layer-dp-c6-production-s1-window2-20260803.md`.
+`docs/reports/og2/layer-dp-c6-production-s1-window3-20260809.md`.

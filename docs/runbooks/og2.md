@@ -192,6 +192,15 @@ its verified local/external SHA-256 is
 There is still no closed L4 snapshot.  See
 `../reports/og2/layer-dp-c6-production-s1-window2-20260803.md`.
 
+The third window resumed generation 15 / cursor 15/124 and ran for 8.0682
+hours.  It stopped normally on generation 26 / cursor 26/124, after the first
+durable checkpoint following the eight-hour target.  The current image
+contains 485,060,060,720 emissions and 903,398,595 real child states; its
+verified local/external SHA-256 is
+`D652E023F52F3E58EDFB35FA8E23195E1950B53CE7C9CBE7394FEA926E6795BF`.
+There is still no closed L4 snapshot.  See
+`../reports/og2/layer-dp-c6-production-s1-window3-20260809.md`.
+
 The production-cap 3-to-4 allocation/restart rehearsal passed on 2026-08-01:
 
 ```text

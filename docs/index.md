@@ -35,6 +35,7 @@
 
 ## Dated evidence
 
+- `reports/og2/layer-dp-c6-production-s1-window3-20260809.md`
 - `reports/og2/layer-dp-c6-production-s1-window2-20260803.md`
 - `reports/og2/layer-dp-c6-production-s1-window1-20260803.md`
 - `reports/og2/layer-dp-c6-bounded-end-to-end-rehearsal-20260802.md`
