@@ -40,6 +40,7 @@
 
 ## Dated evidence
 
+- `reports/og2/layer-dp-c6-gen37-prepare-only-20260815.md`
 - `reports/og2/layer-dp-c6-audit-infrastructure-20260815.md`
 - `reports/og2/layer-dp-c6-production-s1-window4-20260810.md`
 - `reports/og2/layer-dp-c6-production-s1-window3-20260809.md`
