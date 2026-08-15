@@ -6,7 +6,8 @@
 candidate, not a completed C=6 result.  It is exact and independently gated
 through C=5.  Its checkpoint/restart path has passed repeated process-kill,
 wide-accumulator, corrupt-generation fallback, and snapshot round-trip tests.
-No full C=6 layer-4 construction or 63,199-class contraction has been run.
+Production S1 is partial at generation 37 / cursor 38 of 124; no full C=6
+layer-4 construction or 63,199-class contraction has been run.
 
 The raw design notes under `docs/expert/2026-07-26/` and
 `docs/expert/2026-07-27/` explain the route's provenance.  This file records
@@ -98,6 +99,14 @@ existing generation or snapshot; use a fresh base or explicitly resume.
 `--resume` and `--checkpoint` must name the same base, and mode/configuration
 mismatches are rejected.
 
+The production controllers now add a separate append-only `progress.csv`.
+The helper validates each checkpoint header and exact file length, computes
+SHA-256, and reads the immutable parent's relevant `stab` slice to derive
+exact real-parent and emission deltas.  It never writes a checkpoint and does
+not change format version 2.  Historical S1 data starts with an explicitly
+labelled recovered generation-37 baseline; missing earlier per-checkpoint
+counters are not synthesized.
+
 ## Reproduction gate
 
 Use the repository-safe compiler flags; do not add `-march=native` on the
@@ -130,6 +139,9 @@ The gate covers:
 - the C=6 G1/G2 representative bridge;
 - refusal of an acknowledged monolithic C=6 large layer;
 - refusal of an unbounded ordinary C=6 invocation.
+- the independent final-certificate semantics, falsified-orbit-size
+  rejection, C=6 G1/G2 witness construction, append-only progress sidecar,
+  and a second PowerShell/.NET BigInteger summation implementation.
 
 This gate is also called by `scripts/verify_all.ps1`.
 
@@ -321,9 +333,19 @@ owner must still choose the production period explicitly.
 See
 `../reports/og2/layer-dp-c6-bounded-end-to-end-rehearsal-20260802.md`.
 
-## Remaining production decision
+## Production boundary
 
 The M4, uniform 4-to-5, exact M5 capacity, allocation/restart, and bounded
-end-to-end gates are complete.  The remaining prerequisite is an explicit
-repository-owner decision before committing the multi-day C=6 S1 run and its
-checkpoint period.  No complete C=6 run is authorized by the rehearsal.
+end-to-end gates are complete.  Four separately authorized S1 windows have
+advanced the exact production image to generation 37 / cursor 38 of 124,
+with 903,398,602 real partial L4 states.  The local and external newest-image
+SHA-256 is
+`ECF0837315B0FDF8AE21C394FDA6676490E43B1828A0825529A344EC17E4E844`.
+There is still no closed L4 snapshot.
+
+Future S1 windows, S2, and S3 remain separate owner decisions.  The staged
+controllers and fail-closed input hashes, stable L4/L5 external snapshots,
+two deterministic final replays, independent semantic certificate, and two
+arbitrary-precision sums are frozen in
+`../runbooks/layer-dp-c6-production.md`.  No complete C=6 run is authorized by
+the rehearsal or by those dormant controller scripts.

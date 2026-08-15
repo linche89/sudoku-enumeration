@@ -5,6 +5,8 @@
 - `../STATUS.md` — the only authoritative current state.
 - `../README.md` — repository entry point and commands.
 - `runbooks/og2.md` — safe build, verification, and checkpoint workflow.
+- `runbooks/layer-dp-c6-production.md` — frozen S1/S2/S3 production chain,
+  progress sidecar, snapshot protection, replay, and final-certificate gates.
 
 ## Verified methods
 
@@ -22,6 +24,9 @@
 - `methods/layer-dp.md` — qualified global row-incremental candidate,
   exact recurrence, canonicalization gates, checkpoint/restart guarantees,
   completed bounded C=6 preflight, and owner-controlled launch boundary.
+- `methods/layer-dp-certificate.md` — independent representative legality,
+  canonicality, stabilizer/orbit, multiplicity, G1/G2 binding, and final CSV
+  certificate verification.
 - `../fj9/reproduction.md` — complete FJ05 9x9 reproduction.
 
 ## Current mathematics
@@ -35,6 +40,8 @@
 
 ## Dated evidence
 
+- `reports/og2/layer-dp-c6-audit-infrastructure-20260815.md`
+- `reports/og2/layer-dp-c6-production-s1-window4-20260810.md`
 - `reports/og2/layer-dp-c6-production-s1-window3-20260809.md`
 - `reports/og2/layer-dp-c6-production-s1-window2-20260803.md`
 - `reports/og2/layer-dp-c6-production-s1-window1-20260803.md`
