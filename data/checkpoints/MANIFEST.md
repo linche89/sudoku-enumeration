@@ -67,10 +67,10 @@ Source and backup had the SHA-256 value above after copying.
 
 ## layer_dp_c6_s1_prod_20260802 (active production namespace)
 
-The repository owner authorized one bounded production S1 (`3->4`) window
-on 2026-08-02.  Its target duration is eight hours, its hard process bound is
-ten hours, and its RSS bound is 85 GiB.  This is partial resumable work, not a
-closed layer or a C=6 result.
+The repository owner has authorized four bounded production S1 (`3->4`)
+windows individually.  Each used an eight-hour target, ten-hour hard process
+bound, 85-GiB RSS bound, and a 40-minute checkpoint period after the initial
+recovery.  This is partial resumable work, not a closed layer or a C=6 result.
 
 ```text
 checkpoint base:
@@ -122,7 +122,7 @@ and fixes progress formatting.  A subsequent complete repository gate plus
 `-PrepareOnly -ContinueExisting` recognized the local generation and its
 external receipt, passed resource preflight, and wrote no checkpoint.
 
-Current authoritative state after production window 3:
+Prior authoritative state after production window 3:
 
 ```text
 status: partial S1, safe to resume; NOT a closed L4
@@ -151,3 +151,53 @@ Window 3 ran for 8.0682 hours, peaked at 61.854 GiB RSS, stopped at
 `target_window_checkpoint`, verified the external copy, and left no engine or
 controller process.  Detailed evidence is in
 `docs/reports/og2/layer-dp-c6-production-s1-window3-20260809.md`.
+
+Current authoritative state after production window 4:
+
+```text
+status: partial S1, safe to resume; NOT a closed L4
+generation: 37 (.a)
+cursor: 38/124 chunks, chunkParents=100000
+completed parent chunks: 30.6452%
+emissionsSoFar: 704741992192
+cacheHitsSoFar: 34280078
+claimed entries: 903398620
+parallel insertion holes: 18
+real states: 903398602
+local bytes: 32522350448
+local SHA-256: ECF0837315B0FDF8AE21C394FDA6676490E43B1828A0825529A344EC17E4E844
+external SHA-256: ECF0837315B0FDF8AE21C394FDA6676490E43B1828A0825529A344EC17E4E844
+```
+
+The current external image and receipt are:
+
+```text
+D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_s1_prod_20260802\
+  session-008-20260810-170245-layer_dp_c6_s1_prod_20260802.a
+D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_s1_prod_20260802\
+  session-008-20260810-170245-layer_dp_c6_s1_prod_20260802.a.sha256.txt
+```
+
+The prior local A/B fallback remains intact:
+
+```text
+generation: 36 (.b)
+cursor: 37/124 chunks
+emissionsSoFar: 686604415424
+cacheHitsSoFar: 32904033
+claimed entries / holes / real states: 903398620 / 18 / 903398602
+local bytes: 32522350448
+local SHA-256: B11F94B0D9A471A1FFACD340AD94FFE29874D537AB3FD2EACB3E1C8233F3FDF9
+```
+
+Window 4 ran for 8.4374 hours, peaked at 61.856 GiB RSS, stopped at
+`target_window_checkpoint`, verified the external copy, and left no engine or
+controller process.  A separate read-only audit on 2026-08-15 recalculated
+both generation-37 SHA-256 values above.  Detailed evidence is in
+`docs/reports/og2/layer-dp-c6-production-s1-window4-20260810.md`.
+
+The append-only progress sidecar begins with a recovered generation-37
+baseline at
+`data/logs/layer_dp_c6_s1_prod_20260802/progress.csv`.  Empty delta fields on
+that baseline are intentional: generations 0--36 were not all retained, and
+no earlier chunk may be rerun merely to reconstruct performance history.
