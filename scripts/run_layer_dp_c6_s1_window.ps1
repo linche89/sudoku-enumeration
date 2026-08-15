@@ -23,6 +23,8 @@ param(
         "D:\sudoku_FJ_checkpoint_backups\layer_dp_c6_s1_prod_20260802",
     [string]$LogRoot =
         "data/logs/layer_dp_c6_s1_prod_20260802",
+    [string]$ProgressSidecar =
+        "data/logs/layer_dp_c6_s1_prod_20260802/progress.csv",
     [switch]$ContinueExisting,
     [switch]$PrepareOnly
 )
@@ -101,8 +103,11 @@ function Wait-StartMemory {
 }
 
 function Get-LatestDurableImage {
+    $snapshot = $checkpointBasePath + ".L4.snap"
+    if (Test-Path -LiteralPath $snapshot) {
+        return Get-Item -Force -LiteralPath $snapshot
+    }
     $candidates = @(
-        ($checkpointBasePath + ".L4.snap"),
         ($checkpointBasePath + ".a"),
         ($checkpointBasePath + ".b")
     ) | Where-Object { Test-Path -LiteralPath $_ }
@@ -138,9 +143,16 @@ function Backup-DurableImage {
         }
     }
 
+    $isSnapshot = $Source.Name.EndsWith(
+        ".L4.snap", [StringComparison]::OrdinalIgnoreCase)
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $destName = "session-{0:D3}-{1}-{2}" -f `
-        $SessionNumber, $stamp, $Source.Name
+    $destName = if ($isSnapshot) {
+        $Source.Name
+    }
+    else {
+        "session-{0:D3}-{1}-{2}" -f `
+            $SessionNumber, $stamp, $Source.Name
+    }
     $dest = Join-Path $externalBackupPath $destName
     $temp = $dest + ".copying"
     if ((Test-Path -LiteralPath $dest) -or
@@ -157,7 +169,7 @@ function Backup-DurableImage {
     Move-Item -LiteralPath $temp -Destination $dest
     $receiptPath = $dest + ".sha256.txt"
     @(
-        "mode=C6_PRODUCTION_S1_PARTIAL",
+        "mode=$(if ($isSnapshot) {'C6_PRODUCTION_L4_SNAPSHOT'} else {'C6_PRODUCTION_S1_PARTIAL'})",
         "reason=$Reason",
         "created=$((Get-Date).ToString('o'))",
         "source_path=$($Source.FullName)",
@@ -189,6 +201,102 @@ function Get-CheckpointMarkers {
     }
 }
 
+function Add-LayerProgress {
+    param(
+        [Parameter(Mandatory = $true)][string]$Checkpoint,
+        [Parameter(Mandatory = $true)][string]$Parent,
+        [Parameter(Mandatory = $true)][string]$Event,
+        [Parameter(Mandatory = $true)][int]$SessionNumber,
+        [Parameter(Mandatory = $true)][string]$GitHead,
+        [Parameter(Mandatory = $true)][string]$ObservedAt,
+        [Parameter(Mandatory = $true)][double]$ElapsedSeconds,
+        [Parameter(Mandatory = $true)][Int64]$RssBytes,
+        [Parameter(Mandatory = $true)][double]$AvailableGiB,
+        [double]$CheckpointWriteSeconds = 0,
+        [Nullable[UInt64]]$ExpectedGeneration = $null,
+        [Nullable[UInt64]]$ExpectedCursor = $null,
+        [Nullable[UInt64]]$ExpectedChunks = $null,
+        [string]$KnownSha256 = ""
+    )
+    $invariant = [Globalization.CultureInfo]::InvariantCulture
+    $progressArgs = @(
+        $progressHelper,
+        $Checkpoint,
+        "--progress", $progressPath,
+        "--parent", $Parent,
+        "--event", $Event,
+        "--session", "$SessionNumber",
+        "--git-head", $GitHead,
+        "--observed-at", $ObservedAt,
+        "--elapsed-seconds", $ElapsedSeconds.ToString("F3", $invariant),
+        "--rss-bytes", "$RssBytes",
+        "--rss-gib", ($RssBytes / 1GB).ToString("F6", $invariant),
+        "--available-gib", $AvailableGiB.ToString("F3", $invariant)
+    )
+    if ($CheckpointWriteSeconds -gt 0) {
+        $progressArgs += @(
+            "--checkpoint-write-seconds",
+            $CheckpointWriteSeconds.ToString("F3", $invariant)
+        )
+    }
+    if ($null -ne $ExpectedGeneration) {
+        $progressArgs += @("--expect-generation", "$ExpectedGeneration")
+    }
+    if ($null -ne $ExpectedCursor) {
+        $progressArgs += @("--expect-cursor", "$ExpectedCursor")
+    }
+    if ($null -ne $ExpectedChunks) {
+        $progressArgs += @("--expect-nchunks", "$ExpectedChunks")
+    }
+    if ($KnownSha256) {
+        $progressArgs += @("--known-sha256", $KnownSha256)
+    }
+    $output = @(& python @progressArgs 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        throw "progress sidecar append failed: $($output -join ' ')"
+    }
+    Write-Host "progress sidecar: $($output -join ' ')"
+}
+
+function Sync-CheckpointProgress {
+    param(
+        [Parameter(Mandatory = $true)][string]$StdoutPath,
+        [Parameter(Mandatory = $true)][int]$ProcessedCount,
+        [Parameter(Mandatory = $true)][int]$SessionNumber,
+        [Parameter(Mandatory = $true)][string]$GitHead,
+        [Parameter(Mandatory = $true)][datetime]$Started,
+        [Parameter(Mandatory = $true)][Int64]$RssBytes,
+        [Parameter(Mandatory = $true)][double]$AvailableGiB,
+        [Parameter(Mandatory = $true)][string]$Parent
+    )
+    $markers = @(Get-CheckpointMarkers $StdoutPath)
+    if ($markers.Count -lt $ProcessedCount) {
+        throw "checkpoint marker log moved backwards"
+    }
+    for ($i = $ProcessedCount; $i -lt $markers.Count; $i++) {
+        $marker = $markers[$i]
+        $checkpoint = $marker.Groups[5].Value.Trim()
+        $allowed = @(
+            ($checkpointBasePath + ".a"),
+            ($checkpointBasePath + ".b")
+        )
+        if ($checkpoint -notin $allowed) {
+            throw "checkpoint marker names unexpected path $checkpoint"
+        }
+        Add-LayerProgress `
+            -Checkpoint $checkpoint -Parent $Parent -Event "checkpoint" `
+            -SessionNumber $SessionNumber -GitHead $GitHead `
+            -ObservedAt ((Get-Date).ToString('o')) `
+            -ElapsedSeconds (((Get-Date) - $Started).TotalSeconds) `
+            -RssBytes $RssBytes -AvailableGiB $AvailableGiB `
+            -CheckpointWriteSeconds ([double]$marker.Groups[6].Value) `
+            -ExpectedGeneration ([UInt64]$marker.Groups[1].Value) `
+            -ExpectedCursor ([UInt64]$marker.Groups[2].Value) `
+            -ExpectedChunks ([UInt64]$marker.Groups[3].Value)
+    }
+    return $markers.Count
+}
+
 function Invoke-LoggedProcess {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
@@ -218,6 +326,8 @@ $logParent = Join-Path $root "data/logs"
 $checkpointBasePath = Assert-PathUnder $CheckpointBase $checkpointRoot `
     "CheckpointBase"
 $logRootPath = Assert-PathUnder $LogRoot $logParent "LogRoot"
+$progressPath = Assert-PathUnder $ProgressSidecar $logParent `
+    "ProgressSidecar"
 $externalRoot = "D:\sudoku_FJ_checkpoint_backups"
 $externalBackupPath = Assert-PathUnder $ExternalBackupDir $externalRoot `
     "ExternalBackupDir"
@@ -231,13 +341,15 @@ if ([IO.Path]::GetFileName($checkpointBasePath) -notlike
     throw "CheckpointBase must use a layer_dp_c6_s1_prod_* basename"
 }
 
-$dirty = @(& git status --porcelain)
+$dirty = @(& git status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -ne 0) { throw "git status failed" }
 if ($dirty.Count) {
     throw "production S1 requires a clean tracked worktree"
 }
 $gitHead = (& git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw "cannot resolve Git HEAD" }
+$progressHelper = (Resolve-Path -LiteralPath `
+    "scripts/layer_dp_progress.py").Path
 
 if (Get-Process -Name "layer_dp_gate" -ErrorAction SilentlyContinue) {
     throw "another layer_dp_gate process is already running"
@@ -316,12 +428,13 @@ if (Test-Path -LiteralPath ($checkpointBasePath + ".L4.snap")) {
     throw "S1 is already closed; do not resume it as a partial window"
 }
 
+$beforeBackup = $null
 if ($ContinueExisting) {
     $beforeImage = Get-LatestDurableImage
     if ($null -eq $beforeImage) {
         throw "resume base has no durable image"
     }
-    $null = Backup-DurableImage $beforeImage $sessionNumber `
+    $beforeBackup = Backup-DurableImage $beforeImage $sessionNumber `
         "pre-resume coverage"
 }
 
@@ -345,6 +458,16 @@ if ($PrepareOnly) {
     Write-Host "PRODUCTION S1 PREPARATION PASSED (no checkpoint written)"
     Write-Host "session directory: $sessionDir"
     exit 0
+}
+
+if ($ContinueExisting) {
+    Add-LayerProgress `
+        -Checkpoint $beforeBackup.Source -Parent $layer3Path `
+        -Event "resume_baseline" -SessionNumber $sessionNumber `
+        -GitHead $gitHead -ObservedAt ((Get-Date).ToString('o')) `
+        -ElapsedSeconds 0 -RssBytes 0 `
+        -AvailableGiB (Get-AvailableRamGiB) `
+        -KnownSha256 $beforeBackup.Hash
 }
 
 $stdout = Join-Path $sessionDir "stdout.log"
@@ -375,6 +498,10 @@ $proc = Start-Process -FilePath $exe -ArgumentList $engineArgs `
     -PassThru -WindowStyle Hidden
 $started = Get-Date
 [Int64]$peakRss = 0
+[Int64]$lastRss = 0
+$lastAvailableGiB = Get-AvailableRamGiB
+$processedMarkerCount = 0
+$progressFailure = ""
 $pauseRequested = $false
 $markersAtRequest = 0
 $stopReason = ""
@@ -388,12 +515,28 @@ try {
         $live = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
         if ($null -eq $live) { break }
         [Int64]$rss = $live.WorkingSet64
+        $lastRss = $rss
         if ($rss -gt $peakRss) { $peakRss = $rss }
         $rssGiB = [Math]::Round($rss / 1GB, 3)
         $availableGiB = Get-AvailableRamGiB
+        $lastAvailableGiB = $availableGiB
         "$((Get-Date).ToString('o')),$($proc.Id),$rss,$rssGiB,$availableGiB" |
             Add-Content -LiteralPath $rssLog
         $elapsedHours = ((Get-Date) - $started).TotalHours
+
+        try {
+            $processedMarkerCount = Sync-CheckpointProgress `
+                -StdoutPath $stdout -ProcessedCount $processedMarkerCount `
+                -SessionNumber $sessionNumber -GitHead $gitHead `
+                -Started $started -RssBytes $rss `
+                -AvailableGiB $availableGiB -Parent $layer3Path
+        }
+        catch {
+            $progressFailure = $_.Exception.Message
+            $stopReason = "progress_sidecar_failure"
+            Stop-Process -Id $proc.Id -Force
+            break
+        }
 
         if (((Get-Date) - $lastReport).TotalMinutes -ge 5) {
             $markers = Get-CheckpointMarkers $stdout
@@ -439,6 +582,20 @@ try {
 finally {
     Wait-Process -Id $proc.Id -Timeout 60 -ErrorAction SilentlyContinue
     $proc.Refresh()
+}
+
+if (!$progressFailure) {
+    try {
+        $processedMarkerCount = Sync-CheckpointProgress `
+            -StdoutPath $stdout -ProcessedCount $processedMarkerCount `
+            -SessionNumber $sessionNumber -GitHead $gitHead `
+            -Started $started -RssBytes $lastRss `
+            -AvailableGiB $lastAvailableGiB -Parent $layer3Path
+    }
+    catch {
+        $progressFailure = $_.Exception.Message
+        if (!$stopReason) { $stopReason = "progress_sidecar_failure" }
+    }
 }
 
 $ended = Get-Date
@@ -510,6 +667,8 @@ $summary = @(
     "durable_backup=$($backup.Backup)",
     "durable_sha256=$($backup.Hash)",
     "receipt=$($backup.Receipt)",
+    "progress_sidecar=$progressPath",
+    "progress_rows=$(@(Import-Csv -LiteralPath $progressPath).Count)",
     "layer3_sha256=$afterLayer3Hash",
     "layer3_backup_sha256=$afterLayer3BackupHash"
 )
@@ -525,6 +684,10 @@ Write-Host "external backup: $($backup.Backup)"
 Write-Host "SHA-256: $($backup.Hash)"
 Write-Host "summary: $summaryPath"
 
+if ($progressFailure) {
+    throw "S1 progress sidecar failed after preserving the newest durable " +
+          "checkpoint: $progressFailure"
+}
 if ($engineFailure) {
     Get-Content -LiteralPath $stdout -Tail 100 -ErrorAction SilentlyContinue
     Get-Content -LiteralPath $stderr -ErrorAction SilentlyContinue

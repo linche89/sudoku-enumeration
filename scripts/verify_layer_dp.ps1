@@ -39,6 +39,29 @@ if ((Get-Sha256 $ref) -ne $expectedRefHash) {
     throw "C=5 reference triple fixture hash mismatch"
 }
 $s4 = (Resolve-Path -LiteralPath "experiments/proto/s4_exact_sum.py").Path
+$s4PowerShell = (Resolve-Path -LiteralPath `
+    "experiments/proto/s4_exact_sum.ps1").Path
+$certificateVerifier = (Resolve-Path -LiteralPath `
+    "experiments/proto/s4_certificate_verify.py").Path
+$progressHelper = (Resolve-Path -LiteralPath `
+    "scripts/layer_dp_progress.py").Path
+$productionControllers = @(
+    (Resolve-Path -LiteralPath `
+        "scripts/run_layer_dp_c6_s1_window.ps1").Path,
+    (Resolve-Path -LiteralPath `
+        "scripts/run_layer_dp_c6_s2_window.ps1").Path,
+    (Resolve-Path -LiteralPath `
+        "scripts/run_layer_dp_c6_s3_finalize.ps1").Path
+)
+foreach ($controller in $productionControllers) {
+    $parseTokens = $null
+    $parseErrors = $null
+    [void][Management.Automation.Language.Parser]::ParseFile(
+        $controller, [ref]$parseTokens, [ref]$parseErrors)
+    if ($parseErrors.Count) {
+        throw "production controller does not parse: $controller"
+    }
+}
 $caps = "200,20000,20000,600"
 $expectedN = "1903816047972624930994913280000"
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
@@ -327,6 +350,65 @@ try {
         throw "staged stop did not produce a closed layer-4 snapshot"
     }
 
+    Write-Host "== read-only checkpoint progress sidecar =="
+    $generationInfo = @()
+    foreach ($generationPath in @(
+        ($stagedBase + ".a"),
+        ($stagedBase + ".b")
+    )) {
+        $json = @(& python $progressHelper $generationPath "--json" 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            throw "checkpoint progress inspection failed: $($json -join ' ')"
+        }
+        $generationInfo += ($json -join "`n" | ConvertFrom-Json)
+    }
+    $generationInfo = @($generationInfo | Sort-Object generation)
+    $progressCsv = Join-Path $stagedDir "progress.csv"
+    $progressParent = $stagedBase + ".L3.snap"
+    $older = $generationInfo[-2]
+    $newer = $generationInfo[-1]
+    & python $progressHelper $older.checkpoint_path `
+        "--progress" $progressCsv "--parent" $progressParent `
+        "--event" "resume_baseline" "--session" "1" `
+        "--git-head" "gate" "--elapsed-seconds" "0" *> `
+        (Join-Path $stagedDir "progress-baseline.log")
+    if ($LASTEXITCODE -ne 0) {
+        Get-Content -LiteralPath (Join-Path $stagedDir "progress-baseline.log")
+        throw "progress baseline append failed"
+    }
+    & python $progressHelper $newer.checkpoint_path `
+        "--progress" $progressCsv "--parent" $progressParent `
+        "--event" "checkpoint" "--session" "1" `
+        "--git-head" "gate" "--elapsed-seconds" "1" `
+        "--expect-generation" "$($newer.generation)" `
+        "--expect-cursor" "$($newer.cursor_chunk)" `
+        "--expect-nchunks" "$($newer.n_chunks)" *> `
+        (Join-Path $stagedDir "progress-checkpoint.log")
+    if ($LASTEXITCODE -ne 0) {
+        Get-Content -LiteralPath (Join-Path $stagedDir "progress-checkpoint.log")
+        throw "progress checkpoint append failed"
+    }
+    $progressRows = @(Import-Csv -LiteralPath $progressCsv)
+    if ($progressRows.Count -ne 2 -or
+        $progressRows[-1].generation -ne "$($newer.generation)" -or
+        [UInt64]$progressRows[-1].emissions_delta -ne
+            ([UInt64]$newer.emissions - [UInt64]$older.emissions) -or
+        [UInt64]$progressRows[-1].parents_processed_delta -eq 0) {
+        throw "progress sidecar delta/header gate failed"
+    }
+    # Repeating the identical append is idempotent and must not rewrite or
+    # duplicate the already durable row.
+    & python $progressHelper $newer.checkpoint_path `
+        "--progress" $progressCsv "--parent" $progressParent `
+        "--event" "checkpoint" "--session" "1" `
+        "--git-head" "gate" "--elapsed-seconds" "1" `
+        "--expect-generation" "$($newer.generation)" *> `
+        (Join-Path $stagedDir "progress-idempotent.log")
+    if ($LASTEXITCODE -ne 0 -or
+        @(Import-Csv -LiteralPath $progressCsv).Count -ne 2) {
+        throw "progress sidecar idempotence gate failed"
+    }
+
     # Production-shaped sparse-lineage rehearsal.  Layer 3 is an exact
     # import; all descendants are watermarked by the checkpoint fingerprint,
     # deliberately interrupted, and forbidden to load in production mode.
@@ -430,6 +512,46 @@ try {
     if ($LASTEXITCODE -ne 0) {
         Get-Content -LiteralPath (Join-Path $work "s4.log")
         throw "S4 exact summation failed"
+    }
+
+    Write-Host "== independent final-certificate semantics =="
+    & python $certificateVerifier "--self-test-c6-anchors" *> `
+        (Join-Path $work "certificate-c6-anchors.log")
+    if ($LASTEXITCODE -ne 0) {
+        Get-Content -LiteralPath (Join-Path $work "certificate-c6-anchors.log")
+        throw "independent C=6 certificate anchors failed"
+    }
+    & python $certificateVerifier $gold "--c" "5" "--classes" "355" `
+        "--expect-n" $expectedN "--quiet" *> `
+        (Join-Path $work "certificate.log")
+    if ($LASTEXITCODE -ne 0) {
+        Get-Content -LiteralPath (Join-Path $work "certificate.log")
+        throw "independent certificate verifier failed"
+    }
+    $badCertificate = Join-Path $work "bad-certificate.csv"
+    $badRows = @(Import-Csv -LiteralPath $gold)
+    $badRows[0].coordinate_orbit_size =
+        "$([UInt64]$badRows[0].coordinate_orbit_size + 1)"
+    $badRows | Export-Csv -LiteralPath $badCertificate `
+        -NoTypeInformation -Encoding ascii
+    $savedErrorPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & python $certificateVerifier $badCertificate "--c" "5" `
+        "--classes" "355" "--quiet" *> `
+        (Join-Path $work "bad-certificate.log")
+    $badCertificateExit = $LASTEXITCODE
+    $ErrorActionPreference = $savedErrorPreference
+    if ($badCertificateExit -eq 0) {
+        throw "certificate verifier accepted a falsified orbit size"
+    }
+
+    Write-Host "== independent PowerShell BigInteger summation =="
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $s4PowerShell `
+        $gold -Classes 355 -ExpectN $expectedN *> `
+        (Join-Path $work "s4-powershell.log")
+    if ($LASTEXITCODE -ne 0) {
+        Get-Content -LiteralPath (Join-Path $work "s4-powershell.log")
+        throw "PowerShell BigInteger exact summation failed"
     }
 
     $rng = [Random]::new(20260730)
