@@ -1,9 +1,25 @@
 # Current Project Status
 
-Last updated: 2026-08-15
+Last updated: 2026-09-05
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.
+
+## Current C=6 decision (2026-09-05)
+
+An exact new route now reuses the completed L4/L5 support catalogues, shares
+F4 graph values without merging native downstream responses, and computes
+F5 by a rooted reverse recurrence. Its complete C5 and interruption/recovery
+gates pass. Three bounded real C6 F4 windows have saved 1,689,458 closed graph
+values; the current stable-ID record prefix is [0,10525000), externally backed
+up. No complete C6 F4/L5 export or independently closed N(6) exists yet.
+
+The measurements support pursuing this route instead of finishing the old
+forward S1 work, but do not certify a total runtime or a global speedup
+factor. The old checkpoints are unchanged and remain available as fallback.
+Long computation windows must fit the owner's available daily runtime;
+the scripts require positive work limits, time/RSS bounds and backups.
+Detailed evidence follows under "Direct-layer investigation" below.
 
 ## Stable results
 
@@ -546,11 +562,123 @@ independent big-integer sums.  Their existence is not authorization.  Future
 S1, S2, and S3 work remain separate owner decisions.  See
 `docs/runbooks/layer-dp-c6-production.md`.
 
+## Direct-layer investigation (2026-09-05)
+
+An independent two-missing-box Burnside counter now gives the exact native
+four-row inventory `M_4(6) = 903,398,603`, with raw coordinate mass
+`41,602,261,536,160`. It reproduces the complete C=2..5 layer counts and passes
+independent fixed-point differentials; no production states enter that count.
+
+Read-only header, payload and SHA-256 scans confirm that the current generation
+37 contains 903,398,602 real keys with stored-stabilizer mass
+41,602,261,532,320. The one missing orbit has been explicitly found, has
+stabilizer 12 and orbit size 3,840, and is absent by a complete membership scan.
+The retained rehearsal L5 catalogue contains 96,452,753 real keys; two explicit
+absent witnesses of orbit sizes 32 and 192 close its exact 96,452,755-key
+inventory and raw coordinate mass. Given the established legality, uniqueness
+and stabilizer guarantees for the stored keys, the old catalogues plus these
+three witnesses therefore constitute complete L4 and L5 SUPPORT SETS.
+
+This does not close any partial T4 weight or accept any rehearsal weight.
+Original files are unchanged; no repaired production checkpoint has been
+written. The witness data and source hashes are retained in
+`data/golden/og2-c6-support-witnesses.json`; proofs and commands are in
+`docs/math/two-missing-layer-burnside.md`.
+
+Direct graph-value and rooted reverse-layer decision tools now pass every
+native C=2..5 coefficient, including all 355 final C=5 classes. A native-key
+reverse implementation substantially reduces canonicalization cost compared
+with an unpaired-graph key on the same bounded C=6 samples. Parallel direct F4
+values agree across 1/8/24 threads, but their kernel-only rate projects about
+41.65 hours if every native state is evaluated separately.
+
+Exact graph-value aliases are now implemented by enumerating admissible slot
+pairings on both bipartitions and taking the minimum retained native key.
+Complete C5 L4 is partitioned into 12,543 graph fibers without discarding any
+of its 17,120 distinct native responses. Actual uniform C6 samples support
+approximately 6.5-fold sharing of F4 evaluations; this is an inventory/work
+estimate, not a whole-job speedup guarantee. A full read-only C6 index rebuild
+confirmed zero duplicate stored keys and all 314,584 tested predecessor
+lookups hit; it took 21.09 seconds with 24-thread indexing and peaked at
+38.30 GiB. The source SHA-256 remained unchanged.
+
+A combined closed-value engine now persists immutable, source-fingerprinted
+alias/F4 chunks and exports a native layer only after complete alias closure.
+Fresh C4/C5 runs reproduce every weight; the newly exported C5 F4 values feed
+an independent reverse check of all 355 final values and the exact N(5).
+Changed-thread resume, actual forced termination, corrupt headers/payloads,
+invalid aliases, insertion holes and overwrite refusal are tested. On a
+fiber-closed C6 sample, all 12,345 native values in 1,024 graph fibers match
+independent cold F4 evaluations. This is explicitly a sample domain, not a
+closed global F4 cache.
+
+The shared-value mathematical route is therefore exact and its combined
+implementation has passed complete small-case gates. Full-size C6 lookup
+scaling and two bounded shared-F4 production windows have also passed; no
+new end-to-end C6 duration or complete N(6) result is claimed. See
+`docs/math/native-graph-value-sharing.md` and
+`docs/reports/og2/c6-catalogue-direct-route-20260905.md`.
+
+The first bounded real C6 shared-value window has now passed: 500,000 stable
+ID records and 83,778 closed graph-representative F4 values are committed in
+20 immutable chunks. Computation/commit took 15.465317 seconds; complete
+engine elapsed was 47.835427 seconds and peak working set 41.714 GiB. All
+21 files including the manifest have SHA-verified external physical copies.
+This prefix is not a uniform timing sample and is not a closed native T4
+layer. The new namespace, original-source pin and recovery status are recorded
+in the checkpoint manifest and
+`docs/reports/og2/c6-shared-f4-window1-20260905.md`.
+
+A second bounded window resumed those same 20 chunks without recomputing
+them and added 25,000 IDs and 3,649 closed representative values. The current
+prefix is [0,525000), with 21 immutable chunks and 87,427 closed F4 values.
+The engine took 46.116907 seconds including input validation and index
+reconstruction; the new computation/commit took 0.716339 seconds. The
+before/after external copies were independently SHA-verified. This remains
+a nonuniform prefix, not a whole-population timing sample or closed T4 layer.
+See `docs/reports/og2/c6-shared-f4-window2-20260905.md`.
+
+The third bounded window processed 10,000,000 additional IDs in 400 new
+immutable chunks. The current prefix is [0,10525000), with 1,689,458 closed
+representative F4 values. New computation/commit took 302.293218 seconds;
+complete engine elapsed was 348.030754 seconds with a 41.715-GiB peak.
+All 422 files (126,408,032 bytes) have independent SHA-verified external
+copies. A separately bounded streaming reader checked all headers, payloads,
+aliases, counters and before/after receipts, including preservation of the
+previous 22 files. It found 2,156,246 processed IDs already resolving to
+closed values and 8,368,754 referring to future representatives. No native
+T4 export or population-wide runtime guarantee is implied. The released
+counting implementation is retained in local commit `6d19785`; see
+`docs/reports/og2/c6-shared-f4-window3-20260905.md`.
+
+The actual resumable reverse-F5 implementation now passes a fresh complete
+C5 chain from a NEW shared-F4 export through all 355 F5 values, byte-identical
+native L5 export, and independent N(5). Forced-kill recovery, changed-thread
+resume, both input lineages, old-weight erasure, corruption and invalid-value
+refusal also pass. This release took 40.8867173 seconds including compilation.
+The C6 L5 support loader independently rejects duplicate keys, erases all old
+weights, appends the two proved missing keys, and restores production
+configuration. A separate-volume physical copy of that original support file
+has the pinned SHA-256; both files remain unchanged.
+
+On 512 uniformly sampled C6 L5 records, the reverse core made 2,471,101
+successful predecessor lookups against the complete 903,398,603-key L4 index.
+Query wall times at 1/8/24 threads were 7.761470/0.990884/0.432451 seconds,
+with identical counters/checksum and no misses. The 24-thread process peaked
+at 38.31 GiB. This test did NOT read numerical F4 values or compute F5; its
+approximately 22.63-hour full-population query extrapolation excludes those
+operations, other production overhead and sample uncertainty. No C6 F5
+production chunk exists yet: a fully closed F4 export is the required input.
+See `docs/runbooks/layer-reverse-c6.md` and
+`docs/reports/og2/c6-reverse-f5-release-20260905.md`.
+
 ## Current checkpoints
 
 All retained checkpoints are documented in `data/checkpoints/MANIFEST.md`.
-The active layer-DP production image is the partial generation 37 described
-above.  The separate factorization/orbit graph memo contains 5,315,962 closed
+The original layer-DP production image remains the partial generation 37
+described above. The new shared-F4 namespace contains the independently
+closed representative values/aliases just described, with no full layer
+export yet. The separate factorization/orbit graph memo contains 5,315,962 closed
 exact values.  Neither binary is stored in Git.  Factorization verification
 must use `checkpointreadonly`; layer-DP production images are inspected only
 through their read-only header/hash helper or a protected staged resume.
@@ -559,6 +687,9 @@ through their read-only header/hash helper or a protected staged resume.
 
 - `layer_dp_gate` (experiments/proto): row-incremental layer DP, the
   qualified C=6 candidate; audited runbook in `docs/methods/layer-dp.md`.
+- `layer_shared_f4` / `layer_reverse_f5` (experiments/proto): new exact
+  support-reuse route, complete C5 and recovery gates passed; bounded real
+  C6 F4 progress only. No complete C6 native export or final sum yet.
 - `factorization_orbit`: primary C=2..5 exact factorization/orbit engine and
   the C=5 oracle for the layer DP.
 - `multiset_q`: independent transfer-kernel research and cross-check route.

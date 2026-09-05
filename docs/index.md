@@ -7,6 +7,11 @@
 - `runbooks/og2.md` — safe build, verification, and checkpoint workflow.
 - `runbooks/layer-dp-c6-production.md` — frozen S1/S2/S3 production chain,
   progress sidecar, snapshot protection, replay, and final-certificate gates.
+- `runbooks/layer-shared-c6.md` — bounded new-route shared-F4 windows,
+  immutable chunks, source/backup checks and daily runtime limits; not a
+  complete N(6) command.
+- `runbooks/layer-reverse-c6.md` — resumable reverse F5 from a verified
+  closed F4 export, key-only rehearsal support, exact gates and S3 handoff.
 
 ## Verified methods
 
@@ -34,12 +39,37 @@
 - `math/c6-current-bottleneck.md` — audited C=6 mathematical frontier.
 - `math/penultimate-layer-burnside.md` — exact native penultimate-layer
   Burnside count, including `M_5(6) = 96,452,755` and small-C differentials.
+- `math/two-missing-layer-burnside.md` — exact `M_4(6) = 903,398,603`,
+  constructive L4/L5 support-completion witnesses, and bounded certificates;
+  no closed production weights are implied.
+- `math/native-graph-value-sharing.md` — exact pairing-fiber graph keys,
+  retained native responses, shared F4 values, reverse F5 recurrence and
+  unbiased workload-estimation identities.
 - `math/og2-band-kernel-lowrank.md` — separate formalized transfer-kernel
   question, completed small-rank gate, fixed-source frontier lower bound, and
   surviving target-only/response-subspace questions.
 
 ## Dated evidence
 
+- `reports/og2/c6-shared-f4-window3-20260905.md` — 10,000,000 additional
+  real C6 records in a bounded window, 1,689,458 cumulative closed F4 values,
+  streaming independent audit and protected external copies.
+- `reports/og2/c6-shared-f4-window2-20260905.md` — bounded real C6 resume:
+  525,000 durable records, 87,427 closed F4 values and external backups.
+- `reports/og2/c6-reverse-f5-release-20260905.md` — actual reverse-F5
+  complete C5/recovery release, full-size C6 lookup-only scaling and protected
+  L5 support; no C6 F5 production values or final N(6).
+- `reports/og2/c6-shared-f4-window1-20260905.md` — first bounded real C6
+  shared-value window: 500,000 durable records, 83,778 closed F4 values and
+  independently hashed external backup; no complete native layer or N(6).
+- `reports/og2/c6-catalogue-direct-route-20260905.md` — read-only catalogue
+  certificates, complete small-case direct/reverse coefficient gates, and
+  bounded C=6 performance measurements.
+- `reports/og2/c6-standalone-research-prompt-20260905.md` — copy-ready
+  research prompt with no repository dependencies, an embedded finite Python
+  reference, proof labels, scoped barriers, and explicit falsification gates.
+- `reports/og2/c6-structure-research-handoff-20260905.md` — earlier research
+  brief with local provenance; use the standalone prompt above for forwarding.
 - `reports/og2/layer-dp-c6-gen37-prepare-only-20260815.md`
 - `reports/og2/layer-dp-c6-audit-infrastructure-20260815.md`
 - `reports/og2/layer-dp-c6-production-s1-window4-20260810.md`
