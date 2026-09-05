@@ -19,8 +19,32 @@ time on 2026-09-05; its controller completed external backup by 19:57 and
 exited zero. The independent full-prefix audit passed. The incremental CPU
 kernel processed 296,200,000 additional IDs and saved 45,477,034 new closed
 graph values. The F4 ID scan is 50.0969% complete, not the entire N(6) task.
-No C6 production process remains and no next window has been started.
+No C6 production process remained at that audited handoff.
 See `docs/reports/og2/c6-shared-f4-window7-20260905.md`.
+
+The owner then explicitly authorized the remaining F4 scan. Window8 started
+its computing child at 20:39:46 local time on 2026-09-05 (observed PID 47052)
+after the SHA-verified physical before-backup of all 18,104 prior files.
+It resumed the audited prefix and has committed new chunks. Bounds are
+`limit=450823621`, `chunk=25000`, 24 threads, 55 GiB, 180-minute soft stop
+and 195-minute hard child limit. This covers the remaining ID domain exactly,
+including the final 23,621-record partial chunk; final alias closure is still
+required. No export or downstream F5/final-sum stage is requested. Completion
+and after-backup are not yet observed. The owner will return with progress;
+do not keep polling or automatically launch another job.
+
+Window8 controller log:
+`data/logs/c6-direct-route-20260905/shared-production-window8-controller.log`.
+Engine logs:
+`data/logs/shared-f4-window-20260905-203613-9c0bee91ce974a24878857f4d09c78b2/`.
+Before-backup:
+`D:/sudoku_FJ_checkpoint_backups/c6_shared_f4_20260905/20260905-203613-9c0bee91ce974a24878857f4d09c78b2-before/`.
+The launched controller uses the full gate in
+`data/logs/shared-window7-handoff-full-uangbw2w/stdout.log` and installed-path
+shared gate in `data/logs/shared-incremental-installed-release-pq4fj7dy/stdout.log`;
+their SHA pins and the installed release SHA were rechecked before launch.
+On the owner's return, inspect this same process and terminal logs first;
+never infer termination from this dated note or restart an unverified window.
 
 The measurements support pursuing this route instead of finishing the old
 forward S1 work, but do not certify a total runtime or a global speedup
