@@ -125,6 +125,9 @@ def audit(args: argparse.Namespace, guard: HardBounds) -> dict:
     require(digest(prior_raw) == args.previous_sha256.upper(), 'previous audit report SHA mismatch')
     previous = json.loads(prior_raw)
     require(previous.get('status') == 'PASS', 'previous report did not pass')
+    require(previous.get('prefix_snapshot',False) is False and
+            previous.get('backup_snapshot_test',False) is False,
+            'a production audit chain cannot inherit a snapshot/test report')
     prior_prefix = int(previous['closed_prefix'])
     require(0 < prior_prefix < args.expected_prefix <= args.max_entries,
             'a resumed audit requires a strictly extended, bounded prefix')
