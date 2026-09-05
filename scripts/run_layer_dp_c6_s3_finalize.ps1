@@ -12,8 +12,12 @@ param(
     [string]$Caps = "2000,14000000,1350000000,250000000,100000",
     [UInt64]$ChunkParents = 100000,
     [double]$CheckpointMinutes = 40.0,
-    [ValidateRange(1.0, 24.0)]
-    [double]$MaxHoursPerAttempt = 10.0,
+    [ValidateRange(0.25, 8.0)]
+    [double]$MaxHoursPerAttempt = 3.5,
+    [ValidateRange(0.5, 8.0)]
+    [double]$SessionMaxHours = 7.5,
+    [ValidateRange(5, 60)]
+    [int]$ReserveMinutes = 15,
     [int]$RssLimitGB = 32,
     [int]$MinimumAvailableGB = 8,
     [int]$StartAvailableGB = 32,
@@ -41,6 +45,11 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+$sessionDeadline = (Get-Date).AddHours($SessionMaxHours)
+$operationDeadline = $sessionDeadline.AddMinutes(-$ReserveMinutes)
+if ($operationDeadline -le (Get-Date).AddMinutes(5)) {
+    throw "Session ceiling must leave computing time plus backup reserve"
+}
 
 if (!$AuthorizeFullC6) { throw "-AuthorizeFullC6 is required" }
 if ($Threads -lt 2) { throw "Threads must be at least 2" }
@@ -54,26 +63,62 @@ if ($MaxHoursPerAttempt -le 0 -or $RssLimitGB -lt 1 -or
 if ($ExpectedN -notmatch '^[0-9]+$') { throw "ExpectedN must be decimal" }
 $Layer5Sha256 = $Layer5Sha256.ToUpperInvariant()
 
+function Assert-SessionTime {
+    if ((Get-Date) -ge $operationDeadline) { throw "S3 session computing deadline reached; backup reserve retained" }
+}
+function Quoted-Arguments([string[]]$Items) {
+    return @($Items | ForEach-Object {
+        if ($_ -match '["\r\n]') { throw "Quote/newline in process argument is forbidden" }
+        if ($_ -match '\s') {'"'+$_+'"'} else {$_}
+    })
+}
+function Stop-ChildTree([Diagnostics.Process]$Child) {
+    $Child.Refresh()
+    if (!$Child.HasExited) {
+        & taskkill.exe /PID $Child.Id /T /F | Out-Null
+        $null = $Child.WaitForExit(10000)
+    }
+}
+
 function Get-Sha256 {
     param([Parameter(Mandatory = $true)][string]$Path)
     $stream = [IO.File]::OpenRead($Path)
     $sha = [Security.Cryptography.SHA256]::Create()
     try {
-        return ([BitConverter]::ToString(
-            $sha.ComputeHash($stream))).Replace("-", "")
+        $buffer = New-Object byte[] (8MB)
+        while (($read = $stream.Read($buffer,0,$buffer.Length)) -gt 0) {
+            if ((Get-Date) -ge $sessionDeadline) {throw 'S3 session ceiling reached while hashing'}
+            $null = $sha.TransformBlock($buffer,0,$read,$buffer,0)
+        }
+        $null = $sha.TransformFinalBlock([byte[]]@(),0,0)
+        return ([BitConverter]::ToString($sha.Hash)).Replace("-", "")
     }
     finally { $sha.Dispose(); $stream.Dispose() }
 }
 
 function Assert-PathUnder {
     param([string]$Path, [string]$Parent, [string]$Label)
-    $full = [IO.Path]::GetFullPath($Path)
+    $full = if ([IO.Path]::IsPathRooted($Path)) {[IO.Path]::GetFullPath($Path)} else {
+        [IO.Path]::GetFullPath((Join-Path $root $Path))
+    }
     $parentFull = [IO.Path]::GetFullPath($Parent).TrimEnd('\', '/') + '\'
     if (!$full.StartsWith($parentFull,
             [StringComparison]::OrdinalIgnoreCase)) {
         throw "$Label must stay under $parentFull"
     }
     return $full
+}
+function Assert-NoReparse([string]$Path) {
+    $at = if ([IO.Path]::IsPathRooted($Path)) {[IO.Path]::GetFullPath($Path)} else {
+        [IO.Path]::GetFullPath((Join-Path $root $Path))
+    }
+    while ($at) {
+        if ((Test-Path -LiteralPath $at) -and
+            ((Get-Item -LiteralPath $at -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "Reparse-point source/backup/namespace paths are not accepted: $at"
+        }
+        $at = [IO.Path]::GetDirectoryName($at)
+    }
 }
 
 function Get-AvailableRamGiB {
@@ -86,6 +131,7 @@ function Wait-StartMemory {
     param([string]$Label)
     $deadline = (Get-Date).AddMinutes(10)
     while ($true) {
+        Assert-SessionTime
         $available = Get-AvailableRamGiB
         if ($available -ge $StartAvailableGB) {
             Write-Host "$Label`: available RAM $available GiB [READY]"
@@ -101,10 +147,16 @@ function Wait-StartMemory {
 function Invoke-LoggedProcess {
     param([string]$FilePath, [string[]]$Arguments, [string]$StdoutPath,
           [string]$StderrPath, [string]$SuccessPattern)
-    $child = Start-Process -FilePath $FilePath -ArgumentList $Arguments `
+    Assert-SessionTime
+    $child = Start-Process -FilePath $FilePath -ArgumentList (Quoted-Arguments $Arguments) `
         -RedirectStandardOutput $StdoutPath `
         -RedirectStandardError $StderrPath -PassThru -WindowStyle Hidden
-    $child.WaitForExit(); $child.Refresh()
+    try {
+        while (!$child.WaitForExit(1000)) { Assert-SessionTime }
+    } finally {
+        if (!$child.HasExited) { Stop-ChildTree $child }
+    }
+    $child.Refresh()
     if ($null -ne $child.ExitCode) { return [int]$child.ExitCode }
     if ((Get-Content -Raw -LiteralPath $StdoutPath) -match $SuccessPattern) {
         return 0
@@ -219,6 +271,7 @@ function Invoke-FinalAttempt {
     param([string]$Attempt, [string]$Base, [string]$Dump,
           [string]$Directory, [string]$Progress)
     Wait-StartMemory $Attempt
+    Invoke-Lineage "validate" $Attempt $Base $Dump
     New-Item -ItemType Directory -Force -Path $Directory | Out-Null
     $stdout = Join-Path $Directory "stdout.log"
     $stderr = Join-Path $Directory "stderr.log"
@@ -246,18 +299,23 @@ function Invoke-FinalAttempt {
         $engineArgs += @("--load-layer", "5", $layer5Path)
     }
     $commandPath = Join-Path $Directory "command.txt"
+    $displayCommand = (Quoted-Arguments (@($exe)+$engineArgs)) -join ' '
     @(
         "git_head=$gitHead",
         "attempt=$Attempt",
+        "layer5_sha256=$Layer5Sha256",
+        "binding_sha256=$(Get-Sha256 ($Base+'.s3-binding.json'))",
+        "exe_sha256=$(Get-Sha256 $exe)",
         "created=$((Get-Date).ToString('o'))",
-        "command=$exe $($engineArgs -join ' ')"
+        "command=$displayCommand"
     ) | Set-Content -LiteralPath $commandPath -Encoding ascii
     $started = Get-Date
     if ($beforeBackup) {
         Add-ProgressRecord $Progress $beforeBackup.Source "resume_baseline" `
             $Attempt $started 0 (Get-AvailableRamGiB) $null $beforeBackup.Hash
     }
-    $proc = Start-Process -FilePath $exe -ArgumentList $engineArgs `
+    Assert-SessionTime
+    $proc = Start-Process -FilePath $exe -ArgumentList (Quoted-Arguments $engineArgs) `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
         -PassThru -WindowStyle Hidden
     [Int64]$peak = 0
@@ -306,7 +364,8 @@ function Invoke-FinalAttempt {
                 $guardReason="available_ram_guard"
                 Stop-Process -Id $proc.Id -Force; break
             }
-            if (((Get-Date)-$started).TotalHours -ge $MaxHoursPerAttempt) {
+            if (((Get-Date)-$started).TotalHours -ge $MaxHoursPerAttempt -or
+                    (Get-Date) -ge $operationDeadline) {
                 $guardReason="hard_time_guard"; Stop-Process -Id $proc.Id -Force; break
             }
         }
@@ -349,18 +408,79 @@ function Invoke-FinalAttempt {
     if (Test-Path -LiteralPath $Dump) {
         throw "$Attempt stable CSV path unexpectedly exists: $Dump"
     }
-    Move-Item -LiteralPath $attemptDump -Destination $Dump
     $finalImage = Get-Item -LiteralPath ($Base + ".L6.snap")
     $backup = Backup-Artifact $finalImage $Attempt "closed final wide snapshot"
+    Hold-Input ($Base+'.L5.snap')
+    Invoke-Lineage "prepare-result" $Attempt $Base $Dump @(
+        '--prepared-csv',$attemptDump,'--command-record',$commandPath)
+    Backup-Lineage $Attempt $Base
+    Invoke-Lineage "finalize-result" $Attempt $Base $Dump
     return [pscustomobject]@{
         Attempt=$Attempt; PeakGiB=[Math]::Round($peak/1GB,3)
         Hours=[Math]::Round(((Get-Date)-$started).TotalHours,4)
         Dump=$Dump; Snapshot=$finalImage.FullName
         SnapshotSha256=$backup.Hash; SnapshotBackup=$backup.Backup
-        Command="$exe $($engineArgs -join ' ')"; CommandRecord=$commandPath
+        Command=$displayCommand; CommandRecord=$commandPath
     }
 }
 
+function Hold-Input([string]$Path) {
+    if (!$script:heldInputNames.Contains($Path)) {
+        $stream = New-Object IO.FileStream($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read,1)
+        $script:inputLocks.Add($stream)
+        $null = $script:heldInputNames.Add($Path)
+    }
+}
+function Assert-SeparateInputCopy([string]$Source,[string]$Copy) {
+    if ([IO.Path]::GetPathRoot($Source) -eq [IO.Path]::GetPathRoot($Copy)) {
+        throw 'L5 requires a genuinely separate-volume physical backup'
+    }
+}
+function Assert-DistinctStages([string]$Primary,[string]$Replay) {
+    if ($Primary.Equals($Replay,[StringComparison]::OrdinalIgnoreCase) -or
+        $Primary.StartsWith($Replay+'.',[StringComparison]::OrdinalIgnoreCase) -or
+        $Replay.StartsWith($Primary+'.',[StringComparison]::OrdinalIgnoreCase) -or
+        $Primary.StartsWith($Replay+'\',[StringComparison]::OrdinalIgnoreCase) -or
+        $Replay.StartsWith($Primary+'\',[StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Primary and replay stage namespaces must be distinct and nonoverlapping'
+    }
+}
+function Invoke-Lineage([string]$Mode,[string]$Role,[string]$Base,[string]$Dump,[string[]]$Extra=@()) {
+    Assert-SessionTime
+    $peer = if ($Role -eq 'primary') {$replayBasePath} else {$primaryBasePath}
+    $lineageArgs = @($lineageHelper,$Mode,'--c','6','--source',$layer5Path,
+        '--source-sha256',$Layer5Sha256,'--base',$Base,'--peer',$peer,'--dump',$Dump,
+        '--role',$Role,'--caps',$Caps,'--chunk',"$ChunkParents",'--expected-n',$ExpectedN) + $Extra
+    $auditLog = Join-Path $logRootPath ('lineage-'+$Role+'-'+$Mode+'-'+[guid]::NewGuid().ToString('N')+'.log')
+    if ((Invoke-LoggedProcess 'python' $lineageArgs $auditLog ($auditLog+'.stderr') 'S3_LINEAGE ') -ne 0) {
+        Get-Content -LiteralPath ($auditLog+'.stderr')
+        throw "S3 immutable lineage refused $Role $Mode"
+    }
+    Get-Content -LiteralPath $auditLog | ForEach-Object {Write-Host $_}
+}
+function Backup-Lineage([string]$Role,[string]$Base) {
+    foreach ($suffix in @('.s3-binding.json','.s3-result.json')) {
+        $source = $Base+$suffix
+        if (!(Test-Path -LiteralPath $source)) {continue}
+        $target = Join-Path $externalPath ($Role+$suffix)
+        $digest = Get-Sha256 $source
+        if (Test-Path -LiteralPath $target) {
+            if ((Get-Sha256 $target) -ne $digest) {throw "Different immutable S3 lineage backup exists"}
+        } else {
+            [IO.File]::Copy($source,$target,$false)
+            if ((Get-Sha256 $target) -ne $digest) {throw "S3 lineage physical backup mismatch"}
+        }
+        if ((Get-Sha256 $source) -ne $digest) {throw "S3 lineage changed during backup"}
+    }
+}
+
+$script:inputLocks = New-Object 'Collections.Generic.List[IDisposable]'
+$script:heldInputNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+$controllerMutex = New-Object Threading.Mutex($false,'Local\sudoku_FJ_S3_finalization_controller')
+$haveMutex = $false
+try {
+try { $haveMutex = $controllerMutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $haveMutex = $true }
+if (!$haveMutex) {throw 'Another S3 finalization controller is active'}
 $checkpointRoot = Join-Path $root "data/checkpoints"
 $logParent = Join-Path $root "data/logs"
 $primaryBasePath = Assert-PathUnder $PrimaryBase $checkpointRoot "PrimaryBase"
@@ -369,6 +489,12 @@ $logRootPath = Assert-PathUnder $LogRoot $logParent "LogRoot"
 $externalRoot = "D:\sudoku_FJ_checkpoint_backups"
 $externalPath = Assert-PathUnder $ExternalBackupDir $externalRoot `
     "ExternalBackupDir"
+$primaryDump = Join-Path $logRootPath "final-primary.csv"
+$replayDump = Join-Path $logRootPath "final-replay.csv"
+foreach ($path in @($PrimaryBase,$ReplayBase,$LogRoot,$ExternalBackupDir,$Layer5,$Layer5Backup)) {
+    Assert-NoReparse $path
+}
+Assert-DistinctStages $primaryBasePath $replayBasePath
 foreach ($base in @($primaryBasePath,$replayBasePath)) {
     if ([IO.Path]::GetFileName($base) -notlike "layer_dp_c6_s3_prod_*") {
         throw "S3 checkpoint basenames must use layer_dp_c6_s3_prod_*"
@@ -390,18 +516,27 @@ if (Get-Process -Name "layer_dp_gate" -ErrorAction SilentlyContinue) {
 }
 $layer5Path = (Resolve-Path -LiteralPath $Layer5).Path
 $layer5BackupPath = (Resolve-Path -LiteralPath $Layer5Backup).Path
+Assert-SeparateInputCopy $layer5Path $layer5BackupPath
+Hold-Input $layer5Path
+Hold-Input $layer5BackupPath
+foreach ($base in @($primaryBasePath,$replayBasePath)) {
+    if (Test-Path -LiteralPath ($base+'.L5.snap')) {Hold-Input ($base+'.L5.snap')}
+}
 if ((Get-Sha256 $layer5Path) -ne $Layer5Sha256 -or
     (Get-Sha256 $layer5BackupPath) -ne $Layer5Sha256) {
     throw "local/external L5 hashes do not match -Layer5Sha256"
 }
 New-Item -ItemType Directory -Force -Path $logRootPath,$externalPath | Out-Null
 $progressHelper = (Resolve-Path -LiteralPath "scripts/layer_dp_progress.py").Path
+$lineageHelper = (Resolve-Path -LiteralPath "scripts/layer_s3_lineage.py").Path
 $certificate = (Resolve-Path -LiteralPath `
     "experiments/proto/s4_certificate_verify.py").Path
 $pythonSum = (Resolve-Path -LiteralPath `
     "experiments/proto/s4_exact_sum.py").Path
 $powerShellSum = (Resolve-Path -LiteralPath `
     "experiments/proto/s4_exact_sum.ps1").Path
+Invoke-Lineage 'validate' 'primary' $primaryBasePath $primaryDump
+Invoke-Lineage 'validate' 'replay' $replayBasePath $replayDump
 
 $session = 1
 while (Test-Path -LiteralPath (Join-Path $logRootPath (
@@ -435,8 +570,6 @@ if ($PrepareOnly) {
     exit 0
 }
 
-$primaryDump = Join-Path $logRootPath "final-primary.csv"
-$replayDump = Join-Path $logRootPath "final-replay.csv"
 $primaryProgress = Join-Path $logRootPath "progress-primary.csv"
 $replayProgress = Join-Path $logRootPath "progress-replay.csv"
 $allArtifacts = @(
@@ -445,13 +578,30 @@ $allArtifacts = @(
     ($primaryBasePath + ".a"),
     ($primaryBasePath + ".b"),
     ($primaryBasePath + ".L6.snap"),
+    ($primaryBasePath + ".L5.snap"),
+    ($primaryBasePath + ".s3-binding.json"),
+    ($primaryBasePath + ".s3-result.json"),
     ($replayBasePath + ".a"),
     ($replayBasePath + ".b"),
-    ($replayBasePath + ".L6.snap")
+    ($replayBasePath + ".L6.snap"),
+    ($replayBasePath + ".L5.snap"),
+    ($replayBasePath + ".s3-binding.json"),
+    ($replayBasePath + ".s3-result.json")
 )
 if (!$ContinueExisting -and ($allArtifacts | Where-Object {
         Test-Path -LiteralPath $_ }).Count) {
     throw "S3 artifacts already exist; use -ContinueExisting"
+}
+Invoke-Lineage 'bind' 'primary' $primaryBasePath $primaryDump
+Invoke-Lineage 'bind' 'replay' $replayBasePath $replayDump
+Backup-Lineage 'primary' $primaryBasePath
+Backup-Lineage 'replay' $replayBasePath
+foreach ($role in @('primary','replay')) {
+    $base = if ($role -eq 'primary') {$primaryBasePath} else {$replayBasePath}
+    $dump = if ($role -eq 'primary') {$primaryDump} else {$replayDump}
+    if (Test-Path -LiteralPath ($base+'.s3-result.json')) {
+        Invoke-Lineage 'finalize-result' $role $base $dump
+    }
 }
 
 $primaryResult = $null
@@ -474,23 +624,24 @@ $replayHash = Get-Sha256 $replayDump
 if ($primaryHash -ne $replayHash) { throw "S3 replay CSV SHA-256 mismatch" }
 
 $certificateLog = Join-Path $sessionDir "certificate.log"
-& python $certificate $primaryDump "--c" "6" "--classes" "63199" `
-    "--expect-n" $ExpectedN "--quiet" *> $certificateLog
-if ($LASTEXITCODE -ne 0) { throw "semantic certificate verification failed" }
+if ((Invoke-LoggedProcess 'python' @($certificate,$primaryDump,'--c','6','--classes','63199',
+        '--expect-n',$ExpectedN,'--quiet') $certificateLog ($certificateLog+'.stderr') `
+        'CERTIFICATE PASS') -ne 0) {throw 'semantic certificate verification failed'}
 $certificateText = Get-Content -Raw -LiteralPath $certificateLog
 if ($certificateText -notmatch "CERTIFICATE PASS") {
     throw "certificate verifier omitted its PASS marker"
 }
 
 $pythonSumLog = Join-Path $sessionDir "sum-python.log"
-& python $pythonSum $primaryDump "--classes" "63199" `
-    "--expect-f" "6986348258918400,7053808087203840" `
-    "--expect-n" $ExpectedN *> $pythonSumLog
-if ($LASTEXITCODE -ne 0) { throw "Python exact sum failed" }
+if ((Invoke-LoggedProcess 'python' @($pythonSum,$primaryDump,'--classes','63199',
+        '--expect-f','6986348258918400,7053808087203840','--expect-n',$ExpectedN) `
+        $pythonSumLog ($pythonSumLog+'.stderr') 'PASS') -ne 0) {throw 'Python exact sum failed'}
 $powerShellSumLog = Join-Path $sessionDir "sum-powershell.log"
-& powershell -NoProfile -ExecutionPolicy Bypass -File $powerShellSum `
-    $primaryDump -Classes 63199 -ExpectN $ExpectedN *> $powerShellSumLog
-if ($LASTEXITCODE -ne 0) { throw "PowerShell BigInteger exact sum failed" }
+if ((Invoke-LoggedProcess 'powershell' @('-NoProfile','-ExecutionPolicy','Bypass','-File',
+        $powerShellSum,$primaryDump,'-Classes','63199','-ExpectN',$ExpectedN) `
+        $powerShellSumLog ($powerShellSumLog+'.stderr') 'POWERSHELL EXACT SUM PASS') -ne 0) {
+    throw 'PowerShell BigInteger exact sum failed'
+}
 $pythonText = Get-Content -Raw -LiteralPath $pythonSumLog
 $powerShellText = Get-Content -Raw -LiteralPath $powerShellSumLog
 if ($pythonText -notmatch "N\(6\) = ([0-9]+)") {
@@ -559,6 +710,11 @@ $commandRecords = @($commandFiles | ForEach-Object { $_.FullName }) -join ';'
 $summary = @(
     "mode=C6_PRODUCTION_S3_FINALIZED", "git_head=$gitHead",
     "layer5_sha256=$Layer5Sha256", "primary_csv=$primaryDump",
+    "primary_binding_sha256=$(Get-Sha256 ($primaryBasePath+'.s3-binding.json'))",
+    "replay_binding_sha256=$(Get-Sha256 ($replayBasePath+'.s3-binding.json'))",
+    "primary_result_sha256=$(Get-Sha256 ($primaryBasePath+'.s3-result.json'))",
+    "replay_result_sha256=$(Get-Sha256 ($replayBasePath+'.s3-result.json'))",
+    "session_max_hours=$SessionMaxHours", "backup_reserve_minutes=$ReserveMinutes",
     "replay_csv=$replayDump", "csv_sha256=$primaryHash",
     "semantic_sha256=$semanticHash", "classes=63199",
     "G1_F=6986348258918400", "G2_F=7053808087203840",
@@ -575,3 +731,8 @@ Write-Host "PRODUCTION S3 CERTIFICATE CLOSED"
 Write-Host "CSV SHA-256: $primaryHash"
 Write-Host "N(6): $pythonN"
 Write-Host "summary: $summaryPath"
+} finally {
+    foreach ($held in $script:inputLocks) {$held.Dispose()}
+    if ($haveMutex) {$controllerMutex.ReleaseMutex()}
+    $controllerMutex.Dispose()
+}
