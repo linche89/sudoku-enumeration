@@ -63,7 +63,7 @@ if ($built -gt $reverseGate.LastWriteTimeUtc) {throw "Reverse executable rebuilt
 foreach ($path in @("experiments/proto/layer_reverse_f5.cpp","experiments/proto/layer_reverse_f5_core.h",
     "experiments/proto/layer_reverse_f5_chunks.h","experiments/proto/layer_shared_catalog.h",
     "experiments/proto/layer_shared_chunks.h","experiments/proto/layer_native_gather_bench.cpp",
-    "experiments/proto/layer_dp_gate.cpp")) {
+    "experiments/proto/layer_dp_gate.cpp","src/layer_two_missing_prefix_canon.h")) {
     if ((Get-Item -LiteralPath $path).LastWriteTimeUtc -gt $built) {throw "Source changed after build: $path"}
 }
 function Assert-InputCopies([string]$Source,[string]$Copy,[string]$Sha) {

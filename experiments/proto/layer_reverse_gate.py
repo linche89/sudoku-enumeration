@@ -79,6 +79,51 @@ def reseal_native(raw):
 
 
 class ReverseGate(Gate):
+    def fixture(self, c):
+        if c != 5:
+            raise ValueError("production reverse release gate requires complete C5")
+        stem = self.out/"reference-c5"
+        command = [str(self.args.layer_exe.resolve()), "5", "--threads", "1", "--caps",
+                   ",".join(str(max(100, n*2)) for n in COUNTS[5][1:]),
+                   "--invariance", "50", "--scan-check", "50", "--ref", str(REFERENCE)]
+        for layer in (3, 4, 5):
+            command += ["--save-layer", str(layer), str(stem.with_suffix(f".L{layer}.snap"))]
+        result = self.run(command, "fresh-complete-C5-reference")
+        if str(KNOWN[5]) not in result or "355 rows, 355 matched" not in result:
+            raise ValueError("fresh independent complete C5 reference failed")
+        for layer in (3, 4, 5):
+            export_closed(stem.with_suffix(f".L{layer}.snap"), stem.with_suffix(f".L{layer}.txt"), 5, layer)
+        return stem
+
+    def prefix_chain(self, stem):
+        common = [str(self.args.prefix_gate_exe.resolve()), "5"]
+        tests = (
+            ("complete-prefix-L3-invariance", ["3", f"input={stem.with_suffix('.L3.txt')}",
+                "limit=16150", "maxqueries=20000", "maxseconds=120", "invariance=16150"],
+             {"sources": 16150, "queries": 16150, "distinct": 16150, "transforms": 129200}),
+            ("complete-prefix-L3-L4-coefficients", ["4", f"input={stem.with_suffix('.L4.txt')}",
+                f"preload={stem.with_suffix('.L3.txt')}", "limit=17120", "maxqueries=5000000", "maxseconds=120"],
+             {"predecessors": 16150, "targets": 17120, "labelled_matchings": 3375557,
+              "weak_queries": 2935081, "sumF4": 3972941184, "sumOrbitF4": 14365876248576}),
+        )
+        for label, options, expected in tests:
+            result = self.run(common+options, label)
+            row = next((line for line in result.splitlines() if line.startswith(
+                "DIFFERENTIAL " if "invariance" in label else "COMPLETE_C5_L3_L4 ")), "")
+            found = fields(row)
+            if any(int(found.get(key, -1)) != value for key, value in expected.items()):
+                raise ValueError(f"incomplete compatible-prefix certificate: {label}")
+            if "[OK] EXTRACTED_COMPATIBLE_PREFIX" not in result or "production_keys_unchanged=YES" not in result:
+                raise ValueError("production-compatible dispatch gate lacks success marker")
+            if "invariance" in label:
+                wanted = "1:15013,2:977,3:1,4:123,5:3,6:3,8:20,10:2,12:1,20:4,24:3,"
+                if found.get("histogram") != wanted or "seeded_fallback=YES" not in result:
+                    raise ValueError("prefix stabilizer histogram or fallback differential changed")
+            elif (found.get("all_term_keys_stabs_coefficients_equal") != "YES" or
+                  found.get("all_F4_equal") != "YES"):
+                raise ValueError("full operator coefficient certificate missing")
+            self.checks.append(dict(test=label, production_translation_unit=True, **expected))
+
     def cmd(self, l4, support, namespace, *, chunk=50, limit=355,
             threads=None, verify=None, export=None, digest=None):
         seconds = self.args.seconds_per_process
@@ -270,13 +315,14 @@ def main():
     parser.add_argument("--reverse-exe", type=Path, default=ROOT/"build/layer_reverse_f5.exe")
     parser.add_argument("--shared-exe", type=Path, default=ROOT/"build/layer_shared_f4.exe")
     parser.add_argument("--layer-exe", type=Path, default=ROOT/"build/layer_dp_gate.exe")
+    parser.add_argument("--prefix-gate-exe", type=Path, default=ROOT/"build/layer_two_missing_prefix_gate.exe")
     parser.add_argument("--threads", type=int, choices=range(2, 25), default=4)
     parser.add_argument("--seconds-per-process", type=int, default=180)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if not 30 <= args.seconds_per_process <= 600:
         parser.error("per-process limit must be30..600 seconds")
-    for exe in (args.reverse_exe, args.shared_exe, args.layer_exe):
+    for exe in (args.reverse_exe, args.shared_exe, args.layer_exe, args.prefix_gate_exe):
         if not exe.is_file():
             parser.error(f"missing executable: {exe}")
     if sha(REFERENCE) != REFERENCE_SHA256:
@@ -291,9 +337,10 @@ def main():
     start = time.monotonic()
     gate = ReverseGate(args, out)
     stem = gate.fixture(5)
+    gate.prefix_chain(stem)
     old_l4, support = stem.with_suffix(".L4.snap"), stem.with_suffix(".L5.snap")
     reference = stem.with_suffix(".L5.txt")
-    protected = {path:sha(path) for path in (old_l4, support)}
+    protected = {path:sha(path) for path in (stem.with_suffix(".L3.snap"), old_l4, support)}
     l4 = out/"new-shared.L4.snap"
     text = gate.run(Gate.cmd(gate, 5, old_l4, out/"new-shared-f4", chunk=500,
                             verify=stem.with_suffix(".L4.txt"), export=l4), "fresh-shared-F4")

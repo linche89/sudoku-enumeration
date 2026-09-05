@@ -5,7 +5,13 @@
 #undef main
 #include "layer_shared_catalog.h"
 #include "layer_shared_chunks.h" // Reuse exclusive atomic I/O, not F4 records.
+#include "../../src/layer_two_missing_prefix_canon.h"
+// Narrow compatible-key substitution only in the reverse numerical core.
+// The header was compiled before this macro, so its native fallback cannot
+// recurse. Loader/repair/source audits below retain the original canonize.
+#define canonize two_missing_prefix::canonicalize
 #include "layer_reverse_f5_core.h"
+#undef canonize
 #include "layer_reverse_f5_chunks.h"
 
 namespace reverse_f5_run {
