@@ -10,19 +10,17 @@ historical handoffs and raw expert responses are not current project state.
 An exact new route now reuses the completed L4/L5 support catalogues, shares
 F4 graph values without merging native downstream responses, and computes
 F5 by a rooted reverse recurrence. Its complete C5 and interruption/recovery
-gates pass. Six bounded real C6 F4 windows have saved 24,667,321 closed graph
-values; the latest independently audited prefix is [0,156375000), externally backed
+gates pass. Seven bounded real C6 F4 windows have saved 70,144,355 closed graph
+values; the latest independently audited prefix is [0,452575000), externally backed
 up. No complete C6 F4/L5 export or independently closed N(6) exists yet.
 
-Window7 started at 18:13:17 local time on 2026-09-05 with the newly qualified
-incremental CPU kernel. It resumed all 6,255 prior chunks and emitted new
-closed chunks. Its bounds are 300,000,000 additional IDs, 100-minute soft stop,
-105-minute hard child limit, 24 threads and 55 GiB; physical before-backup
-completed. Expected soft stop is about 19:53, followed by backup. This is an
-observed running window, not an audited terminal result. Inspect the live
-process and controller log before any resume; never restart from this note
-alone. Controller log:
-`data/logs/c6-direct-route-20260905/shared-production-window7-controller.log`.
+Window7 stopped normally at its 100-minute soft deadline around 19:53 local
+time on 2026-09-05; its controller completed external backup by 19:57 and
+exited zero. The independent full-prefix audit passed. The incremental CPU
+kernel processed 296,200,000 additional IDs and saved 45,477,034 new closed
+graph values. The F4 ID scan is 50.0969% complete, not the entire N(6) task.
+No C6 production process remains and no next window has been started.
+See `docs/reports/og2/c6-shared-f4-window7-20260905.md`.
 
 The measurements support pursuing this route instead of finishing the old
 forward S1 work, but do not certify a total runtime or a global speedup
@@ -643,7 +641,7 @@ closed global F4 cache.
 
 The shared-value mathematical route is therefore exact and its combined
 implementation has passed complete small-case gates. Full-size C6 lookup
-scaling and six bounded shared-F4 production windows have also passed; no
+scaling and seven bounded shared-F4 production windows have also passed; no
 new end-to-end C6 duration or complete N(6) result is claimed. See
 `docs/math/native-graph-value-sharing.md` and
 `docs/reports/og2/c6-catalogue-direct-route-20260905.md`.
@@ -706,7 +704,7 @@ See `docs/reports/og2/c6-shared-f4-window5-20260905.md`.
 
 The sixth bounded window added 48,375,000 IDs and 7,639,462 closed F4 values.
 It stopped normally after 1,500.277530 engine seconds (1,464.604096 new
-computation/commit), peaking at 44,789,915,648 bytes. The current prefix
+computation/commit), peaking at 44,789,915,648 bytes. Its resulting prefix
 [0,156375000) has 6,255 chunks and 24,667,321 closed graph values. All 6,256
 files (1,878,101,536 bytes) have independently checked physical copies; all
 4,321 previous files are unchanged. The independent production bitset audit
@@ -714,6 +712,22 @@ passed in 21.938503 seconds: 59,094,214 processed IDs address closed values
 and 97,280,786 address future representatives. No native F4 export, numerical
 F5 production chunk or N(6) result is implied. See
 `docs/reports/og2/c6-shared-f4-window6-20260905.md`.
+
+The seventh bounded window used the released incremental CPU kernel and
+added 296,200,000 IDs (nine holes) and 45,477,034 closed F4 values. Engine
+wall time was 6,000.213190 seconds, with 5,949.581754 seconds of new
+computation/commit and a 44,735,246,336-byte peak. The current prefix
+[0,452575000) contains 18,103 chunks and 70,144,355 closed graph values.
+All 18,104 files (5,435,534,624 bytes) have independently verified external
+copies; all 6,256 prior files are unchanged. The 65.371485-second production
+bitset audit found 300,246,735 live IDs resolving to closed values and
+152,328,256 addressing future representatives. The observed engine-wall scan
+rate was 49,364.913 IDs/s versus 32,244.034 in window6, a 1.531x ratio across
+different ID intervals, not a controlled arithmetic-only speedup. A linear
+extrapolation gives about 2.54 hours for the remaining F4 scan only; later
+workload variation, audits, backups, export, F5 and the final sum are excluded.
+This is not a guaranteed completion time. See
+`docs/reports/og2/c6-shared-f4-window7-20260905.md`.
 
 A separately implemented two-pass native bitset reader now reproduces every
 window-4 audit counter against its immutable external copy in a bounded

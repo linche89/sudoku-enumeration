@@ -56,6 +56,9 @@
 
 ## Dated evidence
 
+- `reports/og2/c6-shared-f4-window7-20260905.md` — 296,200,000 additional
+  real C6 IDs with the incremental kernel; 70,144,355 cumulative closed F4
+  values, independent full-prefix audit and physical backups; no N(6).
 - `reports/og2/shared-f4-incremental-publication-20260905.md` — recoverable
   production installation, fresh full repository and installed-path gates;
   native checkpoint compatibility retained, no global speedup claim.
