@@ -45,12 +45,28 @@
 - `math/native-graph-value-sharing.md` — exact pairing-fiber graph keys,
   retained native responses, shared F4 values, reverse F5 recurrence and
   unbiased workload-estimation identities.
+- `math/two-missing-canonical-prefix.md` — proved compatible maximum-edge
+  native search pruning, distinct from the separately tested rekeying scheme.
+- `math/shared-alias-closure-audit.md` — exact representative-bitset closure
+  identity, bounded finite checks and explicitly unimplemented full-scale plan.
 - `math/og2-band-kernel-lowrank.md` — separate formalized transfer-kernel
   question, completed small-rank gate, fixed-source frontier lower bound, and
   surviving target-only/response-subspace questions.
 
 ## Dated evidence
 
+- `reports/og2/c6-shared-f4-window4-20260905.md` — 49,150,000 additional
+  real C6 records; 9,345,067 cumulative closed F4 values, full-prefix audit
+  and independently checked external copies.
+- `reports/og2/c6-compatible-prefix-lookup-20260905.md` — complete C5
+  coefficient and real C6 same-table query differentials, with a scoped
+  1.277x 24-thread lookup-only measurement.
+- `reports/og2/c6-shared-export-controller-20260905.md` — independently
+  reviewed closed-only export controller, complete C5 native-value and
+  fail-closed safety qualification; not an executed C6 export.
+- `reports/og2/c6-gpu-rooted4-probe-20260905.md` — bounded exact tiny GPU
+  probes and the separately reported throughput-preflight limit; no production
+  GPU speedup or full C6 claim.
 - `reports/og2/c6-shared-f4-window3-20260905.md` — 10,000,000 additional
   real C6 records in a bounded window, 1,689,458 cumulative closed F4 values,
   streaming independent audit and protected external copies.

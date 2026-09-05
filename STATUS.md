@@ -10,8 +10,8 @@ historical handoffs and raw expert responses are not current project state.
 An exact new route now reuses the completed L4/L5 support catalogues, shares
 F4 graph values without merging native downstream responses, and computes
 F5 by a rooted reverse recurrence. Its complete C5 and interruption/recovery
-gates pass. Three bounded real C6 F4 windows have saved 1,689,458 closed graph
-values; the current stable-ID record prefix is [0,10525000), externally backed
+gates pass. Four bounded real C6 F4 windows have saved 9,345,067 closed graph
+values; the current stable-ID record prefix is [0,59675000), externally backed
 up. No complete C6 F4/L5 export or independently closed N(6) exists yet.
 
 The measurements support pursuing this route instead of finishing the old
@@ -614,7 +614,7 @@ closed global F4 cache.
 
 The shared-value mathematical route is therefore exact and its combined
 implementation has passed complete small-case gates. Full-size C6 lookup
-scaling and two bounded shared-F4 production windows have also passed; no
+scaling and four bounded shared-F4 production windows have also passed; no
 new end-to-end C6 duration or complete N(6) result is claimed. See
 `docs/math/native-graph-value-sharing.md` and
 `docs/reports/og2/c6-catalogue-direct-route-20260905.md`.
@@ -639,7 +639,7 @@ a nonuniform prefix, not a whole-population timing sample or closed T4 layer.
 See `docs/reports/og2/c6-shared-f4-window2-20260905.md`.
 
 The third bounded window processed 10,000,000 additional IDs in 400 new
-immutable chunks. The current prefix is [0,10525000), with 1,689,458 closed
+immutable chunks. Its resulting prefix was [0,10525000), with 1,689,458 closed
 representative F4 values. New computation/commit took 302.293218 seconds;
 complete engine elapsed was 348.030754 seconds with a 41.715-GiB peak.
 All 422 files (126,408,032 bytes) have independent SHA-verified external
@@ -650,6 +650,18 @@ closed values and 8,368,754 referring to future representatives. No native
 T4 export or population-wide runtime guarantee is implied. The released
 counting implementation is retained in local commit `6d19785`; see
 `docs/reports/og2/c6-shared-f4-window3-20260905.md`.
+
+The fourth bounded window added 49,150,000 IDs and 7,655,609 closed F4 values
+before its normal soft-time stop. The current prefix is [0,59675000), with
+2,387 immutable chunks and 9,345,067 closed representative values. Computing
+and committing took 1,465.946353 seconds; complete engine wall time was
+1,500.746988 seconds with a 41.714-GiB peak. All 2,388 committed files
+(716,711,328 bytes) have independently checked external physical copies;
+all 422 prior files are unchanged. The independent full-prefix audit found
+15,991,860 processed IDs resolving to closed representatives and 43,683,140
+pointing to future representatives. Neither this nonuniform prefix nor its
+timing establishes a complete native T4 vector or a total N(6) duration.
+See `docs/reports/og2/c6-shared-f4-window4-20260905.md`.
 
 The actual resumable reverse-F5 implementation now passes a fresh complete
 C5 chain from a NEW shared-F4 export through all 355 F5 values, byte-identical
@@ -671,6 +683,16 @@ operations, other production overhead and sample uncertainty. No C6 F5
 production chunk exists yet: a fully closed F4 export is the required input.
 See `docs/runbooks/layer-reverse-c6.md` and
 `docs/reports/og2/c6-reverse-f5-release-20260905.md`.
+
+A compatible maximum-missing-edge prefix now prunes native canonical search
+without changing its keys or exact stabilizers. Its isolated complete C5
+two-missing coefficient gate passes. Against the same full C6 native index,
+all 2,471,101 residual queries from 512 sources agree in key, stabilizer and
+ID. The one-worker query wall was 9.1103971 versus 7.3035589 seconds; at 24
+workers it was 0.4223821 versus 0.3306939 seconds (about 1.277x). This is a
+lookup-only measurement, not a numerical F5 run or a whole-job speedup.
+Production adoption requires its own actual-engine release/recovery gate.
+See `docs/reports/og2/c6-compatible-prefix-lookup-20260905.md`.
 
 ## Current checkpoints
 

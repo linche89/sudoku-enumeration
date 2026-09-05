@@ -181,3 +181,79 @@ not request native snapshot export. Complete alias closure, a new non-overwritin
 export, independent readback and a separately qualified F5 stage are required
 before moving downstream. No command in this runbook closes the final outer
 square sum or establishes N(6).
+
+## Export a completely closed F4 namespace
+
+The separate `scripts/export_layer_shared.ps1` controller performs this
+handoff without changing or rebuilding the released producer. It is **not**
+another computing window and must not be used until all 903,398,621 IDs are
+committed and the complete namespace has a separate-volume physical backup.
+Current partial prefixes are not eligible. There has been no production C6
+export test or completed C6 native F4 export.
+
+Do not invoke the producer with only `checkpointreadonly export=...` and
+assume it is read-only with respect to chunks. A bounded C5 check showed that
+this combination can compute and commit missing chunks. The new controller
+instead requires complete, contiguous, source-matched chunk headers before
+launch. It retains Windows deny-write/delete handles on the original source,
+its physical copy, and every local and backed-up chunk throughout export and
+verification. Directory ancestors are pinned root-to-leaf and opened reparse
+points are rejected. A disappearing or modified input therefore cannot turn
+this operation into a computing resume. Any malformed chunk is rejected by
+the released producer before its computation loop.
+
+The producer must report full alias closure, `new_chunks=0`, and
+`new_indices=0`. It writes only a new native snapshot path. The controller
+then uses the independently implemented streaming `layer_support_probe` to
+verify the complete SHA-256, header hash, payload hash, entry/hole/live counts,
+and stored-stabilizer orbit mass. It verifies a plain production L4 header and
+creates a new physical output copy on a separate volume, checking both hashes
+before writing an exclusive JSON receipt beside the local export.
+
+The streaming reader verifies serialization and the recorded support mass;
+it does **not** independently recompute every C6 F4 value or compare every
+exported weight with the alias chunks. Numerical provenance comes from the
+closed chunk computation and full producer alias closure, qualified by the
+complete C5 gate. That gate compares every one of 17,120 native keys,
+stabilizers and weighted T values against a fresh independent row-incremental
+oracle. It also exercises incomplete suffixes, internal gaps, overwrite
+refusal, existing-writer conflict, and denial of subsequent writes/deletion.
+
+Once closure is genuinely available, the command shape is:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/export_layer_shared.ps1 `
+  -FullGateEvidence "PATH_TO_RECENT_FULL_GATE.log" `
+  -SharedGateEvidence "PATH_TO_RECENT_SHARED_GATE.log" `
+  -DirectGateEvidence "PATH_TO_RECENT_DIRECT_GATE.log" `
+  -SourceBackup "D:/sudoku_FJ_checkpoint_backups/layer_dp_c6_s1_prod_20260802/session-008-20260810-170245-layer_dp_c6_s1_prod_20260802.a" `
+  -NamespacePath "data/checkpoints/c6_shared_f4_20260905" `
+  -NamespaceBackup "D:/PATH_TO_COMPLETE_VERIFIED_CHUNK_COPY" `
+  -ManifestSha256 "EXACT_SHA256_OF_COMMITTED_MANIFEST" `
+  -OutputPath "E:/PATH_TO_NEW_CLOSED_L4.snap" `
+  -OutputBackup "D:/PATH_TO_NEW_CLOSED_L4.snap" `
+  -Chunk 25000 -Threads 24 -MaxMinutes 30 -AuditMaxSeconds 300 -LimitGiB 55
+```
+
+The placeholders are intentional: no future output SHA or complete-namespace
+backup is invented. Both output parent directories must already exist, and
+the local output, external output, and JSON receipt must not exist. The
+controller verifies both original-source hashes and every committed input
+file against its physical copy. It checks output/backup disk headroom. Keep
+at least one full new 32.53-GB native file's space on each volume, in addition
+to the original input and immutable chunks.
+
+`-MaxMinutes` is the producer-child bound; `-AuditMaxSeconds` is the streaming
+readback bound. Pre/post source and chunk hashing, backup copying and receipt
+work are additional overhead. These example limits are interlocks, not a
+measured full-C6 export-duration guarantee; reserve them within the owner's
+daily availability. Roughly 36,136 chunks require about 72,272 retained file
+handles for both copies; one-byte stream buffers avoid a 4-KiB buffer per
+file. Full-scale handle/runtime behavior has not yet been exercised.
+
+A failed operation produces no accepted handoff receipt. Native or private
+temporary files may remain and must be retained for audit, not overwritten
+or promoted. A successfully verified export is still only closed F4, not
+closed F5 or N(6). Record the new output SHA and external copy in the manifest
+before using the independently qualified reverse-F5 controller described in
+`layer-reverse-c6.md`.
