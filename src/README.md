@@ -22,6 +22,9 @@
 - `big.hpp` — exact integer support for OG-2 engines.
 - `band.hpp`, `count.hpp`, `reduce.hpp` — FJ9 reproduction.
 - `mpq_sigkey.hpp` — fixed-buffer signature key used by `multiset_q.cpp`.
+- `layer_two_missing_prefix_canon.h` — compatible maximum-missing-edge
+  canonical-search helper for the separately gated reverse-F5 engine; it
+  preserves native keys/stabilizers and falls back outside its exact domain.
 
 Superseded code lives in `experiments/legacy/`; bounded decision engines and
 pre-promotion candidates live in `experiments/proto/`.  The layer-DP candidate

@@ -55,6 +55,9 @@
 
 ## Dated evidence
 
+- `reports/og2/c6-reverse-prefix-release-20260905.md` — actual reverse-F5
+  compatible-prefix release, complete operator/final-count/recovery gates,
+  old-version chunk compatibility and recoverable executable publication.
 - `reports/og2/c6-shared-f4-window4-20260905.md` — 49,150,000 additional
   real C6 records; 9,345,067 cumulative closed F4 values, full-prefix audit
   and independently checked external copies.

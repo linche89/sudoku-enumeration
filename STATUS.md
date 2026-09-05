@@ -691,8 +691,16 @@ all 2,471,101 residual queries from 512 sources agree in key, stabilizer and
 ID. The one-worker query wall was 9.1103971 versus 7.3035589 seconds; at 24
 workers it was 0.4223821 versus 0.3306939 seconds (about 1.277x). This is a
 lookup-only measurement, not a numerical F5 run or a whole-job speedup.
-Production adoption requires its own actual-engine release/recovery gate.
-See `docs/reports/og2/c6-compatible-prefix-lookup-20260905.md`.
+The optimization has now passed its actual-engine release/recovery gate,
+including the complete C5 two-missing coefficient chain, all 355 F5 values
+and N(5), the actual C6 dispatch on 314,584 bounded residuals, and zero-new-work
+resume of an old-version closed C5 namespace. The released reverse binary
+has SHA-256 `E09123878A3098EFF955AA4DA1CCAF33B875F9CCEF7D9F337DF28F3ED08AFB9B`.
+The old executable is physically retained; shared-F4 and checkpoint semantics
+are unchanged. The fresh complete repository regression also passed in
+191.6011702 seconds. No full numerical C6 F5 run is implied.
+See `docs/reports/og2/c6-compatible-prefix-lookup-20260905.md` and
+`docs/reports/og2/c6-reverse-prefix-release-20260905.md`.
 
 ## Current checkpoints
 
