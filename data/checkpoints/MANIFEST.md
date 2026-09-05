@@ -1,5 +1,101 @@
 # Checkpoint Manifest
 
+## c6_shared_f4_20260905 (closed-value chunks; new route)
+
+This namespace is NOT a closed native L4 image and is NOT a result for N(6).
+The original generation-37 A/B files remain unchanged. Only their keys and
+stabilizers are used; every original partial T is discarded. The one proved
+missing L4 key is appended only to the engine's in-memory catalogue.
+
+Current state after the third bounded window, 2026-09-05:
+
+```text
+directory: data/checkpoints/c6_shared_f4_20260905/
+format: SFR4MT01 manifest / SFR4CK01 immutable chunks, version 1
+semantics: SF4MIN01 (exact minimum-fiber aliases plus closed F4 at representatives)
+complete support IDs including holes: 903398621
+complete live support: 903398603
+closed record prefix: [0,10525000)
+live records in prefix: 10525000
+chunk size: 25000
+committed chunks: 421
+closed representative F4 values: 1689458
+sum of representative F4 values (modulo 2^64): 2350687498944
+files including manifest: 422
+total bytes: 126408032
+manifest SHA-256: 848B9DC72452AB389C5BF5424E264AE86C673C7FBA673F5F14FDC845BF4DEB91
+original input SHA-256: ECF0837315B0FDF8AE21C394FDA6676490E43B1828A0825529A344EC17E4E844
+```
+
+A nonrepresentative record contains a proved alias, not its own numerical
+value. Its representative may lie beyond the current prefix. Therefore
+10,525,000 committed records do NOT mean 10,525,000 closed native T4 weights.
+The engine verifies all aliases point to closed self-representatives before
+any full native layer export. Uncommitted temporary files are never accepted.
+
+External physical backup, independently hashed source/copy on every file:
+
+```text
+D:\sudoku_FJ_checkpoint_backups\c6_shared_f4_20260905\
+  20260905-150953-5405e65ad3b14c34a45fa7b7826ee6ce-after\
+receipt.csv SHA-256:
+A9800577A51FA80A9CB8F3F64CB8FC6F2741BBF6424246613C11BF6CB09588E2
+```
+
+The receipt lists the individual SHA-256 of all 422 committed files.
+The third window used `limit=10000000`, `chunk=25000`, 24 threads, a 55 GiB
+guard, 8-minute soft stop and 10-minute hard child bound. It resumed the
+previous 21 chunks, added 400 new chunks, and exited normally after 348.030754
+engine seconds, including complete original-source SHA and index
+reconstruction; new computation/commit took 302.293218 seconds. Peak working
+set was 44,791,013,376 bytes. Backup hashing/copying lies outside the child
+budget. No shared-F4 computing process remained after this window.
+
+Use `scripts/run_layer_shared_window.ps1` with current successful full/shared
+gate evidence and the original external source backup. It backs up any
+previous committed prefix before a writable resume and the resulting prefix
+afterward. The `.gitignore` explicitly excludes this binary namespace.
+Evidence: `docs/reports/og2/c6-shared-f4-window1-20260905.md`,
+`docs/reports/og2/c6-shared-f4-window2-20260905.md` and
+`docs/reports/og2/c6-shared-f4-window3-20260905.md`. Earlier external copies
+are retained; no original source or earlier committed chunk was overwritten.
+
+The independent streaming audit reproduced all file contents, header/payload
+hashes, prior-prefix preservation, before/after backup receipts and exact
+counters. It found 2,156,246 processed IDs resolving to closed representatives
+and 8,368,754 referring to future representatives. This is file integrity and
+alias-closure evidence, not independent numerical reevaluation of all F4.
+
+## C6 rehearsal L5 support (read-only input to the new route)
+
+This is NOT a closed production L5. Only its catalogue keys/stabilizers may
+be reused, after erasing every old rehearsal T5 value. The two proved absent
+keys are added in RAM; neither source file nor physical copy is patched.
+
+```text
+source: data/logs/layer-dp-c6-e2e-rehearsal-20260802-1pct/s2-4to5/ck.L5.snap
+physical backup: D:\sudoku_FJ_checkpoint_backups\c6_layer5_support_20260905\ck.L5.rehearsal.snap
+bytes in each file: 3472307192
+SHA-256 of each file: A5FDDB22F8C79FD4DDC0015795558FBF1647F0DB556248F5C9551F2DB24891DF
+source configuration: rehearsal denominator 100, generation 4
+source entries / holes / live: 96452974 / 221 / 96452753
+RAM-repaired entries / holes / live: 96452976 / 221 / 96452755
+new IDs: 96452974, 96452975
+new stabilizers: 1440, 240
+repaired raw orbit mass: 4439972139072
+repair fingerprint: 11401178190082244558
+```
+
+The new separate-volume copy was physically created and both full files were
+SHA-verified on 2026-09-05. The actual reverse-engine support loader checked
+the full image and SHA, zero duplicate original keys, old-weight erasure and
+production-configuration restoration in a bounded read-only smoke. See
+`docs/reports/og2/c6-reverse-f5-release-20260905.md`.
+
+The reserved `data/checkpoints/c6_reverse_f5_20260905/` namespace is ignored
+by Git but has no C6 production chunks yet. It must consume a NEW verified
+closed F4 export, never the partial generation-37 T4 values.
+
 ## factorization_orbit_c6_graphmemo.bin
 
 ```text
