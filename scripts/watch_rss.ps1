@@ -47,6 +47,7 @@ $startInfo = @{
     FilePath = $resolvedExe
     ArgumentList = $Arguments
     PassThru = $true
+    WindowStyle = "Hidden"
     RedirectStandardOutput = $StdoutPath
     RedirectStandardError = $StderrPath
 }

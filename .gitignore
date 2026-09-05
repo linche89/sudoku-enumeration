@@ -17,6 +17,8 @@ data/checkpoints/*.snap
 data/checkpoints/*.tmp
 data/checkpoints/*.a
 data/checkpoints/*.b
+data/checkpoints/c6_shared_f4_20260905/
+data/checkpoints/c6_reverse_f5_20260905/
 data/logs/**
 
 # legacy scratch names (kept while old commands remain reproducible)

@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-05",
+  "C": 6,
+  "coordinate_group_order": 46080,
+  "mask_encoding": "true slot bits: bit 2*b+s denotes box b, side s; these are not packed engine keys",
+  "scope": "Constructive support completion of the two audited catalogues; no layer weights are certified or supplied.",
+  "assumptions": [
+    "The original engine's established native-key legality and uniqueness guarantees apply to the audited catalogues.",
+    "The stored stabilizers used for source orbit masses are correct; the read-only scans did not recompute every stabilizer.",
+    "Witness legality and stabilizers are independently verified over all 46080 coordinate transformations."
+  ],
+  "sources": [
+    {
+      "id": "l4_production_generation37",
+      "C": 6,
+      "L": 4,
+      "generation": 37,
+      "kind": "partial production layer-4 catalogue",
+      "sha256": "ECF0837315B0FDF8AE21C394FDA6676490E43B1828A0825529A344EC17E4E844",
+      "real_states": 903398602,
+      "raw_orbit_mass": 41602261532320,
+      "complete_support_states": 903398603,
+      "complete_raw_orbit_mass": 41602261536160,
+      "membership_log": "data/logs/c6-direct-route-20260905/l4-order3-membership.log",
+      "payload_hash_verified": true,
+      "header_hash_verified": true,
+      "readonly_scan": true,
+      "semantic_full_key_audit": false,
+      "all_stabilizers_recomputed": false,
+      "weights_closed": false,
+      "witnesses_applied_to_source": false
+    },
+    {
+      "id": "l5_rehearsal_generation4",
+      "C": 6,
+      "L": 5,
+      "generation": 4,
+      "kind": "rehearsal layer-5 catalogue with intentionally incomplete weights",
+      "sha256": "A5FDDB22F8C79FD4DDC0015795558FBF1647F0DB556248F5C9551F2DB24891DF",
+      "real_states": 96452753,
+      "raw_orbit_mass": 4439972138848,
+      "complete_support_states": 96452755,
+      "complete_raw_orbit_mass": 4439972139072,
+      "membership_log": "data/logs/c6-direct-route-20260905/l5-target-membership.txt",
+      "payload_hash_verified": true,
+      "header_hash_verified": true,
+      "readonly_scan": true,
+      "semantic_full_key_audit": false,
+      "all_stabilizers_recomputed": false,
+      "weights_closed": false,
+      "witnesses_applied_to_source": false
+    }
+  ],
+  "witnesses": [
+    {
+      "id": "l4_missing",
+      "C": 6,
+      "L": 4,
+      "slot_masks": [294, 294, 554, 554, 1161, 1161, 1360, 1360, 2181, 2181, 2640, 2640],
+      "stabilizer": 12,
+      "orbit_mass": 3840,
+      "source_id": "l4_production_generation37",
+      "membership_target": 48,
+      "real_matches_in_source": 0,
+      "construction": "The unique absent class among all 66 stabilizer-12 orbits obtained from the two complete order-three fixed sets.",
+      "candidate_coverage": "41900 fixed-state records reduce to 1060 native classes; all 66 stabilizer-12 classes were tested through their 253440 coordinate images."
+    },
+    {
+      "id": "l5_disconnected",
+      "C": 6,
+      "L": 5,
+      "slot_masks": [341, 682, 1109, 1301, 1349, 1361, 1364, 2218, 2602, 2698, 2722, 2728],
+      "stabilizer": 1440,
+      "orbit_mass": 32,
+      "source_id": "l5_rehearsal_generation4",
+      "membership_target": 0,
+      "real_matches_in_source": 0,
+      "construction": "For each missing box, take the all-side-zero and all-side-one masks on the other five boxes."
+    },
+    {
+      "id": "l5_conference",
+      "C": 6,
+      "L": 5,
+      "slot_masks": [421, 602, 1129, 1364, 1418, 1574, 1681, 2198, 2329, 2402, 2629, 2728],
+      "stabilizer": 240,
+      "orbit_mass": 192,
+      "source_id": "l5_rehearsal_generation4",
+      "membership_target": 1,
+      "real_matches_in_source": 0,
+      "construction": "Complementary row-word pairs of the symmetric order-six conference matrix checked in layer_support_witnesses.py."
+    }
+  ],
+  "verification_command": "python experiments/proto/layer_support_witnesses.py --fixture data/golden/og2-c6-support-witnesses.json --time-limit 30",
+  "verification_scope": "The command verifies witness geometry, coordinate orbit sizes, and fixture completion arithmetic. It does not reopen source checkpoints or repeat membership scans."
+}
