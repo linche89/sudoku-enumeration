@@ -7,7 +7,7 @@ The original generation-37 A/B files remain unchanged. Only their keys and
 stabilizers are used; every original partial T is discarded. The one proved
 missing L4 key is appended only to the engine's in-memory catalogue.
 
-Current state after the fifth bounded window, 2026-09-05:
+Current state after the sixth bounded window, 2026-09-05:
 
 ```text
 directory: data/checkpoints/c6_shared_f4_20260905/
@@ -15,21 +15,21 @@ format: SFR4MT01 manifest / SFR4CK01 immutable chunks, version 1
 semantics: SF4MIN01 (exact minimum-fiber aliases plus closed F4 at representatives)
 complete support IDs including holes: 903398621
 complete live support: 903398603
-closed record prefix: [0,108000000)
-live records in prefix: 108000000
+closed record prefix: [0,156375000)
+live records in prefix: 156375000
 chunk size: 25000
-committed chunks: 4320
-closed representative F4 values: 17027859
-sum of representative F4 values (modulo 2^64): 23769515209728
-files including manifest: 4321
-total bytes: 1297106176
+committed chunks: 6255
+closed representative F4 values: 24667321
+sum of representative F4 values (modulo 2^64): 34408298870016
+files including manifest: 6256
+total bytes: 1878101536
 manifest SHA-256: 848B9DC72452AB389C5BF5424E264AE86C673C7FBA673F5F14FDC845BF4DEB91
 original input SHA-256: ECF0837315B0FDF8AE21C394FDA6676490E43B1828A0825529A344EC17E4E844
 ```
 
 A nonrepresentative record contains a proved alias, not its own numerical
 value. Its representative may lie beyond the current prefix. Therefore
-108,000,000 committed records do NOT mean 108,000,000 closed native T4 weights.
+156,375,000 committed records do NOT mean 156,375,000 closed native T4 weights.
 The engine verifies all aliases point to closed self-representatives before
 any full native layer export. Uncommitted temporary files are never accepted.
 
@@ -37,18 +37,18 @@ External physical backup, independently hashed source/copy on every file:
 
 ```text
 D:\sudoku_FJ_checkpoint_backups\c6_shared_f4_20260905\
-  20260905-163018-799440dfd9bb496ea730129838706504-after\
+  20260905-173432-23bc6465d3a74b1cb642e7a088e1b34f-after\
 receipt.csv SHA-256:
-927CECD30305BC8A84161983414B0EC87C1CD9F821EEAB1E0FA75A3248984E72
+E54BADC15712081634993B6CF1C70753F32DEBF21F5B7D273951F8456948EFF9
 ```
 
-The receipt lists the individual SHA-256 of all 4,321 committed files.
-The fifth window used `limit=50000000`, `chunk=25000`, 24 threads, a 55 GiB
+The receipt lists the individual SHA-256 of all 6,256 committed files.
+The sixth window used `limit=50000000`, `chunk=25000`, 24 threads, a 55 GiB
 guard, 25-minute soft stop and 30-minute hard child bound. It resumed the
-previous 2,387 chunks, added 1,933 new chunks, and exited normally after 1,500.045880
+previous 4,320 chunks, added 1,935 new chunks, and exited normally after 1,500.277530
 engine seconds, including complete original-source SHA and index
-reconstruction; new computation/commit took 1,465.255134 seconds. Peak working
-set was 44,791,046,144 bytes. Backup hashing/copying lies outside the child
+reconstruction; new computation/commit took 1,464.604096 seconds. Peak working
+set was 44,789,915,648 bytes. Backup hashing/copying lies outside the child
 budget. No shared-F4 computing process remained after this window.
 
 Use `scripts/run_layer_shared_window.ps1` with current successful full/shared
@@ -58,17 +58,18 @@ afterward. The `.gitignore` explicitly excludes this binary namespace.
 Evidence: `docs/reports/og2/c6-shared-f4-window1-20260905.md`,
 `docs/reports/og2/c6-shared-f4-window2-20260905.md`,
 `docs/reports/og2/c6-shared-f4-window3-20260905.md`,
-`docs/reports/og2/c6-shared-f4-window4-20260905.md` and
-`docs/reports/og2/c6-shared-f4-window5-20260905.md`. Earlier external copies
+`docs/reports/og2/c6-shared-f4-window4-20260905.md`,
+`docs/reports/og2/c6-shared-f4-window5-20260905.md` and
+`docs/reports/og2/c6-shared-f4-window6-20260905.md`. Earlier external copies
 are retained; no original source or earlier committed chunk was overwritten.
 
 The independent two-pass native bitset audit reproduced all file contents, header/payload
 hashes, prior-prefix preservation, before/after backup receipts and exact
-counters. It found 34,895,143 processed IDs resolving to closed representatives
-and 73,104,857 referring to future representatives. This is file integrity and
+counters. It found 59,094,214 processed IDs resolving to closed representatives
+and 97,280,786 referring to future representatives. This is file integrity and
 alias-closure evidence, not independent numerical reevaluation of all F4.
-Its production report is `data/logs/c6-direct-route-20260905/shared-window5-independent-audit.json`,
-SHA-256 `93BC52CB7234383405EC4BA8A18FF175E0E49FC478BA136DE136CEDA6C110CA4`.
+Its production report is `data/logs/c6-direct-route-20260905/shared-window6-independent-audit.json`,
+SHA-256 `E4544DDE15555EA4F47A63F5405C6200119BEF8351EFA688CDBAB5834FE6F0BE`.
 
 ## C6 rehearsal L5 support (read-only input to the new route)
 
@@ -131,8 +132,9 @@ a temporary file and replace operation.
 ## layer_dp_c6_layer3_20260731.snap
 
 ```text
-format magic: LDPCAN01
+format magic: SDFJLCK1 (0x314B434C4A464453)
 format version: 2
+key/value algorithm tag: LDPCAN01 (0x4C445043414E3031)
 size: 443695556 bytes
 stored entries: 12324873
 closed states: 12324872
