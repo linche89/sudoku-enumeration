@@ -135,6 +135,7 @@ def main():
         'experiments/proto/layer_shared_f4_incremental_bridge.cpp',
         'experiments/proto/layer_shared_gate.py',
         'experiments/proto/layer_shared_incremental_candidate_gate.py')]
+    protected += [ROOT/'scripts/build_layer_shared.ps1', ROOT/'scripts/run_layer_shared_window.ps1']
     guard = TreeBound()
     pins = {str(p): digest(p) for p in protected+old_files+[sample]}
     result = dict(status='INCOMPLETE', production_checkpoint_io=False,
@@ -143,7 +144,7 @@ def main():
                   aggregate_rss_limit_bytes=6 << 30, before_sha256=pins,
                   candidate_binary=str(candidate))
     try:
-        guard.run(['g++', '-O3', '-mpopcnt', '-std=c++20', '-fopenmp',
+        guard.run(['g++', '-O3', '-mpopcnt', '-std=c++20', '-fopenmp', '-Wall', '-Wextra',
                    'experiments/proto/layer_shared_f4.cpp',
                    'experiments/proto/layer_shared_f4_incremental_bridge.cpp',
                    '-o', str(candidate), '-lbcrypt', '-lpsapi'], out/'compile.log')

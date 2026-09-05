@@ -54,6 +54,8 @@ if ((Get-Item -LiteralPath $exe).LastWriteTimeUtc -gt $sharedGate.LastWriteTimeU
 foreach ($path in @("experiments/proto/layer_shared_f4.cpp", "experiments/proto/layer_shared_chunks.h",
                    "experiments/proto/layer_shared_catalog.h", "experiments/proto/layer_shared_f4_core.h",
                    "experiments/proto/layer_shared_f4_bridge.cpp", "experiments/proto/layer_shared_f4_bridge.h",
+                   "experiments/proto/layer_shared_f4_incremental_bridge.cpp",
+                   "experiments/proto/layer_cpu_f4_incremental_core.h", "experiments/proto/layer_gpu_f4_nodp_core.h",
                    "experiments/proto/layer_dp_gate.cpp", "experiments/proto/layer_pairing_fiber_bench.cpp",
                    "src/factorization_orbit.cpp", "src/future_twin.hpp")) {
     if ((Get-Item -LiteralPath $path).LastWriteTimeUtc -gt (Get-Item -LiteralPath $exe).LastWriteTimeUtc) {

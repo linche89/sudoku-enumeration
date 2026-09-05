@@ -1,4 +1,5 @@
-// CANDIDATE ONLY: interchangeable bridge TU, not part of released builds.
+// Exact incremental packed-DSU bridge, selected by the standard shared build.
+// The reference bridge is retained for independent differential/ablation gates.
 // The production main/core, native keys and chunk semantics are unchanged.
 #include "layer_shared_f4_bridge.h"
 #include "layer_cpu_f4_incremental_core.h"
