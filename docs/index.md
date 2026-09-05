@@ -48,13 +48,17 @@
 - `math/two-missing-canonical-prefix.md` — proved compatible maximum-edge
   native search pruning, distinct from the separately tested rekeying scheme.
 - `math/shared-alias-closure-audit.md` — exact representative-bitset closure
-  identity, bounded finite checks and explicitly unimplemented full-scale plan.
+  identity, independently qualified streaming reader and the still-unimplemented
+  optional resumable-shard plan.
 - `math/og2-band-kernel-lowrank.md` — separate formalized transfer-kernel
   question, completed small-rank gate, fixed-source frontier lower bound, and
   surviving target-only/response-subspace questions.
 
 ## Dated evidence
 
+- `reports/og2/shared-f4-native-bitset-audit-20260905.md` — independent
+  streaming byte/backup/alias audit; exact agreement on all 59,675,000 current
+  records, bounded malformed-input gates, no F4 numerical reevaluation.
 - `reports/og2/c6-reverse-prefix-release-20260905.md` — actual reverse-F5
   compatible-prefix release, complete operator/final-count/recovery gates,
   old-version chunk compatibility and recoverable executable publication.

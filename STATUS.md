@@ -663,6 +663,19 @@ pointing to future representatives. Neither this nonuniform prefix nor its
 timing establishes a complete native T4 vector or a total N(6) duration.
 See `docs/reports/og2/c6-shared-f4-window4-20260905.md`.
 
+A separately implemented two-pass native bitset reader now reproduces every
+window-4 audit counter against its immutable external copy in a bounded
+same-prefix qualification: 59,675,000 records, 9,345,067 representatives,
+15,991,860 resolved aliases and 43,683,140 future aliases. It used a
+7,459,375-byte representative bitset, took 7.863253 seconds including its
+controller, and retained only about 15.0 MiB worker / 57.0 MiB parent peak
+RSS. The result is explicitly TEST_ONLY_PASS, not a replacement production
+audit-chain node or independent F4 recalculation. A full-domain bitset needs
+112,924,828 bytes; full-domain runtime and resumable audit shards are not yet
+measured or implemented, respectively.
+See `docs/reports/og2/shared-f4-native-bitset-audit-20260905.md` for the
+same-prefix and full resumed-protocol qualification commands and hashes.
+
 The actual resumable reverse-F5 implementation now passes a fresh complete
 C5 chain from a NEW shared-F4 export through all 355 F5 values, byte-identical
 native L5 export, and independent N(5). Forced-kill recovery, changed-thread

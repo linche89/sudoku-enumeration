@@ -207,3 +207,8 @@ process from this release remains. No checkpoint was overwritten, moved or
 deleted. The original executable is recoverable at the explicit retained
 path above. Full C6 F5 and S3 remain gated on a genuinely closed F4 export
 and separate authorization; this release does not claim N(6).
+
+The functional source/build/controller change is retained in local commit
+`ccd4872`; the corresponding status/source-map/release notes are in
+`3f937b3`. No remote push was made. These are source-provenance commits, not
+a completed C6 numerical result.

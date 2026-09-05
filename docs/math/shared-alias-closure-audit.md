@@ -1,7 +1,9 @@
 # Full-scale shared-F4 audit design — bounded independent branch
 
-This is a design and a bounded reference test, not a full-scale implementation
-or a certificate that the F4 catalogue is complete. No producer was changed.
+The two-pass native streaming audit is implemented and independently qualified
+through the existing 59,675,000-ID prefix. The resumable shard design remains
+unimplemented; full-domain 903,398,621-ID runtime is unmeasured. None of these
+audits certifies that the F4 catalogue is complete. No producer was changed.
 
 ## 1. What an incremental audit may inherit
 
@@ -31,10 +33,12 @@ against the enlarged list. Read and verify the physical copies, not only CSV
 digests. Add new counters to inherited old counters and compare the producer's
 resumed, per-new-chunk, and terminal counters separately.
 
-The existing helper now rejects prior reports with either `prefix_snapshot` or
-`backup_snapshot_test` true. Legacy reports lacking both flags remain accepted;
-future schemas should require explicit false flags and a recognized production
-audit type. A `TEST_ONLY_PASS` node is never a production predecessor.
+The existing helper rejects prior reports with either `prefix_snapshot` or
+`backup_snapshot_test` true. Legacy reports lacking both flags remain accepted.
+The new native-audit orchestrator additionally requires one of the three exact
+historical audit scopes, or the recognized explicit type
+`shared-f4-native-bitset-resume-v1` with all qualification flags false and its
+alias check present. A `TEST_ONLY_PASS` node is never a production predecessor.
 
 ## 2. Important non-inheritance: enlarged alias closure
 
@@ -73,11 +77,12 @@ I/O buffer are the only other per-record storage needed.
 This verifies internal alias/value closure, not the factorization arithmetic or
 the graph-equivalence assertion independently of the producer and its proofs.
 
-## 4. Bounded full-scale protocol, without lifting all limits
+## 4. Optional bounded shard protocol, not yet implemented
 
 Old-file inheritance still costs real SHA/I/O work. Near the full domain,
-current+before+after streams can approach 32.5 GB. No claim is made that one
-Python invocation can finish that work within 120 or 180 seconds.
+current+before+after streams can approach 32.5 GB, and the implemented second
+pass rereads current bytes. No claim is made that one native invocation can
+finish the complete domain within 180 seconds.
 
 Partition work by explicit committed-file ranges and byte budgets:
 
@@ -141,13 +146,34 @@ acceptance tests: a valid SHA-resealed false-flag predecessor reproduces all
 window2 counters, and two independently SHA-resealed predecessors with either
 snapshot/test flag true are rejected before producing an output report.
 
-## 6. Current decision
+## 6. Implemented bounded successor and current limit
 
-The existing bounded full-prefix helper remains suitable for window4 once its
-writer has stopped, with explicit max-entries=100,000,000 and an adequate byte
-budget for its at-most-60,525,000 prefix. Its actual 180-second/4-GiB guard stays
-in force. No bound is lifted for the 903-million full domain here.
+`experiments/proto/layer_shared_bitset_audit.cpp` independently parses the raw
+format without producer includes. Its first pass checks every header, payload,
+local record, and current/before/after physical copy, and builds only the
+representative bitset. The second pass rereads and rehashes current files and
+checks every alias into the current prefix against that bitset. Future aliases
+remain explicitly uncomputed. The Python orchestrator pins the predecessor,
+inventories and receipts, checks resumed/new/terminal counters, and rehashes the
+worker and plan before accepting its output. The old array audit is preserved.
 
-The incremental receipt-chain/sharded protocol above is not yet promoted or
-implemented as a complete production audit. The bitset reference and admission
-hardening are the only new executable changes in this branch.
+The native synthetic gate accepted 10 exact direct-array fixtures of 50,000
+records each, rejected 38 malformed cases and 10 invalid predecessor variants,
+and retained the 1,008-case algebraic differential. It also reproduced the
+historical window1-to-window2 protocol using both physical backups.
+
+Both a same-prefix qualification pinned to the window4 audit and the complete
+window3-to-window4 protocol qualification agreed with all 2,388 file records and
+all current/new counters. The latter took 8.388 seconds end-to-end, with a
+15,769,600-byte worker peak and a 62,271,488-byte parent peak. Its bitset payload
+was 7,459,375 bytes. All these qualification reports are `TEST_ONLY_PASS` and
+are not production ancestors. Exact commands and hashes are retained in
+`docs/reports/og2/shared-f4-native-bitset-audit-20260905.md`.
+
+Production invocations remain capped at 180 seconds, with separate 1-GiB parent
+and worker guards, exact domain/file/byte limits, and fail-closed output. The
+full-domain bitset size is proved above, but full-domain runtime has not been
+measured. No resumable shard implementation was added speculatively. File
+certificates describe verified content/provenance at the reads, not a
+simultaneously locked or permanently immutable namespace; the export controller
+provides stronger locking when it consumes a complete catalogue.
