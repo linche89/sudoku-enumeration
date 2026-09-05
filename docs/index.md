@@ -56,6 +56,26 @@
 
 ## Dated evidence
 
+- `reports/og2/shared-f4-incremental-publication-20260905.md` — recoverable
+  production installation, fresh full repository and installed-path gates;
+  native checkpoint compatibility retained, no global speedup claim.
+- `reports/og2/c6-shared-f4-window6-20260905.md` — 48,375,000 additional
+  real C6 records; 24,667,321 cumulative closed F4 values, independent
+  full-prefix integrity audit and external copies; no N(6).
+- `reports/og2/c6-l5-full-support-semantic-audit-20260905.md` — every
+  repaired L5 record checked for native semantics and stable-ID membership;
+  completes the support certificate, not numerical F5.
+- `reports/og2/shared-f4-incremental-release-qualification-20260905.md` —
+  final candidate exact gate, C6 sample and old-version compatibility;
+  its immutable report records qualification before publication.
+- `reports/og2/shared-f4-incremental-candidate-gate-20260905.md` — initial
+  actual-engine incremental bridge qualification, separate from later release.
+- `reports/og2/c6-geometry-ram-rekey-full-benchmark-20260905.md` — complete
+  L4 orbit/stabilizer audit and full-index stable-ID rekey differential;
+  scoped 1.31x query improvement, not numerical F5 or production integration.
+- `reports/og2/c6-cpu-three-kernel-ablation-20260905.md` — complete C4/C5
+  four-row value checks and balanced CPU timings on 1,024 C6 native records;
+  incremental packed-DSU timing candidate; later publication is separate.
 - `reports/og2/c6-shared-f4-window5-20260905.md` — 48,325,000 additional
   real C6 records; 17,027,859 cumulative closed F4 values, independent
   production bitset audit and external physical copies; no N(6).

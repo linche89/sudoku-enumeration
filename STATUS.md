@@ -10,9 +10,19 @@ historical handoffs and raw expert responses are not current project state.
 An exact new route now reuses the completed L4/L5 support catalogues, shares
 F4 graph values without merging native downstream responses, and computes
 F5 by a rooted reverse recurrence. Its complete C5 and interruption/recovery
-gates pass. Five bounded real C6 F4 windows have saved 17,027,859 closed graph
-values; the current stable-ID record prefix is [0,108000000), externally backed
+gates pass. Six bounded real C6 F4 windows have saved 24,667,321 closed graph
+values; the latest independently audited prefix is [0,156375000), externally backed
 up. No complete C6 F4/L5 export or independently closed N(6) exists yet.
+
+Window7 started at 18:13:17 local time on 2026-09-05 with the newly qualified
+incremental CPU kernel. It resumed all 6,255 prior chunks and emitted new
+closed chunks. Its bounds are 300,000,000 additional IDs, 100-minute soft stop,
+105-minute hard child limit, 24 threads and 55 GiB; physical before-backup
+completed. Expected soft stop is about 19:53, followed by backup. This is an
+observed running window, not an audited terminal result. Inspect the live
+process and controller log before any resume; never restart from this note
+alone. Controller log:
+`data/logs/c6-direct-route-20260905/shared-production-window7-controller.log`.
 
 The measurements support pursuing this route instead of finishing the old
 forward S1 work, but do not certify a total runtime or a global speedup
@@ -579,6 +589,25 @@ inventory and raw coordinate mass. Given the established legality, uniqueness
 and stabilizer guarantees for the stored keys, the old catalogues plus these
 three witnesses therefore constitute complete L4 and L5 SUPPORT SETS.
 
+The L4 premises have since been checked over the entire repaired catalogue:
+an alternative geometry-first canonicalizer audited all 903,398,603 live
+records for balanced legality and exact stabilizer, and its rebuilt index
+had zero duplicate orbit keys. Together with the independent Burnside count,
+this proves complete repaired L4 support without assuming the old forward
+enumerator's legality or orbit-uniqueness guarantees. It does not check any
+old partial T weight.
+See `docs/reports/og2/c6-geometry-ram-rekey-full-benchmark-20260905.md`.
+
+A separate full-record L5 audit now verifies all 96,452,755 repaired live
+records with the existing native canonicalizer: legality, canonical fixed
+point, exact stabilizer, unique stable-ID lookup and erased T. Both protected
+input files retained their complete SHA. Together with the independent L5
+Burnside count, this proves complete repaired L5 support without assuming
+the old enumerator's per-record semantics. It is not an independent second
+canonicalization algorithm or a numerical F5 result. The bounded audit took
+59.153134 seconds alongside F4 production, with a 4,591,161,344-byte aggregate
+peak. See `docs/reports/og2/c6-l5-full-support-semantic-audit-20260905.md`.
+
 This does not close any partial T4 weight or accept any rehearsal weight.
 Original files are unchanged; no repaired production checkpoint has been
 written. The witness data and source hashes are retained in
@@ -614,7 +643,7 @@ closed global F4 cache.
 
 The shared-value mathematical route is therefore exact and its combined
 implementation has passed complete small-case gates. Full-size C6 lookup
-scaling and five bounded shared-F4 production windows have also passed; no
+scaling and six bounded shared-F4 production windows have also passed; no
 new end-to-end C6 duration or complete N(6) result is claimed. See
 `docs/math/native-graph-value-sharing.md` and
 `docs/reports/og2/c6-catalogue-direct-route-20260905.md`.
@@ -665,7 +694,7 @@ See `docs/reports/og2/c6-shared-f4-window4-20260905.md`.
 
 The fifth bounded window added 48,325,000 IDs and 7,682,792 closed F4 values.
 It stopped normally after 1,500.045880 engine seconds, of which 1,465.255134
-were new computation/commit, with a 44,791,046,144-byte peak. The current
+were new computation/commit, with a 44,791,046,144-byte peak. Its resulting
 prefix [0,108000000) contains 4,320 chunks and 17,027,859 closed graph values.
 All 4,321 files (1,297,106,176 bytes) have independently verified external
 copies; all 2,388 prior files are unchanged. The independent production
@@ -674,6 +703,17 @@ closed representatives and 73,104,857 address future representatives. This
 is not 108 million available native T4 weights or a percentage-complete
 certificate for N(6). No native F4 export or F5 production chunk exists yet.
 See `docs/reports/og2/c6-shared-f4-window5-20260905.md`.
+
+The sixth bounded window added 48,375,000 IDs and 7,639,462 closed F4 values.
+It stopped normally after 1,500.277530 engine seconds (1,464.604096 new
+computation/commit), peaking at 44,789,915,648 bytes. The current prefix
+[0,156375000) has 6,255 chunks and 24,667,321 closed graph values. All 6,256
+files (1,878,101,536 bytes) have independently checked physical copies; all
+4,321 previous files are unchanged. The independent production bitset audit
+passed in 21.938503 seconds: 59,094,214 processed IDs address closed values
+and 97,280,786 address future representatives. No native F4 export, numerical
+F5 production chunk or N(6) result is implied. See
+`docs/reports/og2/c6-shared-f4-window6-20260905.md`.
 
 A separately implemented two-pass native bitset reader now reproduces every
 window-4 audit counter against its immutable external copy in a bounded
@@ -726,6 +766,36 @@ are unchanged. The fresh complete repository regression also passed in
 191.6011702 seconds. No full numerical C6 F5 run is implied.
 See `docs/reports/og2/c6-compatible-prefix-lookup-20260905.md` and
 `docs/reports/og2/c6-reverse-prefix-release-20260905.md`.
+
+A different exact native representative has now passed the full-size RAM-only
+rekey diagnostic, not just a small index test. All 903,398,603 live IDs and
+their stabilizers were preserved; every one of 2,471,101 sampled queries
+matched its original generic-native ID. Rekey plus replacement index took
+74.982273 seconds; the complete guarded diagnostic took 130.204402 seconds
+and peaked at 41,237,979,136 aggregate bytes. The mean 24-thread query phase
+was 0.253284 seconds for the released compatible prefix and 0.192970 seconds
+for geometry keys (1.31256x on this workload). Phases were not interleaved,
+and no numerical F4/F5 values were read. The alternate key is not yet used
+by the released reverse engine; native disk keys/chunks remain unchanged.
+
+A same-binary CPU arithmetic ablation also passed every C4/C5 four-row value
+and a 1,024-record C6 sample. The new isolated incremental packed-DSU kernel
+agreed per graph in F4 and valid leaves. Median 24-thread C6 kernel time was
+0.1219200 seconds versus 0.1757517 seconds for the released ternary-DP kernel
+(1.442x). Three cyclic timing orders were balanced, with no competing production
+process. This is a native-record sample, not the production graph-representative
+population, not a global speedup measurement.
+See `docs/reports/og2/c6-cpu-three-kernel-ablation-20260905.md`.
+
+The incremental kernel is now released after complete actual-engine gates,
+all 12,345 C6 sample values, old-version C5 chunk/export compatibility, a
+fresh full repository gate and installed-path shared checks. The installed
+binary SHA is `2B8A14606F8F78748C9338130D35551CA199E53238BEB33D95BCB05A2555AFE0`.
+The old binary has local and external physical rollback copies. Native keys,
+weights, alias rules and checkpoint formats are unchanged. Full and installed
+gates took 192.056392 and 27.417311 seconds; no counting process remained
+from either gate. See
+`docs/reports/og2/shared-f4-incremental-publication-20260905.md`.
 
 The S3 controller now binds the actual full-SHA resume parent and each final
 CSV/snapshot/command tuple to an immutable source/stage receipt. Disposable

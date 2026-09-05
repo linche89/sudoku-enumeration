@@ -16,8 +16,13 @@ The second proposal never identifies distinct native states: it changes
 their representative, not their equivalence relation. An eventual in-memory
 index could transform every loaded L4 key while retaining its stable ID,
 stabilizer and closed F4. It would replace the native-key index, not require
-changing saved checkpoints. That full-size construction and lookup benchmark
-has **not** been executed.
+changing saved checkpoints. At this note's initial qualification, that
+full-size construction and lookup benchmark had **not** been executed.
+The later complete single-index diagnostic is now recorded in
+`../reports/og2/c6-geometry-ram-rekey-full-benchmark-20260905.md`: it preserved
+all 903,398,603 live source IDs/stabilizers and every sampled query ID, without
+reading numerical F4/F5 values. Its scope and one-time rekey costs are separate
+from the original small gates retained below.
 
 ## Definitions and exact scope
 
