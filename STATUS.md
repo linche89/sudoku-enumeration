@@ -10,8 +10,8 @@ historical handoffs and raw expert responses are not current project state.
 An exact new route now reuses the completed L4/L5 support catalogues, shares
 F4 graph values without merging native downstream responses, and computes
 F5 by a rooted reverse recurrence. Its complete C5 and interruption/recovery
-gates pass. Four bounded real C6 F4 windows have saved 9,345,067 closed graph
-values; the current stable-ID record prefix is [0,59675000), externally backed
+gates pass. Five bounded real C6 F4 windows have saved 17,027,859 closed graph
+values; the current stable-ID record prefix is [0,108000000), externally backed
 up. No complete C6 F4/L5 export or independently closed N(6) exists yet.
 
 The measurements support pursuing this route instead of finishing the old
@@ -614,7 +614,7 @@ closed global F4 cache.
 
 The shared-value mathematical route is therefore exact and its combined
 implementation has passed complete small-case gates. Full-size C6 lookup
-scaling and four bounded shared-F4 production windows have also passed; no
+scaling and five bounded shared-F4 production windows have also passed; no
 new end-to-end C6 duration or complete N(6) result is claimed. See
 `docs/math/native-graph-value-sharing.md` and
 `docs/reports/og2/c6-catalogue-direct-route-20260905.md`.
@@ -652,7 +652,7 @@ counting implementation is retained in local commit `6d19785`; see
 `docs/reports/og2/c6-shared-f4-window3-20260905.md`.
 
 The fourth bounded window added 49,150,000 IDs and 7,655,609 closed F4 values
-before its normal soft-time stop. The current prefix is [0,59675000), with
+before its normal soft-time stop. Its resulting prefix was [0,59675000), with
 2,387 immutable chunks and 9,345,067 closed representative values. Computing
 and committing took 1,465.946353 seconds; complete engine wall time was
 1,500.746988 seconds with a 41.714-GiB peak. All 2,388 committed files
@@ -662,6 +662,18 @@ all 422 prior files are unchanged. The independent full-prefix audit found
 pointing to future representatives. Neither this nonuniform prefix nor its
 timing establishes a complete native T4 vector or a total N(6) duration.
 See `docs/reports/og2/c6-shared-f4-window4-20260905.md`.
+
+The fifth bounded window added 48,325,000 IDs and 7,682,792 closed F4 values.
+It stopped normally after 1,500.045880 engine seconds, of which 1,465.255134
+were new computation/commit, with a 44,791,046,144-byte peak. The current
+prefix [0,108000000) contains 4,320 chunks and 17,027,859 closed graph values.
+All 4,321 files (1,297,106,176 bytes) have independently verified external
+copies; all 2,388 prior files are unchanged. The independent production
+bitset audit passed in 15.782692 seconds: 34,895,143 processed IDs address
+closed representatives and 73,104,857 address future representatives. This
+is not 108 million available native T4 weights or a percentage-complete
+certificate for N(6). No native F4 export or F5 production chunk exists yet.
+See `docs/reports/og2/c6-shared-f4-window5-20260905.md`.
 
 A separately implemented two-pass native bitset reader now reproduces every
 window-4 audit counter against its immutable external copy in a bounded
@@ -714,6 +726,19 @@ are unchanged. The fresh complete repository regression also passed in
 191.6011702 seconds. No full numerical C6 F5 run is implied.
 See `docs/reports/og2/c6-compatible-prefix-lookup-20260905.md` and
 `docs/reports/og2/c6-reverse-prefix-release-20260905.md`.
+
+The S3 controller now binds the actual full-SHA resume parent and each final
+CSV/snapshot/command tuple to an immutable source/stage receipt. Disposable
+C5 gates passed two separate native contractions, all 355 classes, semantic
+verification, both exact sums and interrupted-publication recovery; changed
+weights, stale artifacts and unbound legacy namespaces are refused. Only
+controller sidecars and safety checks changed, not counting arithmetic or
+native formats. Session defaults now reserve backup time within the owner's
+daily availability; an external watchdog is still required for storage stalls.
+This does not supply the missing closed C6 F4/F5 inputs or launch S3.
+The final complete repository gate passed in 190.6233420 seconds under a
+360-second / 8-GiB aggregate guard, with no surviving child processes.
+See `docs/reports/og2/c6-s3-lineage-handoff-20260905.md`.
 
 ## Current checkpoints
 

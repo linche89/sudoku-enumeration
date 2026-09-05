@@ -238,7 +238,7 @@ for gates, hashing and backups; do not assign all eight hours to computation.
 The controller's wider parameter ranges do not replace review of the pilot
 or the agreed daily limit. Every later window still needs a positive limit.
 
-## Complete export and unchanged S3 handoff
+## Complete export and source-bound S3 handoff
 
 Only when every live target has a closed F5 may the engine export to a **new**
 path. It computes `T5 = (46080/stabilizer) * F5` with checked u64 conversion,
@@ -260,6 +260,16 @@ uncommitted changes or bypass its safeguards.
 
 The existing S3 accepts explicit input-path overrides, so no S3 algorithm or
 checkpoint-format change is needed:
+
+Its controller now requires immutable source/stage bindings and source-bound
+result receipts. It verifies the full SHA of the actual resume parent, not
+only the supplied input. Legacy unbound namespaces are refused; do not adopt
+an old CSV or infer a migration. Defaults are a 7.5-hour shared session,
+15-minute backup reserve and 3.5-hour per-attempt cap. Filesystem operations
+can overrun an in-process deadline, so an external watchdog and availability
+headroom remain required. See
+`../reports/og2/c6-s3-lineage-handoff-20260905.md` for exact qualification and
+the limited prepared-CSV recovery transaction.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_layer_dp_c6_s3_finalize.ps1 `

@@ -136,6 +136,20 @@ After explicit authorization, remove `-PrepareOnly`.  If an externally
 bounded attempt stops, rerun with `-ContinueExisting`; only its last closed
 parent chunk is accepted.
 
+The actual resume-parent full SHA must equal the supplied L5 source. Each
+namespace has an immutable `.s3-binding.json`; completed CSV reuse additionally
+requires its `.s3-result.json`, binding the CSV, snapshot and command record.
+Legacy unbound artifacts are refused, not migrated automatically. Primary and
+replay paths must be distinct and nonoverlapping, and the input backup must
+be on a separate volume. See
+`../reports/og2/c6-s3-lineage-handoff-20260905.md` for the exact recovery boundary.
+
+Defaults are `-SessionMaxHours 7.5 -ReserveMinutes 15 -MaxHoursPerAttempt 3.5`.
+The shared operation deadline reserves handoff time across both attempts;
+it is not an absolute cap on synchronous storage operations. Use an external
+watchdog and leave availability headroom for physical copying. A prepare-only
+run does not create bindings, checkpoints or CSVs, but may write diagnostic logs.
+
 The controller performs all of these steps:
 
 1. contract the immutable L5 in the `primary` checkpoint namespace;

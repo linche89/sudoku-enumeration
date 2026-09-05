@@ -56,8 +56,19 @@
 
 ## Dated evidence
 
+- `reports/og2/c6-shared-f4-window5-20260905.md` — 48,325,000 additional
+  real C6 records; 17,027,859 cumulative closed F4 values, independent
+  production bitset audit and external physical copies; no N(6).
+- `reports/og2/c6-s3-lineage-handoff-20260905.md` — controller-only source
+  binding and recoverable CSV publication; exact C5 and refusal gates.
+- `reports/og2/c6-geometry-ram-rekey-small-gate-20260905.md` — exact
+  stable-ID-preserving small-table rekey; full C6 rekey not executed.
+- `reports/og2/c6-gpu-no-dp-rooted4-20260905.md` — compact exact GPU
+  kernel, tiny finite gates and incomplete occupancy batch; no speedup claim.
+- `reports/og2/c6-gpu-occupancy-timer-v2-20260905.md` — calibrated bounded
+  occupancy probe of the earlier DP kernel; no completed batch values.
 - `reports/og2/shared-f4-native-bitset-audit-20260905.md` — independent
-  streaming byte/backup/alias audit; exact agreement on all 59,675,000 current
+  streaming byte/backup/alias audit; exact agreement on all 59,675,000 window-4
   records, bounded malformed-input gates, no F4 numerical reevaluation.
 - `reports/og2/c6-reverse-prefix-release-20260905.md` — actual reverse-F5
   compatible-prefix release, complete operator/final-count/recovery gates,
