@@ -197,6 +197,60 @@ configuration. This is a support certificate, **not** a calculation of F5.
 
 ## First bounded C6 F5 pilot
 
+### Workstation-specific same-command launcher (2026-09-06)
+
+The owner requested local execution and resumption across daily sessions.
+The prepared repository-root helper is:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_f5.ps1
+```
+
+Use `-CheckOnly` for a read-only preflight. A single named session mutex and
+process checks prevent duplicate launches. No future output SHA is hardcoded:
+the helper obtains it from the protected complete F4 export receipt. It pins
+the full F4 audit, completed chunk backup and qualified production binaries,
+refreshes all four verification gates in bounded small-case processes, and
+never rebuilds shared/reverse production executables. Partial output files
+without an accepted export receipt are retained and refused, not overwritten.
+
+Each invocation first performs up to 10,000 new F5 IDs under the original
+8/10-minute pilot limits. The native engine validates all old chunks before
+resuming; the helper checks the resulting exact prefix/scope, memory bound,
+zero exit, empty engine stderr and completed backup receipt before starting
+the regular window. The owner explicitly requested this automated bounded
+continuation; there is no unreviewed jump directly to an unbounded full job.
+
+The regular window defaults to `-WorkMinutes 330 -MaxMinutes 360`, with
+24 threads, a 55-GiB child bound, `chunk=10000` and a positive limit covering
+the remaining domain. It ends after that one window, reserving daily time
+for gates, input hashing and backups. These latter operations add time outside
+the child's limit. An optional shorter invocation is:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_f5.ps1 -WorkMinutes 45 -MaxMinutes 60
+```
+
+Run the SAME command next time; no paths, SHA or cursor need editing. Completed
+F4 export/backup files are reused only with their matching receipt, and F5
+native resume rechecks closed chunks and computes only the missing suffix.
+Every session has a new `data/logs/f5-manual-<guid>/` directory.
+
+Sleep pauses computation. After wake, a watchdog may end that window with
+exit 98; the helper accepts neither partial accumulators nor an exit-98
+computation certificate. If the controller completed its after-backup, it
+stops with instructions to run the same command. It does NOT automatically
+start another process on wake or retry RSS failures in a loop. An interrupted
+chunk is recomputed on the next native resume. The initial F4 export has no
+partial-export resume; keep the PC awake through that first setup step.
+
+At complete F5 closure the helper stops for independent audit and native L5
+export; it never runs S3 or claims N(6). This preparation has not yet executed
+a real C6 F4 export or F5 pilot. Exact tests and scope are recorded in
+`../reports/og2/c6-f5-manual-resume-launcher-20260906.md`.
+
+### Underlying controller command
+
 There is deliberately no ready-to-run closed-L4 filename or SHA below. Fill
 them only from the verified complete export and its manifest/backup receipt.
 Both L4 and L5 support require separate-volume copies before launch.

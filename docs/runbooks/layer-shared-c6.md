@@ -188,8 +188,12 @@ The separate `scripts/export_layer_shared.ps1` controller performs this
 handoff without changing or rebuilding the released producer. It is **not**
 another computing window and must not be used until all 903,398,621 IDs are
 committed and the complete namespace has a separate-volume physical backup.
-Current partial prefixes are not eligible. There has been no production C6
-export test or completed C6 native F4 export.
+Partial prefixes are not eligible. On 2026-09-06 the COMPLETE namespace passed
+the independent full-domain byte/backup/alias audit; its exact counts and
+physical backup are pinned in the checkpoint manifest and
+`../reports/og2/c6-shared-f4-complete-audit-20260906.md`. There has still been
+no production C6 export test or completed C6 native F4 export. Do not rerun
+the finished F4 computing window; the next stage is this protected export.
 
 Do not invoke the producer with only `checkpointreadonly export=...` and
 assume it is read-only with respect to chunks. A bounded C5 check showed that

@@ -56,6 +56,12 @@
 
 ## Dated evidence
 
+- `reports/og2/c6-f5-manual-resume-launcher-20260906.md` — one PowerShell
+  command for qualified F4 export and bounded, same-namespace F5 continuation;
+  synthetic guards and four fresh gates pass; no C6 export/F5 launch implied.
+- `reports/og2/c6-shared-f4-complete-audit-20260906.md` — all 903,398,621
+  F4 IDs independently byte/backup/alias audited, 140,069,579 closed graph
+  values and zero unresolved live aliases; no native export, F5 or N(6).
 - `reports/og2/c6-shared-f4-window7-20260905.md` — 296,200,000 additional
   real C6 IDs with the incremental kernel; 70,144,355 cumulative closed F4
   values, independent full-prefix audit and physical backups; no N(6).

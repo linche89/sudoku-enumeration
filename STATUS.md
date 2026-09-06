@@ -1,50 +1,54 @@
 # Current Project Status
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.
 
-## Current C=6 decision (2026-09-05)
+## Current C=6 decision (2026-09-06)
 
 An exact new route now reuses the completed L4/L5 support catalogues, shares
 F4 graph values without merging native downstream responses, and computes
 F5 by a rooted reverse recurrence. Its complete C5 and interruption/recovery
-gates pass. Seven bounded real C6 F4 windows have saved 70,144,355 closed graph
-values; the latest independently audited prefix is [0,452575000), externally backed
-up. No complete C6 F4/L5 export or independently closed N(6) exists yet.
+gates pass. The ninth bounded real C6 window completed the entire F4 namespace:
+903,398,621 IDs, 903,398,603 live native states, 18 insertion holes and
+140,069,579 closed graph-representative values. The independent FULL-domain
+byte/backup/alias audit passed: every live alias resolves to a closed value,
+with zero unresolved aliases. No native F4 export, numerical F5 production
+result or independently closed N(6) exists yet.
 
-Window7 stopped normally at its 100-minute soft deadline around 19:53 local
-time on 2026-09-05; its controller completed external backup by 19:57 and
-exited zero. The independent full-prefix audit passed. The incremental CPU
-kernel processed 296,200,000 additional IDs and saved 45,477,034 new closed
-graph values. The F4 ID scan is 50.0969% complete, not the entire N(6) task.
-No C6 production process remained at that audited handoff.
-See `docs/reports/og2/c6-shared-f4-window7-20260905.md`.
+Window8 was interrupted by overnight workstation sleep and ended under the
+hard time bound after wake, at prefix 797,325,000 (controller exit 98).
+It is not recorded as a normal successful computing window. The owner's
+manual continuation, window9, added the remaining 106,073,621 IDs and
+17,245,383 representative values. Its engine finished at 09:38 on 2026-09-06;
+the external after-backup finished at 09:47. Engine/controller exit was zero
+and engine stderr was empty. All 36,137 committed files, 10,850,034,524 bytes,
+are physically backed up. No C6 computing/controller process remains.
 
-The owner then explicitly authorized the remaining F4 scan. Window8 started
-its computing child at 20:39:46 local time on 2026-09-05 (observed PID 47052)
-after the SHA-verified physical before-backup of all 18,104 prior files.
-It resumed the audited prefix and has committed new chunks. Bounds are
-`limit=450823621`, `chunk=25000`, 24 threads, 55 GiB, 180-minute soft stop
-and 195-minute hard child limit. This covers the remaining ID domain exactly,
-including the final 23,621-record partial chunk; final alias closure is still
-required. No export or downstream F5/final-sum stage is requested. Completion
-and after-backup are not yet observed. The owner will return with progress;
-do not keep polling or automatically launch another job.
+On the owner's subsequent request, the independent reader redecoded every
+record, checked both window9 physical backups, and rechecked all 18,104
+files from the SHA-pinned window7 audit. It inherited no unaudited window8
+counters. Full audit elapsed was 166.588572 seconds under a 180-second bound,
+with worker/parent peaks 145,981,440 / 171,200,512 bytes, each capped at 1 GiB.
+This certifies complete internal alias/value closure and storage integrity
+at the verified reads, not independent numerical reevaluation of every F4.
+See `docs/reports/og2/c6-shared-f4-complete-audit-20260906.md`.
 
-Window8 controller log:
-`data/logs/c6-direct-route-20260905/shared-production-window8-controller.log`.
-Engine logs:
-`data/logs/shared-f4-window-20260905-203613-9c0bee91ce974a24878857f4d09c78b2/`.
-Before-backup:
-`D:/sudoku_FJ_checkpoint_backups/c6_shared_f4_20260905/20260905-203613-9c0bee91ce974a24878857f4d09c78b2-before/`.
-The launched controller uses the full gate in
-`data/logs/shared-window7-handoff-full-uangbw2w/stdout.log` and installed-path
-shared gate in `data/logs/shared-incremental-installed-release-pq4fj7dy/stdout.log`;
-their SHA pins and the installed release SHA were rechecked before launch.
-On the owner's return, inspect this same process and terminal logs first;
-never infer termination from this dated note or restart an unverified window.
+The next prerequisite is a fresh, protected native F4 export and independent
+readback. Numerical reverse F5 and the final two exact contractions are still
+downstream tasks, not part of this audit request. Do not rerun the completed
+F4 scan or automatically launch the next production stage.
+
+The owner subsequently requested a local same-command resumable F5 launcher.
+`run_f5.ps1` is prepared and its read-only preflight, synthetic receipt/window
+guards, and fresh full/direct/shared/reverse verification pass. It refreshes
+gates, performs the protected F4 export if absent, then checks a 10,000-ID
+resumed canary before a bounded 330/360-minute F5 window. Re-running the same
+script resumes closed chunks. It does not automatically relaunch after a hard
+bound or run the final N(6) stage. No C6 export or numerical F5 was launched
+during this preparation. See
+`docs/reports/og2/c6-f5-manual-resume-launcher-20260906.md`.
 
 The measurements support pursuing this route instead of finishing the old
 forward S1 work, but do not certify a total runtime or a global speedup
@@ -665,7 +669,7 @@ closed global F4 cache.
 
 The shared-value mathematical route is therefore exact and its combined
 implementation has passed complete small-case gates. Full-size C6 lookup
-scaling and seven bounded shared-F4 production windows have also passed; no
+scaling and the complete nine-window shared-F4 scan have also passed; no
 new end-to-end C6 duration or complete N(6) result is claimed. See
 `docs/math/native-graph-value-sharing.md` and
 `docs/reports/og2/c6-catalogue-direct-route-20260905.md`.
@@ -761,8 +765,9 @@ same-prefix qualification: 59,675,000 records, 9,345,067 representatives,
 controller, and retained only about 15.0 MiB worker / 57.0 MiB parent peak
 RSS. The result is explicitly TEST_ONLY_PASS, not a replacement production
 audit-chain node or independent F4 recalculation. A full-domain bitset needs
-112,924,828 bytes; full-domain runtime and resumable audit shards are not yet
-measured or implemented, respectively.
+112,924,828 bytes. The subsequent 2026-09-06 full-domain audit measured
+166.588572 seconds end-to-end and passed; resumable audit shards remain
+unimplemented and were not needed for that guarded run.
 See `docs/reports/og2/shared-f4-native-bitset-audit-20260905.md` for the
 same-prefix and full resumed-protocol qualification commands and hashes.
 
@@ -865,7 +870,8 @@ through their read-only header/hash helper or a protected staged resume.
   qualified C=6 candidate; audited runbook in `docs/methods/layer-dp.md`.
 - `layer_shared_f4` / `layer_reverse_f5` (experiments/proto): new exact
   support-reuse route, complete C5 and recovery gates passed; bounded real
-  C6 F4 progress only. No complete C6 native export or final sum yet.
+  C6 F4 namespace now completely closed and independently audited. No complete
+  C6 native export, numerical F5 production result or final sum yet.
 - `factorization_orbit`: primary C=2..5 exact factorization/orbit engine and
   the C=5 oracle for the layer DP.
 - `multiset_q`: independent transfer-kernel research and cross-check route.

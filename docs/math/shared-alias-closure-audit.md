@@ -1,9 +1,10 @@
 # Full-scale shared-F4 audit design — bounded independent branch
 
-The two-pass native streaming audit is implemented and independently qualified
-through the existing 59,675,000-ID prefix. The resumable shard design remains
-unimplemented; full-domain 903,398,621-ID runtime is unmeasured. None of these
-audits certifies that the F4 catalogue is complete. No producer was changed.
+The two-pass native streaming audit is implemented and independently qualified.
+On 2026-09-06 it passed the complete 903,398,621-ID domain in 166.588572
+seconds, certifying complete internal alias/value closure and physical-copy
+integrity, not independent reevaluation of all F4 arithmetic. The resumable
+shard design remains unimplemented and was not needed. No producer was changed.
 
 ## 1. What an incremental audit may inherit
 
@@ -172,8 +173,39 @@ are not production ancestors. Exact commands and hashes are retained in
 
 Production invocations remain capped at 180 seconds, with separate 1-GiB parent
 and worker guards, exact domain/file/byte limits, and fail-closed output. The
-full-domain bitset size is proved above, but full-domain runtime has not been
-measured. No resumable shard implementation was added speculatively. File
+full-domain bitset size is proved above; the completed full-domain measurement
+is recorded below. No resumable shard implementation was added speculatively. File
 certificates describe verified content/provenance at the reads, not a
 simultaneously locked or permanently immutable namespace; the export controller
 provides stronger locking when it consumes a complete catalogue.
+
+## 7. Completed full-domain audit without counter inheritance (2026-09-06)
+
+Window8 ended under a hard time bound after overnight sleep, before receiving
+an independent prefix audit. Window9 then completed the domain. The strict
+single-successor audit remains unchanged: no fake window8 predecessor or
+sanitized stderr was inserted into its chain.
+
+`experiments/proto/layer_shared_complete_audit.py` instead reuses the SAME
+SHA-qualified native reader to decode every record, build the full bitset,
+recheck every alias and compare the physical before/after copies for window9.
+It independently sums the decoded prefix counters to check window9's RESUMED
+line, all new chunk counters and final summary. A pinned window7 report is
+used only to check preservation of its 18,104 files, never to supply counters.
+The final controller must report matching before/after copies and exit zero;
+the final engine stderr must be empty. New parser/counter refusal tests and
+the existing 10/38 native acceptance/rejection gate pass.
+
+All 903,398,603 live aliases resolved to closed self-representatives, with
+18 holes, 140,069,579 representative values and zero unresolved aliases.
+The unchanged reader used a 112,924,828-byte bitset. Its worker time was
+165.431 seconds; end-to-end time was 166.588572 seconds under the existing
+180-second limit. Worker/parent peaks were 145,981,440 / 171,200,512 bytes,
+each capped at 1 GiB. Every committed byte was re-read; no local-record or
+closure counter was inherited from an unaudited computation.
+
+This does not independently reprove graph-fiber equivalence or recalculate
+each F4, export weighted native T4, compute F5, or close N(6). The record-level
+source/repair/semantics checks and storage-snapshot caveats above still apply.
+Exact commands, hashes and limits are in
+`../reports/og2/c6-shared-f4-complete-audit-20260906.md`.
