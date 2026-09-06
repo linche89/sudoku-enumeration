@@ -12,6 +12,7 @@ param(
 # The engine stops early when F5 closes; these are limits, not minimum times.
 # This does not export L5 or perform the final N(6) outer contraction.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'scripts/layer_f5_progress.ps1')
 
 function Require-File([string]$Path) {
     if (!(Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Missing required file: $Path" }
@@ -23,14 +24,33 @@ function Require-Sha([string]$Path, [string]$Expected) {
         throw "SHA-256 differs from the qualified input/build: $Path"
     }
 }
-function Invoke-Logged([string]$Program, [string[]]$Items, [string]$LogPath, [switch]$AllowBoundStop) {
+function Invoke-Logged([string]$Program, [string[]]$Items, [string]$LogPath, [switch]$AllowBoundStop, [switch]$ShowF5Progress) {
     if (Test-Path -LiteralPath $LogPath) { throw "Refusing log overwrite: $LogPath" }
     Write-Host "Running stage; log: $LogPath"
+    $progressClock = [Diagnostics.Stopwatch]::StartNew()
+    $progressState = @{ NextSeconds=0.0 }
     $savedPreference = $ErrorActionPreference
     try {
         # Wait for a native controller's final backup even if it writes stderr.
         $ErrorActionPreference = 'Continue'
-        & $Program @Items 2>&1 | Tee-Object -FilePath $LogPath -ErrorAction Stop | Out-Host
+        & $Program @Items 2>&1 | Tee-Object -FilePath $LogPath -ErrorAction Stop | ForEach-Object {
+            # Preserve every raw line in the log. Only the on-screen RSS spam
+            # is replaced by advisory progress; terminal/error lines stay visible.
+            $line = [string]$_
+            if (!$ShowF5Progress -or $line -notmatch '^rss=[0-9.,]+GB\s*$') { $_ | Out-Host }
+            if ($ShowF5Progress -and ($progressClock.Elapsed.TotalSeconds -ge $progressState.NextSeconds -or
+                $line -match '^REVERSE_WINDOW_END ')) {
+                try {
+                    $progress = Get-F5ProgressSnapshot (Split-Path -Parent $LogPath)
+                    Write-Host (Format-F5ProgressLine $progress)
+                } catch {
+                    # A display failure must never interrupt the native controller
+                    # or prevent its final physical backup.
+                    Write-Warning ('Progress display unavailable; raw log retained: ' + $_.Exception.Message)
+                }
+                $progressState.NextSeconds = $progressClock.Elapsed.TotalSeconds + 15
+            }
+        }
         $code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $savedPreference }
     if ($code -ne 0 -and !($AllowBoundStop -and $code -eq 98)) {
@@ -180,6 +200,8 @@ try {
     Write-Host 'Rerun this SAME script on later days or after a bounded stop. Only missing chunks are computed.'
     Write-Host 'Export child limit: 30 minutes; independent readback: 300 seconds. Hashing/backups add time.'
     Write-Host 'Keep the PC awake and this window open until the final backup completes.'
+    Write-Host 'F5 progress prints about every 15s. F5_compute_left is compute-only ETA for ALL remaining F5; window_left is this child window.'
+    Write-Host 'The 10000-ID canary exits normally before the main window starts automatically; that exit is not an interruption.'
     if ($CheckOnly) {
         Write-Host 'CHECK_ONLY_PASS: no gates, export, computation or backup started. Full input hashes remain for the controllers.'
         return
@@ -214,13 +236,14 @@ try {
         '-BackupRoot', (Join-Path $backupRoot 'c6_reverse_f5_20260905'),
         '-Chunk', '10000', '-Threads', '24', '-LimitGiB', '55')
     $canaryLog = Join-Path $runDir 'f5-canary-controller.log'
-    $code = Invoke-Logged $powerShell ($f5BaseArgs + @('-Limit','10000','-WorkMinutes','8','-MaxMinutes','10')) $canaryLog -AllowBoundStop
+    $code = Invoke-Logged $powerShell ($f5BaseArgs + @('-Limit','10000','-WorkMinutes','8','-MaxMinutes','10')) $canaryLog -AllowBoundStop -ShowF5Progress
     $canary = Read-F5Window $canaryLog $code 10000
     if ($null -eq $canary) { return }
     if ($canary.Prefix -lt 96452976) {
         if ($canary.NewIndices -ne 10000) { throw 'Canary did not close the requested new work; inspect logs before a longer run.' }
         $windowLog = Join-Path $runDir 'f5-window-controller.log'
-        $code = Invoke-Logged $powerShell ($f5BaseArgs + @('-Limit','96452976','-WorkMinutes',"$WorkMinutes",'-MaxMinutes',"$MaxMinutes")) $windowLog -AllowBoundStop
+        Write-Host 'CANARY PASSED AND BACKED UP. Starting the main F5 window automatically.'
+        $code = Invoke-Logged $powerShell ($f5BaseArgs + @('-Limit','96452976','-WorkMinutes',"$WorkMinutes",'-MaxMinutes',"$MaxMinutes")) $windowLog -AllowBoundStop -ShowF5Progress
         $window = Read-F5Window $windowLog $code 96452976
         if ($null -eq $window) { return }
     } else { $window = $canary }
