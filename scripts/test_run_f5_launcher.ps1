@@ -5,6 +5,61 @@ $errors = $null
 $path = Join-Path (Split-Path -Parent $PSScriptRoot) 'run_f5.ps1'
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
+
+# Exercise only the real parameter block and ordering guard, never main.
+$timeGuard = $ast.Find({ param($node)
+    $node -is [System.Management.Automation.Language.IfStatementAst] -and
+    $node.Extent.Text -eq "if (`$WorkMinutes -ge `$MaxMinutes) { throw 'WorkMinutes must be below MaxMinutes.' }"
+}, $true)
+if (!$timeGuard) { throw 'Time ordering guard missing' }
+$boundsFixture = [scriptblock]::Create($ast.ParamBlock.Extent.Text + "`n" + $timeGuard.Extent.Text + @'
+
+[pscustomobject]@{WorkMinutes=$WorkMinutes; MaxMinutes=$MaxMinutes; CheckOnly=[bool]$CheckOnly}
+'@)
+$boundsAccepted = 0
+foreach ($case in @(
+    @{ Args=@{}; Work=330; Hard=360 },
+    @{ Args=@{WorkMinutes=450; MaxMinutes=480}; Work=450; Hard=480 },
+    @{ Args=@{WorkMinutes=450; MaxMinutes=480; CheckOnly=$true}; Work=450; Hard=480 },
+    @{ Args=@{WorkMinutes=45; MaxMinutes=60}; Work=45; Hard=60 },
+    @{ Args=@{WorkMinutes=1; MaxMinutes=2}; Work=1; Hard=2 }
+)) {
+    $caseArgs = $case.Args
+    $actual = & $boundsFixture @caseArgs
+    if ($actual.WorkMinutes -ne $case.Work -or $actual.MaxMinutes -ne $case.Hard) { throw 'Wrong time defaults/binding' }
+    $boundsAccepted++
+}
+$boundsRejected = 0
+foreach ($caseArgs in @(
+    @{WorkMinutes=451; MaxMinutes=480}, @{WorkMinutes=450; MaxMinutes=481},
+    @{WorkMinutes=0; MaxMinutes=480}, @{WorkMinutes=1; MaxMinutes=1},
+    @{WorkMinutes=450; MaxMinutes=450}, @{WorkMinutes=450; MaxMinutes=449},
+    @{WorkMinutes=450}
+)) {
+    $caught = $false
+    try { $null = & $boundsFixture @caseArgs } catch { $caught = $true }
+    if (!$caught) { throw 'Invalid synthetic time bounds accepted' }
+    $boundsRejected++
+}
+# The unchanged child controller must also bind the advertised long window.
+$controllerPath = Join-Path $PSScriptRoot 'run_layer_reverse_window.ps1'
+$controllerAst = [System.Management.Automation.Language.Parser]::ParseFile($controllerPath, [ref]$tokens, [ref]$errors)
+if ($errors.Count) { throw ($errors | Out-String) }
+$childFixture = [scriptblock]::Create($controllerAst.ParamBlock.Extent.Text + @'
+
+[pscustomobject]@{WorkMinutes=$WorkMinutes; MaxMinutes=$MaxMinutes; LimitGiB=$LimitGiB; Threads=$Threads; Limit=$Limit; Chunk=$Chunk}
+'@)
+$childArgs = @{
+    FullGateEvidence='SYNTHETIC'; ReverseGateEvidence='SYNTHETIC';
+    Layer4='SYNTHETIC'; Layer4Backup='SYNTHETIC'; Layer4Sha256=('A'*64);
+    WorkMinutes=450; MaxMinutes=480; Limit=96452976; Chunk=10000
+}
+$childBounds = & $childFixture @childArgs
+if ($childBounds.WorkMinutes -ne 450 -or $childBounds.MaxMinutes -ne 480 -or
+    $childBounds.LimitGiB -ne 55 -or $childBounds.Threads -ne 24 -or
+    $childBounds.Limit -ne 96452976 -or $childBounds.Chunk -ne 10000) { throw 'Child bounds differ from launcher' }
+Write-Host "F5_TIME_BOUNDS_SYNTHETIC_PASS accepted=$boundsAccepted rejected=$boundsRejected child_450_480=accepted production_IO=none"
+
 $definition = $ast.Find({ param($node)
     $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Read-ExportReceipt'
 }, $true)
@@ -70,7 +125,8 @@ if (!$windowDefinition) { throw 'Window result validator missing' }
     }
     function Get-Item([string]$LiteralPath) { return [pscustomobject]@{Length=0} }
     function Require-File([string]$Path) { return [pscustomobject]@{Length=1} }
-    function Import-Csv([string]$LiteralPath) { return @('synthetic-manifest', 'synthetic-chunk') }
+    $fixtureBackupCount = 2
+    function Import-Csv([string]$LiteralPath) { return @(1..$fixtureBackupCount) }
     $result = Read-F5Window 'controller' 0 10000
     if ($result.Prefix -ne 10000 -or $result.NewIndices -ne 10000) { throw 'Wrong finite prefix' }
     $rejected = 0
@@ -99,5 +155,15 @@ if (!$windowDefinition) { throw 'Window result validator missing' }
     $engineFixture = 'NO TERMINAL SUMMARY AFTER SYNTHETIC HARD STOP'
     $result = Read-F5Window 'controller' 98 10000
     if ($null -ne $result) { throw 'Bounded stop upgraded to a success result' }
-    Write-Host "F5_WINDOW_SYNTHETIC_PASS accepted=1 rejected=$rejected bounded_stop_not_success=1 production_IO=none"
+    $fixtureBackupCount = 9647
+    $controllerFixture = "PHYSICAL_BACKUP phase=after files=9647 directory=D:\finite-fixture\after`r`n" +
+        "REVERSE_WINDOW_END exit=0 logs=E:\finite-fixture\logs N6=NOT_COMPUTED`r`n"
+    $engineFixture = 'SUMMARY status=CLOSED_F5_CATALOGUE new_chunks=1 new_indices=2976 closed_prefix=96452976 ' +
+        'total_entries=96452976 live_closed=96452755 peak_rss_bytes=1024 source_checkpointreadonly=yes N6=NOT_COMPUTED'
+    $result = Read-F5Window 'controller' 0 10000
+    if ($result.Prefix -ne 96452976 -or $result.NewIndices -ne 2976) { throw 'Final short chunk not recognized' }
+    $engineFixture = $engineFixture.Replace('new_chunks=1 new_indices=2976', 'new_chunks=0 new_indices=0')
+    $result = Read-F5Window 'controller' 0 10000
+    if ($result.Prefix -ne 96452976 -or $result.NewIndices -ne 0) { throw 'Already-complete resume not recognized' }
+    Write-Host "F5_WINDOW_SYNTHETIC_PASS accepted=3 rejected=$rejected bounded_stop_not_success=1 production_IO=none"
 }

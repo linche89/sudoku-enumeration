@@ -1,13 +1,15 @@
 [CmdletBinding()]
 param(
     [switch]$CheckOnly,
-    [ValidateRange(1,330)] [int]$WorkMinutes = 330,
-    [ValidateRange(2,360)] [int]$MaxMinutes = 360
+    [ValidateRange(1,450)] [int]$WorkMinutes = 330,
+    [ValidateRange(2,480)] [int]$MaxMinutes = 360
 )
 
 # Same command on every session: gates -> F4 export if needed -> canary -> F5.
 # No production executable is rebuilt, no old checkpoint is overwritten.
 # Each session is bounded; committed F5 chunks resume without recomputation.
+# Optional final suffix window: -WorkMinutes 450 -MaxMinutes 480.
+# The engine stops early when F5 closes; these are limits, not minimum times.
 # This does not export L5 or perform the final N(6) outer contraction.
 $ErrorActionPreference = 'Stop'
 
