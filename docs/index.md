@@ -56,6 +56,9 @@
 
 ## Dated evidence
 
+- `reports/og2/c6-f5-live-progress-20260906.md` — read-only viewer for the
+  running session and inline progress for future launches; parser, phase and
+  native exit/logging tests; no checkpoint modification or N(6) claim.
 - `reports/og2/c6-f5-window1-and-long-window-20260906.md` — owner-run protected
   F4 export, reviewed 30,200,000-ID F5 prefix, physical-backup checks and optional
   450/480-minute final-suffix launcher bounds; not complete F5 or N(6).

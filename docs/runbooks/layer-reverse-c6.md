@@ -261,6 +261,42 @@ F4 export/backup files are reused only with their matching receipt, and F5
 native resume rechecks closed chunks and computes only the missing suffix.
 Every session has a new `data/logs/f5-manual-<guid>/` directory.
 
+### Live progress without restarting computation
+
+Open a SECOND PowerShell terminal in the repository directory:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\show_f5_progress.ps1 -Watch
+```
+
+It auto-selects the latest manual-session log directory and refreshes every
+15 seconds. Omit `-Watch` for a single snapshot. `-SessionPath` selects an
+explicit session; `-IntervalSeconds 5 -Updates 2 -Watch` is a bounded two-read
+diagnostic. Ctrl+C or closing THIS viewer does not stop computation. Leave
+the original computing terminal open. No checkpoint is opened, hashed or
+written, and no computing process is started, stopped or locked by the viewer.
+
+The same display is included automatically in FUTURE `run_f5.ps1` launches:
+
+- `saved` / percentage: last logged committed/resumed stable-ID prefix,
+  including insertion holes, over 96,452,976 IDs.
+- `recent`: total IDs divided by total wall seconds of up to the last 30
+  completed chunks; not an average of per-chunk rates.
+- `F5_compute_left`: remaining entire-F5 work at that recent speed; excludes
+  future load/gate/backup time, sleep and the final N(6) stage. It is an estimate,
+  not a promise that this session completes the catalogue.
+- `window_left`: remaining time to this child's soft deadline, derived from
+  the real command and process start time; disappears once the child ends.
+- `stage`: distinguishes canary, main computation, preparation, waiting for
+  backup, a saved window and full-F5 log closure awaiting independent audit.
+
+The old running launcher keeps its loaded code; do not restart it for this
+UI change. Inline output replaces repetitive RSS-only lines approximately
+every 15 seconds while the controller emits heartbeats, but its raw log still
+retains every RSS, terminal and error line. Display failures produce a warning
+without cancelling the native controller or its after-backup. The independent
+watchdog, safety checks and 330/360 or optional 450/480 bounds are unchanged.
+
 Sleep pauses computation. After wake, a watchdog may end that window with
 exit 98; the helper accepts neither partial accumulators nor an exit-98
 computation certificate. If the controller completed its after-backup, it

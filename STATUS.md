@@ -74,6 +74,22 @@ Synthetic parameter/receipt/terminal tests pass; no extra production process
 was launched during this change. See
 `docs/reports/og2/c6-f5-window1-and-long-window-20260906.md`.
 
+The owner subsequently requested visible live progress. The read-only
+`show_f5_progress.ps1 -Watch` now observes the existing session without
+checkpoint access or process control. Future `run_f5.ps1` sessions display
+saved-ID percentage, recent speed, remaining F5 compute-time estimate and
+remaining child-window time about every 15 seconds, while retaining every
+raw controller/RSS line in its log. Already-running scripts are not hot
+reloaded; use the separate viewer for the current run. Progress is advisory
+log evidence, not an independent numerical certificate or N(6) percentage.
+See `docs/reports/og2/c6-f5-live-progress-20260906.md` for display, exit-code
+isolation and live read-only tests. Counting engines, watchdog, window bounds
+and checkpoint semantics remain unchanged. The complete repository gate
+passed in 255.4768223 seconds under a 360-second / 6-GiB aggregate guard,
+with all protected production-file hashes unchanged and no surviving gate
+child. An earlier four-thread override hit the time guard at FJ9 and remains
+an explicitly incomplete test, not a numerical mismatch or successful gate.
+
 The measurements support pursuing this route instead of finishing the old
 forward S1 work, but do not certify a total runtime or a global speedup
 factor. The old checkpoints are unchanged and remain available as fallback.
