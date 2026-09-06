@@ -7,7 +7,8 @@ The original generation-37 A/B files remain unchanged. Only their keys and
 stabilizers are used; every original partial T is discarded. The one proved
 missing L4 key is appended only to the engine's in-memory catalogue.
 
-Current state after the seventh bounded window, 2026-09-05:
+Current state after the ninth bounded window and full independent audit,
+2026-09-06. The shared F4 catalogue is CLOSED; a native L4 export is still absent.
 
 ```text
 directory: data/checkpoints/c6_shared_f4_20260905/
@@ -15,68 +16,78 @@ format: SFR4MT01 manifest / SFR4CK01 immutable chunks, version 1
 semantics: SF4MIN01 (exact minimum-fiber aliases plus closed F4 at representatives)
 complete support IDs including holes: 903398621
 complete live support: 903398603
-closed record prefix: [0,452575000)
-live records in prefix: 452574991
-holes in prefix: 9
+closed record prefix: [0,903398621)
+live records in prefix: 903398603
+holes in prefix: 18
 chunk size: 25000
-committed chunks: 18103
-closed representative F4 values: 70144355
-sum of representative F4 values (modulo 2^64): 97566141160704
-files including manifest: 18104
-total bytes: 5435534624
+committed chunks: 36136
+closed representative F4 values: 140069579
+sum of representative F4 values (modulo 2^64): 194468287162752
+live aliases resolving to closed representatives: 903398603
+aliases to future/uncomputed representatives: 0
+files including manifest: 36137
+total bytes: 10850034524
 manifest SHA-256: 848B9DC72452AB389C5BF5424E264AE86C673C7FBA673F5F14FDC845BF4DEB91
 original input SHA-256: ECF0837315B0FDF8AE21C394FDA6676490E43B1828A0825529A344EC17E4E844
 ```
 
 A nonrepresentative record contains a proved alias, not its own numerical
-value. Its representative may lie beyond the current prefix. Therefore
-452,575,000 committed records do NOT mean 452,575,000 closed native T4 weights.
-The engine verifies all aliases point to closed self-representatives before
-any full native layer export. Uncommitted temporary files are never accepted.
+value. Every live alias now resolves to a closed self-representative, checked
+both by the producer and by a separate full-domain bitset reader. The native
+weighted T4 image has not been exported. Uncommitted temporaries are never
+accepted, and no original partial T4 accumulator is used.
 
 External physical backup, independently hashed source/copy on every file:
 
 ```text
 D:\sudoku_FJ_checkpoint_backups\c6_shared_f4_20260905\
-  20260905-181202-99e8286d25c7401f944ce14c0fc6039b-after\
+  20260906-085138-8974f5a375294f26852c7ac7392947d9-after\
 receipt.csv SHA-256:
-CBF8655AEF4CCFBC336A13511BBD3AB4B071E8F9637C84A85220571F81B64A16
+C0FBBDF098186FCA77E6C47E2CA64A2FD6DA60151FB51E08CB3B1ECC1EC6284E
 ```
 
-The receipt lists the individual SHA-256 of all 18,104 committed files.
-The seventh window used `limit=300000000`, `chunk=25000`, 24 threads, a 55 GiB
-guard, 100-minute soft stop and 105-minute hard child bound. It resumed the
-previous 6,255 chunks, added 11,848 new chunks, and exited normally after 6,000.213190
-engine seconds, including complete original-source SHA and index
-reconstruction; new computation/commit took 5,949.581754 seconds. Peak working
-set was 44,735,246,336 bytes. Backup hashing/copying lies outside the child
-budget. No shared-F4 computing process remained after this window.
+The receipt lists the individual SHA-256 of all 36,137 committed files.
+Window9 used `limit=106073621`, `chunk=25000`, 24 threads, a 55 GiB guard,
+75-minute soft stop and 90-minute hard child bound. It resumed 31,893 chunks,
+added 4,243 chunks (including the final 23,621-record chunk), and exited zero
+after 2,258.025330 engine seconds. New computation/commit took 2,196.059251
+seconds. Peak working set was 44,734,844,928 bytes. Engine completion was at
+09:38 and after-backup at 09:47 local time on 2026-09-06. No computing process
+remained. Backup work lies outside the child time budget.
+
+Window8 had retained prefix 797,325,000 after overnight sleep, but its
+controller exit 98 is NOT a normal successful termination. The complete
+audit redecoded every record; it does not inherit unaudited window8 counters.
 
 This window used the newly qualified incremental bridge, installed executable
 SHA-256 `2B8A14606F8F78748C9338130D35551CA199E53238BEB33D95BCB05A2555AFE0`.
 Native keys, alias/value rules and chunk formats are unchanged. Both old-binary
 rollback copies and all previous checkpoint copies remain retained.
 
-Use `scripts/run_layer_shared_window.ps1` with current successful full/shared
-gate evidence and the original external source backup. It backs up any
-previous committed prefix before a writable resume and the resulting prefix
-afterward. The `.gitignore` explicitly excludes this binary namespace.
+The F4 scan is finished; do not launch another computing window. The next
+handoff is the separately protected native export in
+`docs/runbooks/layer-shared-c6.md`, not F5 on the original partial image.
+The `.gitignore` explicitly excludes this binary namespace.
 Evidence: `docs/reports/og2/c6-shared-f4-window1-20260905.md`,
 `docs/reports/og2/c6-shared-f4-window2-20260905.md`,
 `docs/reports/og2/c6-shared-f4-window3-20260905.md`,
 `docs/reports/og2/c6-shared-f4-window4-20260905.md`,
 `docs/reports/og2/c6-shared-f4-window5-20260905.md`,
 `docs/reports/og2/c6-shared-f4-window6-20260905.md` and
-`docs/reports/og2/c6-shared-f4-window7-20260905.md`. Earlier external copies
+`docs/reports/og2/c6-shared-f4-window7-20260905.md` and
+`docs/reports/og2/c6-shared-f4-complete-audit-20260906.md`. Earlier external copies
 are retained; no original source or earlier committed chunk was overwritten.
 
-The independent two-pass native bitset audit reproduced all file contents, header/payload
-hashes, prior-prefix preservation, before/after backup receipts and exact
-counters. It found 300,246,735 live IDs resolving to closed representatives
-and 152,328,256 referring to future representatives. This is file integrity and
-alias-closure evidence, not independent numerical reevaluation of all F4.
-Its production report is `data/logs/c6-direct-route-20260905/shared-window7-independent-audit.json`,
-SHA-256 `EF661DC093E9DCAC888F6934E9341C2412C7B51AFE156A6C545AE73C289972F7`.
+The independent two-pass native bitset audit reproduced every record,
+header/payload hash, and both final-window physical copies; all 18,104 files
+from the SHA-pinned window7 audit are unchanged. All 903,398,603 live IDs
+resolve to closed representatives; unresolved aliases are zero. This is file
+integrity and complete internal alias-closure evidence, not independent
+numerical reevaluation of all F4. No full source catalogue was opened by it.
+Elapsed time was 166.588572 seconds, with a 180-second guard and separate
+1-GiB worker/parent bounds. Production report:
+`data/logs/c6-direct-route-20260905/shared-complete-independent-audit-20260906.json`,
+SHA-256 `8FAA333C7F4CC38D6733AA94A3DCFE31D2E469D602B3A212065DE70EAF001741`.
 
 ## C6 rehearsal L5 support (read-only input to the new route)
 
