@@ -8,7 +8,8 @@ stabilizers are used; every original partial T is discarded. The one proved
 missing L4 key is appended only to the engine's in-memory catalogue.
 
 Current state after the ninth bounded window and full independent audit,
-2026-09-06. The shared F4 catalogue is CLOSED; a native L4 export is still absent.
+2026-09-06. The shared F4 catalogue is CLOSED. The owner subsequently created
+the protected native L4 export recorded in the separate section below.
 
 ```text
 directory: data/checkpoints/c6_shared_f4_20260905/
@@ -34,7 +35,8 @@ original input SHA-256: ECF0837315B0FDF8AE21C394FDA6676490E43B1828A0825529A344EC
 A nonrepresentative record contains a proved alias, not its own numerical
 value. Every live alias now resolves to a closed self-representative, checked
 both by the producer and by a separate full-domain bitset reader. The native
-weighted T4 image has not been exported. Uncommitted temporaries are never
+weighted T4 image was subsequently exported to a separate, new file below.
+Uncommitted temporaries are never
 accepted, and no original partial T4 accumulator is used.
 
 External physical backup, independently hashed source/copy on every file:
@@ -64,9 +66,9 @@ SHA-256 `2B8A14606F8F78748C9338130D35551CA199E53238BEB33D95BCB05A2555AFE0`.
 Native keys, alias/value rules and chunk formats are unchanged. Both old-binary
 rollback copies and all previous checkpoint copies remain retained.
 
-The F4 scan is finished; do not launch another computing window. The next
-handoff is the separately protected native export in
-`docs/runbooks/layer-shared-c6.md`, not F5 on the original partial image.
+The F4 scan is finished; do not launch another computing window. Its separately
+protected native export is recorded below. F5 must never use the original
+partial image as a completed weight vector.
 The `.gitignore` explicitly excludes this binary namespace.
 Evidence: `docs/reports/og2/c6-shared-f4-window1-20260905.md`,
 `docs/reports/og2/c6-shared-f4-window2-20260905.md`,
@@ -88,6 +90,67 @@ Elapsed time was 166.588572 seconds, with a 180-second guard and separate
 1-GiB worker/parent bounds. Production report:
 `data/logs/c6-direct-route-20260905/shared-complete-independent-audit-20260906.json`,
 SHA-256 `8FAA333C7F4CC38D6733AA94A3DCFE31D2E469D602B3A212065DE70EAF001741`.
+
+## c6_shared_f4_closed_20260906.L4.snap (closed native F4 export)
+
+The owner's first manual F5 session completed the protected export, independent
+full SHA/header/payload/count/mass readback and separate-volume physical copy
+at 12:16 on 2026-09-06. No F4 numerical values were recalculated during export.
+
+```text
+local: data/checkpoints/c6_shared_f4_closed_20260906.L4.snap
+backup: D:\sudoku_FJ_checkpoint_backups\c6_shared_f4_exports\c6_shared_f4_closed_20260906.L4.snap
+bytes in each file: 32522350484
+SHA-256 of each file: 7BA5E5BA3255DD17851043521F67FB4EE70F76AE565FD6CA9AD962E7D5014D94
+entries / live / holes: 903398621 / 903398603 / 18
+orbit mass: 41602261536160
+new shared chunks / new indices during export: 0 / 0
+receipt: data/checkpoints/c6_shared_f4_closed_20260906.L4.snap.receipt.json
+receipt SHA-256: 6A5236B3E8447FE5F66C4A36A84BB8F557DDDDB435A2C55F897024B8E58A2B9D
+export logs: data/logs/shared-f4-export-20260906-120609-f2d507515a6244b182bda1b9c07c59d1/
+```
+
+The receipt binds the fully closed shared-F4 namespace, original input and
+its physical copy, producer/independent-reader binaries and fresh gates.
+The reverse controller rehashes both native export copies before each run.
+The original generation-37 partial image remains untouched.
+
+## c6_reverse_f5_20260905 (partial closed-value F5 chunks)
+
+Last reviewed completed manual session, 2026-09-06 at 17:50. This is a
+resumable numerical F5 prefix, NOT a complete F5 layer or N(6).
+
+```text
+directory: data/checkpoints/c6_reverse_f5_20260905/
+closed stable-ID prefix: [0,30200000)
+complete stable-ID domain: 96452976
+live closed values / holes in reviewed prefix: 30199969 / 31
+complete live domain / holes: 96452755 / 221
+progress by stable IDs: 31.310594294156356%
+chunk size: 10000
+committed chunks / files including manifest: 3020 / 3021
+bytes per physical copy: 242373376
+F5_checksum_mod2_64: 1205041302659950080
+controller/engine exit: 0 / 0
+engine status: INCOMPLETE_RESUMABLE
+engine stderr: empty
+backup: D:\sudoku_FJ_checkpoint_backups\c6_reverse_f5_20260905\20260906-121946-99b4c5514bd943f1902d18e740ce48f1-after\
+receipt.csv SHA-256: 0363AD06245CECAA5D973B93C43A8DEA26BFEFD1C4E909B0C45B4013F4D52D2E
+session logs: data/logs/f5-manual-a0d9e35d7f2d44bbb309864537ae243f/
+engine logs: data/logs/reverse-f5-window-20260906-121946-99b4c5514bd943f1902d18e740ce48f1/
+```
+
+A separate read-only check compared every local and backup file's size and
+SHA-256 with the receipt, and checked contiguous 10,000-ID chunk filenames.
+All matched. It did not independently decode/recalculate all F5 payload
+values; resume performs the engine's existing full chunk validation.
+
+The owner started a later ordinary session at 18:28 on 2026-09-06. The live
+namespace may therefore contain more chunks than this reviewed session.
+Do not overwrite/trim it to the recorded prefix or treat an in-progress
+suffix as a reviewed completed-window result. The next command may use
+`run_f5.ps1 -WorkMinutes 450 -MaxMinutes 480` only after that session stops.
+The old namespace, all committed chunks and all physical copies are retained.
 
 ## C6 rehearsal L5 support (read-only input to the new route)
 
@@ -115,9 +178,9 @@ the full image and SHA, zero duplicate original keys, old-weight erasure and
 production-configuration restoration in a bounded read-only smoke. See
 `docs/reports/og2/c6-reverse-f5-release-20260905.md`.
 
-The reserved `data/checkpoints/c6_reverse_f5_20260905/` namespace is ignored
-by Git but has no C6 production chunks yet. It must consume a NEW verified
-closed F4 export, never the partial generation-37 T4 values.
+The `data/checkpoints/c6_reverse_f5_20260905/` namespace is ignored by Git;
+its owner-run numerical production prefix is recorded above. It consumes
+the new verified closed F4 export, never partial generation-37 T4 values.
 
 ## factorization_orbit_c6_graphmemo.bin
 
