@@ -56,6 +56,9 @@
 
 ## Dated evidence
 
+- `reports/og2/c6-f5-window1-and-long-window-20260906.md` — owner-run protected
+  F4 export, reviewed 30,200,000-ID F5 prefix, physical-backup checks and optional
+  450/480-minute final-suffix launcher bounds; not complete F5 or N(6).
 - `reports/og2/c6-f5-manual-resume-launcher-20260906.md` — one PowerShell
   command for qualified F4 export and bounded, same-namespace F5 continuation;
   synthetic guards and four fresh gates pass; no C6 export/F5 launch implied.

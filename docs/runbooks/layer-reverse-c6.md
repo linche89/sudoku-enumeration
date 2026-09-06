@@ -2,10 +2,12 @@
 
 This is the new **S2 computation of closed five-row values**, not a final
 Sudoku count. It consumes a newly verified closed native L4 snapshot and
-reuses the old rehearsal L5 file **only as a support catalogue**. No C6 F5
-values have yet been computed by this engine. The complete C5 end-to-end and
-recovery release gate and a read-only C6 support-loader smoke have passed.
-The exact evidence and the distinction from a C6 computation are below.
+reuses the old rehearsal L5 file **only as a support catalogue**. The owner's
+first manual C6 session has now closed 30,200,000 IDs (31.3106%) and physically
+backed up its 3,020 immutable chunks. The complete F4 export exists, but F5
+is not yet complete and N(6) is not computed. See the checkpoint manifest and
+`../reports/og2/c6-f5-window1-and-long-window-20260906.md` for this production
+evidence; the earlier qualification evidence follows below.
 
 Read `../../STATUS.md`, `../../data/checkpoints/MANIFEST.md` and `og2.md`
 before a computing window. The user has authorized completing the exact C6
@@ -231,6 +233,29 @@ the child's limit. An optional shorter invocation is:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\run_f5.ps1 -WorkMinutes 45 -MaxMinutes 60
 ```
 
+The owner also authorized a longer final-suffix session after the current
+ordinary session ends. Use the same script with explicit longer bounds:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_f5.ps1 -WorkMinutes 450 -MaxMinutes 480
+```
+
+This permits up to 7.5 hours before stopping new chunks and an 8-hour hard
+computing-child limit, within the unchanged underlying controller's range.
+It is still one session, with the same canary, 24 threads, 55-GiB bound and
+before/after physical backups. It stops EARLY if the entire F5 domain closes;
+there is no artificial 94% boundary and no requirement to use all 450 minutes.
+The original 330/360 defaults are unchanged, including for an already-running
+session. Never start the long command concurrently with that session.
+
+The first real window measured 30,190,000 new IDs in 19,763.068581 computation
+seconds. At that rate a remaining 37%--40% takes roughly 6.5--7.0 computing
+hours; this is an extrapolation, not a guarantee that the remaining suffix
+will close within 450 minutes. Gates, input hashing and backups add time
+outside the child limit. Keep the computer awake; the script does not change
+system power settings. If a time/RSS bound is reached, the usual protected
+stop and same-command resume rules still apply.
+
 Run the SAME command next time; no paths, SHA or cursor need editing. Completed
 F4 export/backup files are reused only with their matching receipt, and F5
 native resume rechecks closed chunks and computes only the missing suffix.
@@ -245,9 +270,10 @@ chunk is recomputed on the next native resume. The initial F4 export has no
 partial-export resume; keep the PC awake through that first setup step.
 
 At complete F5 closure the helper stops for independent audit and native L5
-export; it never runs S3 or claims N(6). This preparation has not yet executed
-a real C6 F4 export or F5 pilot. Exact tests and scope are recorded in
-`../reports/og2/c6-f5-manual-resume-launcher-20260906.md`.
+export; it never runs S3 or claims N(6). The original preparation-only tests
+are recorded in `../reports/og2/c6-f5-manual-resume-launcher-20260906.md`;
+the subsequent owner-run production session and extended time-bound tests
+are recorded in `../reports/og2/c6-f5-window1-and-long-window-20260906.md`.
 
 ### Underlying controller command
 

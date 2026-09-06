@@ -14,8 +14,10 @@ gates pass. The ninth bounded real C6 window completed the entire F4 namespace:
 903,398,621 IDs, 903,398,603 live native states, 18 insertion holes and
 140,069,579 closed graph-representative values. The independent FULL-domain
 byte/backup/alias audit passed: every live alias resolves to a closed value,
-with zero unresolved aliases. No native F4 export, numerical F5 production
-result or independently closed N(6) exists yet.
+with zero unresolved aliases. The owner has since completed the protected
+native F4 export and the first numerical F5 session: 30,200,000 saved IDs
+(31.3106%), with 30,199,969 live closed F5 values. No complete F5 catalogue
+or independently closed N(6) exists yet.
 
 Window8 was interrupted by overnight workstation sleep and ended under the
 hard time bound after wake, at prefix 797,325,000 (controller exit 98).
@@ -24,7 +26,8 @@ manual continuation, window9, added the remaining 106,073,621 IDs and
 17,245,383 representative values. Its engine finished at 09:38 on 2026-09-06;
 the external after-backup finished at 09:47. Engine/controller exit was zero
 and engine stderr was empty. All 36,137 committed files, 10,850,034,524 bytes,
-are physically backed up. No C6 computing/controller process remains.
+are physically backed up. No F4 computing/controller process remained at
+that handoff; the owner has subsequently started F5 as described below.
 
 On the owner's subsequent request, the independent reader redecoded every
 record, checked both window9 physical backups, and rechecked all 18,104
@@ -35,10 +38,11 @@ This certifies complete internal alias/value closure and storage integrity
 at the verified reads, not independent numerical reevaluation of every F4.
 See `docs/reports/og2/c6-shared-f4-complete-audit-20260906.md`.
 
-The next prerequisite is a fresh, protected native F4 export and independent
-readback. Numerical reverse F5 and the final two exact contractions are still
-downstream tasks, not part of this audit request. Do not rerun the completed
-F4 scan or automatically launch the next production stage.
+The protected native F4 export and independent readback subsequently passed
+on the owner's first manual F5 session. Export SHA-256 is
+`7BA5E5BA3255DD17851043521F67FB4EE70F76AE565FD6CA9AD962E7D5014D94`;
+the input/source and separate-volume output copy are bound by its receipt.
+Do not rerun the completed F4 scan or substitute the old partial T4 image.
 
 The owner subsequently requested a local same-command resumable F5 launcher.
 `run_f5.ps1` is prepared and its read-only preflight, synthetic receipt/window
@@ -49,6 +53,26 @@ script resumes closed chunks. It does not automatically relaunch after a hard
 bound or run the final N(6) stage. No C6 export or numerical F5 was launched
 during this preparation. See
 `docs/reports/og2/c6-f5-manual-resume-launcher-20260906.md`.
+
+The first owner-run F5 session ended normally at the 330-minute soft limit,
+not at complete F5 closure. Its 3,020 committed chunks plus manifest contain
+242,373,376 bytes per physical copy; all 3,021 local/backup SHA-256 values
+were independently compared with the after-backup receipt and matched.
+This is storage/contiguous-prefix evidence, not independent numerical
+reevaluation of every F5 value. The regular window added 30,190,000 IDs in
+19,763.068581 computation seconds, with a 45,665,304,576-byte peak.
+
+The owner started another ordinary session at 18:28 on 2026-09-06; it is
+left running and its unfinished suffix is not included in the reviewed
+prefix above. For the FOLLOWING session the owner requested a single longer
+window to finish the expected remaining 37%--40%. The launcher now accepts
+`-WorkMinutes 450 -MaxMinutes 480` (7.5-hour soft / 8-hour hard child limits),
+stopping early on full F5 closure. Defaults stay 330/360; the current running
+session is unchanged. Only two entry-parameter limits changed, not counting
+arithmetic, the underlying controller, checkpoint formats or safety gates.
+Synthetic parameter/receipt/terminal tests pass; no extra production process
+was launched during this change. See
+`docs/reports/og2/c6-f5-window1-and-long-window-20260906.md`.
 
 The measurements support pursuing this route instead of finishing the old
 forward S1 work, but do not certify a total runtime or a global speedup
@@ -858,8 +882,10 @@ See `docs/reports/og2/c6-s3-lineage-handoff-20260905.md`.
 All retained checkpoints are documented in `data/checkpoints/MANIFEST.md`.
 The original layer-DP production image remains the partial generation 37
 described above. The new shared-F4 namespace contains the independently
-closed representative values/aliases just described, with no full layer
-export yet. The separate factorization/orbit graph memo contains 5,315,962 closed
+closed representative values/aliases just described and now has a verified
+native F4 export. The new F5 namespace has a reviewed 30,200,000-ID prefix;
+the owner's later session is in progress. The separate factorization/orbit
+graph memo contains 5,315,962 closed
 exact values.  Neither binary is stored in Git.  Factorization verification
 must use `checkpointreadonly`; layer-DP production images are inspected only
 through their read-only header/hash helper or a protected staged resume.
@@ -870,8 +896,9 @@ through their read-only header/hash helper or a protected staged resume.
   qualified C=6 candidate; audited runbook in `docs/methods/layer-dp.md`.
 - `layer_shared_f4` / `layer_reverse_f5` (experiments/proto): new exact
   support-reuse route, complete C5 and recovery gates passed; bounded real
-  C6 F4 namespace now completely closed and independently audited. No complete
-  C6 native export, numerical F5 production result or final sum yet.
+  C6 F4 namespace now completely closed, independently audited and exported.
+  Numerical F5 has a reviewed 30,200,000-ID prefix and an owner-run continuation;
+  no complete F5 catalogue or final sum yet.
 - `factorization_orbit`: primary C=2..5 exact factorization/orbit engine and
   the C=5 oracle for the layer DP.
 - `multiset_q`: independent transfer-kernel research and cross-check route.
