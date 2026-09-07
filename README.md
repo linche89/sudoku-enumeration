@@ -151,8 +151,6 @@ do not use its root-level production launchers as a fresh-clone quick start.
 
 ## Provenance and licensing
 
-The former repository name was `sudoku_FJ`. Historical paths and command
-receipts intentionally retain it; the local checkpoint tree was not renamed.
 Raw expert responses are research inputs, not established mathematical facts.
 
 Historical attribution and third-party notices remain applicable. No blanket
