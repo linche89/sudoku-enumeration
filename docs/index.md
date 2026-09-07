@@ -4,6 +4,10 @@
 
 - `../STATUS.md` — the only authoritative current state.
 - `../README.md` — repository entry point and commands.
+- [Reproducibility guide](reproducibility.md) — fresh-clone checks, public
+  C6 certificate, computational prerequisites and verification limits.
+- [C6 certificate instructions](releases/c6-certificate-README.md) —
+  standalone final-table checks without production checkpoints.
 - `runbooks/og2.md` — safe build, verification, and checkpoint workflow.
 - `runbooks/layer-dp-c6-production.md` — frozen S1/S2/S3 production chain,
   progress sidecar, snapshot protection, replay, and final-certificate gates.
@@ -26,13 +30,13 @@
 - `methods/reverse-gluing.md` — reverse row-block gluing, exact orbit
   normalization, complete C=2..5 gates, exact C=6 two-row inventory, and the
   failed scale gate for immediate pairwise canonicalization.
-- `methods/layer-dp.md` — qualified global row-incremental candidate,
+- `methods/layer-dp.md` — verified global row-incremental implementation,
   exact recurrence, canonicalization gates, checkpoint/restart guarantees,
   completed bounded C=6 preflight, and owner-controlled launch boundary.
 - `methods/layer-dp-certificate.md` — independent representative legality,
   canonicality, stabilizer/orbit, multiplicity, G1/G2 binding, and final CSV
   certificate verification.
-- `../fj9/reproduction.md` — complete FJ05 9x9 reproduction.
+- `fj9/reproduction.md` — complete FJ05 9x9 reproduction.
 
 ## Current mathematics
 
@@ -208,6 +212,9 @@ They may contain conjectures or proposals that have not been implemented.
 
 Files under `history/` explain how the project arrived here. Their statements,
 commands, and source paths may be obsolete and must not override `STATUS.md`.
+
+- `history/status-through-c6-verification-20260907.md` retains the full
+  pre-publication status and development chronology without deleting evidence.
 
 ## Manuscript
 

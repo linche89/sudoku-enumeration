@@ -3,6 +3,11 @@
 This is the safe workflow for exact 2xC work. Current results and bottlenecks
 live in `../../STATUS.md`; dated timings live under `../reports/og2/`.
 
+Publication note (2026-09-07): the complete hybrid C6 count is closed and
+verified. For a fresh clone, begin with [the reproducibility guide](../reproducibility.md).
+The dated S1 windows and class-local C6 experiments below preserve operational
+history; they are not instructions to resume the completed production job.
+
 ## Build
 
 ```powershell

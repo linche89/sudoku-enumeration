@@ -1,19 +1,31 @@
 # Prototype and Decision Engines
 
 This directory keeps research prototypes and differential tests that still
-have audit value.  Most are outside the normal build.  The layer-DP candidate
-is the exception: the full repository verification builds and gates it through
-its dedicated scripts, while its source remains here until the C=6 preflight
-is complete.
+have audit value. Most are outside the normal build. The verified hybrid C6
+route also remains here to preserve source/build/checkpoint provenance: its
+location is not a statement that the completed count is still provisional.
+The full repository verification builds and gates the layer-DP engine through
+its dedicated scripts. Current numerical status is in `../../STATUS.md`.
 
 Highlights:
 
-- `layer_dp_gate.cpp` - the active global row-incremental C=6 candidate.
-  It is exact through C=5 and has a gated, fail-stop checkpoint/restart path,
-  but no full C=6 layer-4 or final count has been run.  Build and verify it
+- `layer_dp_gate.cpp` - the verified global row-incremental engine. Its final
+  contraction closed all 63,199 C6 classes from the complete reverse-F5 input
+  on 2026-09-07. It also has complete C=2--5 and checkpoint-recovery gates.
+  Build and verify it
   only through `../../scripts/build_layer_dp.ps1` and
   `../../scripts/verify_layer_dp.ps1`; see
   `../../docs/methods/layer-dp.md`.
+- `layer_shared_f4.cpp` and `layer_reverse_f5.cpp` - the complete C6 shared
+  graph-value and reverse native-value stages, with their own small-case and
+  recovery gates. Do not relaunch the finished production scans.
+- `s4_certificate_verify.py`, `s4_exact_sum.py`, `s4_exact_sum.ps1` -
+  standalone semantic and exact-sum checks for the complete final CSV.
+  See `../../docs/reproducibility.md` for the public certificate bundle.
+- `higher_c_structure_certificates.py`, `latin6_certificate.py`,
+  `layer_final_moment_audit.py`, `layer_terminal_transpose_audit.py` - bounded
+  exact structural checks; their scope is stated in
+  `../../docs/math/higher-c-structure.md`.
 - `source_target_frontier_bound.cpp` - a fast arithmetic certificate for the
   fixed-source target-frontier lower bound.  It derives a reachable C=6
   grade-2 witness, proves its stabilizer is trivial, cross-checks two permanent

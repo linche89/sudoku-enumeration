@@ -45,6 +45,7 @@ N(3)   = 28200960
 N(4)   = 29136487207403520
 N(5)   = 1903816047972624930994913280000
 F6(G1) = 6986348258918400
+N(6)   = 38296278920738107863746324732012492486187417600000
 ```
 
 Run the complete gate after structural changes and before handoff:
@@ -131,5 +132,7 @@ Before finishing:
 - report exact commands, results, commits, and any skipped optional gate.
 
 Do not claim that C=6 is solved unless the complete outer sum is independently
-closed and verified. The current exact achievement is the first outer class,
-not the full `N(6)`.
+closed and verified. That gate passed on 2026-09-07; see `STATUS.md` and
+`docs/reports/og2/c6-finalization-20260907.md`. Preserve the documented scope:
+the two final contractions share the same engine and closed F5 input, and
+certificate verification is not independent reevaluation of every F5 value.
