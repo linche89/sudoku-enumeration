@@ -1,0 +1,20 @@
+{
+  "mode": "C6_PRODUCTION_L5_SNAPSHOT",
+  "status": "CLOSED_EXPORTED_BACKED_UP_AND_INDEPENDENTLY_READ_BACK",
+  "source_path": "E:/Code/sudoku_FJ/data/checkpoints/c6_reverse_f5_closed_20260907.L5.snap",
+  "backup_path": "D:/sudoku_FJ_checkpoint_backups/c6_reverse_f5_20260905/20260907-142458-60c5a69f99fc4f98af862fa474975b7c-closed.L5.snap",
+  "sha256": "4CF50FAD4F7C5DB020D30DEF258CE06AEF63125352E351D331A07BE8E173A6CF",
+  "bytes": 3472307264,
+  "entries": 96452976,
+  "live": 96452755,
+  "holes": 221,
+  "orbit_mass": 4439972139072,
+  "semantics": "T5 = (46080 / stabilizer) * CLOSED_F5; plain production LDPCAN01 layer 5",
+  "new_F5_indices_during_export": 0,
+  "f5_integrity_audit_sha256": "B781B8EB2ADE49FC74A872443F604F16716F2341DA4B5252CDF3D06F18976D91",
+  "weighted_readback_audit_sha256": "3BAC093B49EA5C2E9636E979CAFBAAFA8919D62EA3272693AE343DB26B294260",
+  "export_controller_receipt": "data/logs/c6-finalization-20260907/export/receipt.json",
+  "native_readback_receipt": "data/logs/c6-finalization-20260907/native-export-readback/receipt.json",
+  "weighted_readback_receipt": "data/logs/c6-finalization-20260907/weighted-export-readback/receipt.json",
+  "N6": "NOT_COMPUTED"
+}

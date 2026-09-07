@@ -115,7 +115,27 @@ its physical copy, producer/independent-reader binaries and fresh gates.
 The reverse controller rehashes both native export copies before each run.
 The original generation-37 partial image remains untouched.
 
-## c6_reverse_f5_20260905 (partial closed-value F5 chunks)
+## c6_reverse_f5_20260905 (complete closed-value F5 chunks)
+
+Current complete state, independently audited 2026-09-07:
+
+```text
+prefix / complete domain: 96452976 / 96452976
+live / holes: 96452755 / 221
+chunk size / chunks / files: 10000 / 9646 / 9647
+bytes per physical copy: 774093440
+checksum modulo 2^64: 3850733904537200640
+manifest SHA256: 22E81759527CD4CA2309138F0EB9930094617598FD76492882C069D48D117E30
+backup: D:/sudoku_FJ_checkpoint_backups/c6_reverse_f5_20260905/20260907-134453-dfdbbc71d43147de82f6de62f1e5a01b-after/
+backup receipt SHA256: 3BEB4A48D98F275F5F17300B2A10743039BEB6F13EA23AFC31F0F9FB6809CBB6
+independent audit: data/logs/c6-finalization-20260907/f5-audit.json
+audit SHA256: B781B8EB2ADE49FC74A872443F604F16716F2341DA4B5252CDF3D06F18976D91
+```
+
+All headers, payload hashes, input/repair bindings, hole positions, factorial
+divisibility, counters and both copies were independently checked. This is
+not independent numerical reevaluation of all F5. No F5 suffix remains;
+do not restart the computing scan. Historical partial windows follow.
 
 2026-09-07 reviewed extension: prefix [0,93120000), 93,119,793 live values,
 207 holes, 9,312 chunks plus manifest, 747,344,128 bytes per physical copy.
@@ -165,6 +185,29 @@ Do not overwrite/trim it to the recorded prefix or treat an in-progress
 suffix as a reviewed completed-window result. The next command may use
 `run_f5.ps1 -WorkMinutes 450 -MaxMinutes 480` only after that session stops.
 The old namespace, all committed chunks and all physical copies are retained.
+
+## c6_reverse_f5_closed_20260907.L5.snap (closed native production L5)
+
+```text
+local: data/checkpoints/c6_reverse_f5_closed_20260907.L5.snap
+backup: D:/sudoku_FJ_checkpoint_backups/c6_reverse_f5_20260905/20260907-142458-60c5a69f99fc4f98af862fa474975b7c-closed.L5.snap
+bytes per copy: 3472307264
+SHA256 per copy: 4CF50FAD4F7C5DB020D30DEF258CE06AEF63125352E351D331A07BE8E173A6CF
+entries / live / holes: 96452976 / 96452755 / 221
+raw orbit mass: 4439972139072
+semantics: plain narrow native L5, production LDPCAN01, T5 = orbit size * closed F5
+new F5 chunks / IDs during export: 0 / 0
+independent weighted audit: data/logs/c6-finalization-20260907/l5-export-audit.json
+weighted audit SHA256: 3BAC093B49EA5C2E9636E979CAFBAAFA8919D62EA3272693AE343DB26B294260
+closed-input receipt: data/golden/og2-c6-closed-l5-export-receipt.json
+```
+
+The native producer's full roundtrip, independent native header/payload/SHA
+reader, both full physical-copy SHAs and independent all-record weighted
+readback passed. This is an accepted closed input for the owner-authorized
+final stage, not N(6). Inputs and original F4/F5 chunk namespaces remain
+unchanged. Detailed receipts/commands are in
+`docs/reports/og2/c6-finalization-20260907.md`.
 
 ## C6 rehearsal L5 support (read-only input to the new route)
 

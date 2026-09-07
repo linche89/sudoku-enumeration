@@ -2,19 +2,20 @@
 
 Last updated: 2026-09-07
 
-2026-09-07 continuation note: the morning F5 worker reached 93,120,000 IDs
-(96.5445%). Its RSS watcher failed on a telemetry append; computation ended
-at the native soft limit and the outer after-backup completed, but this was
-not a normal zero-exit controller session. A separate read-only check matched
-all 9,313 local/external file sizes and SHA-256 values. The owner authorized
-the remaining suffix after a telemetry-only repair; the new launcher refreshes
-gates before computing. No complete F5 or N(6) is established by this note.
-See `docs/reports/og2/c6-f5-telemetry-recovery-20260907.md`.
+2026-09-07 finalization update: F5 is completely closed and backed up:
+96,452,976 IDs, 96,452,755 live values and 221 holes. Independent full-domain
+byte/lineage/value-shape audit passed on all 9,647 files and both physical
+copies. The native L5 export has also been produced with zero new F5 work;
+its independent all-record weighted readback and separate-volume backup
+also pass. The owner's explicitly authorized final N(6) computation is the
+next gate. No complete N(6) is yet claimed.
+See `docs/reports/og2/c6-finalization-20260907.md`; the earlier telemetry
+incident is retained in `docs/reports/og2/c6-f5-telemetry-recovery-20260907.md`.
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.
 
-## Current C=6 decision (2026-09-06)
+## Current C=6 decision (2026-09-07)
 
 An exact new route now reuses the completed L4/L5 support catalogues, shares
 F4 graph values without merging native downstream responses, and computes
@@ -24,9 +25,10 @@ gates pass. The ninth bounded real C6 window completed the entire F4 namespace:
 140,069,579 closed graph-representative values. The independent FULL-domain
 byte/backup/alias audit passed: every live alias resolves to a closed value,
 with zero unresolved aliases. The owner has since completed the protected
-native F4 export and the first numerical F5 session: 30,200,000 saved IDs
-(31.3106%), with 30,199,969 live closed F5 values. No complete F5 catalogue
-or independently closed N(6) exists yet.
+native F4 export and the complete numerical F5 catalogue: 96,452,976 saved
+IDs (100%), with 96,452,755 live closed F5 values. Its independent integrity
+audit passes; final N(6) closure remains pending. Earlier dated window
+evidence below is historical, not the current F5 percentage.
 
 Window8 was interrupted by overnight workstation sleep and ended under the
 hard time bound after wake, at prefix 797,325,000 (controller exit 98).

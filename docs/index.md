@@ -56,6 +56,8 @@
 
 ## Dated evidence
 
+- `reports/og2/c6-finalization-20260907.md` — complete independent F5 integrity
+  audit, protected L5 export/readback and owner-authorized final N(6) gates.
 - `reports/og2/c6-f5-telemetry-recovery-20260907.md` — reviewed 93,120,000-ID
   prefix/backup, nonfatal telemetry append and exit-code repair, bounded
   owner-authorized final F5 suffix; not a complete N(6) claim.
