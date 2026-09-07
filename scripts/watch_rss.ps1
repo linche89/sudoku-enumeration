@@ -19,6 +19,26 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Telemetry must not abort the watchdog and enter WaitForExit before its
+# time/RSS checks. Use an explicitly shared write-only append stream instead
+# of the PowerShell Add-Content provider (which failed during live viewing).
+function Write-RssTelemetry([string]$Path, [string]$Line) {
+    $stream = $null
+    try {
+        $stream = [IO.FileStream]::new($Path, [IO.FileMode]::Append,
+            [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
+        $bytes = [Text.Encoding]::UTF8.GetBytes($Line + [Environment]::NewLine)
+        $stream.Write($bytes, 0, $bytes.Length)
+    } catch {
+        Write-Host ('RSS_TELEMETRY_WARNING: ' + $_.Exception.Message)
+    } finally {
+        if ($null -ne $stream) {
+            try { $stream.Dispose() }
+            catch { Write-Host ('RSS_TELEMETRY_WARNING: ' + $_.Exception.Message) }
+        }
+    }
+}
+
 $resolvedExe = (Resolve-Path -LiteralPath $Exe).Path
 if ($LogPath -eq "") {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -61,6 +81,9 @@ if ($MaxMinutes -gt 0) {
 }
 
 $proc = Start-Process @startInfo
+# Retain the OS handle while the child is alive. Windows PowerShell can
+# otherwise lose ExitCode after Refresh and silently return null.
+$null = $proc.Handle
 "timestamp,pid,rss_bytes,rss_gb" | Set-Content -LiteralPath $LogPath
 $started = Get-Date
 
@@ -73,7 +96,7 @@ try {
         if ($null -eq $p) { break }
         $rss = [int64]$p.WorkingSet64
         $gb = [Math]::Round($rss / 1GB, 3)
-        "$((Get-Date).ToString('o')),$($proc.Id),$rss,$gb" | Add-Content -LiteralPath $LogPath
+        Write-RssTelemetry $LogPath "$((Get-Date).ToString('o')),$($proc.Id),$rss,$gb"
         Write-Host ("rss={0}GB" -f $gb)
         if ($rss -gt $limitBytes) {
             Write-Host "RSS exceeded ${LimitGB}GB; stopping process $($proc.Id)"
@@ -98,7 +121,7 @@ finally {
 
 if ($proc.HasExited) {
     $code = $proc.ExitCode
-    if ($null -eq $code) { $code = 0 }
+    if ($null -eq $code) { throw 'Child exited without a readable exit code; refusing success' }
     Write-Host "process exited with code $code"
     exit $code
 }
