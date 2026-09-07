@@ -102,8 +102,9 @@ and physical backups are unchanged.
 
 ## Public repository
 
-The project is being published as linche89/sudoku-enumeration, preserving
-its existing Git history and historical attribution. The public entry points
+The project is published as
+[linche89/sudoku-enumeration](https://github.com/linche89/sudoku-enumeration),
+preserving its existing Git history and historical attribution. The public entry points
 are [README.md](README.md), [the reproducibility guide](docs/reproducibility.md)
 and [the documentation index](docs/index.md). Earlier operator-specific
 paths are provenance, not fresh-clone instructions.
@@ -112,3 +113,10 @@ No algorithm, canonicalization rule or checkpoint format was changed for
 publication. The full former status page is retained under docs/history/;
 uncommitted manuscripts and unrelated local probes are not part of this
 publication.
+
+The [C6 certificate release](https://github.com/linche89/sudoku-enumeration/releases/tag/c6-verified-2026-09-07)
+contains the complete final table and standalone checks, without the large
+F4/F5 checkpoints. Both the original workspace and a clean Windows clone
+passed the full regression; publication fixed only a C5 fixture's LF checkout
+rule, not its data. The public ZIP was downloaded and matched the tested
+payload. See [the publication report](docs/reports/repository-publication-20260907.md).

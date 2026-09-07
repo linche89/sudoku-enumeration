@@ -64,6 +64,10 @@
 
 ## Dated evidence
 
+- [Repository publication (2026-09-07)](reports/repository-publication-20260907.md)
+  — preserved history, clean-clone LF fixture fix, full gates, standalone
+  certificate package, remote push and public-download readback.
+
 - `reports/og2/c6-finalization-20260907.md` — complete independent F5 integrity
   audit, protected L5 export/readback, two identical 63,199-class final CSVs
   and independently verified exact N(6), with backups and numerical scope.

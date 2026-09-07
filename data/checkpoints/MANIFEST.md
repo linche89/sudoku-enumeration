@@ -59,6 +59,26 @@ Detailed commands, checks, limitations and timings:
 `docs/reports/og2/c6-finalization-20260907.md`. All earlier checkpoints and
 backups below remain protected; nothing was deleted to complete this result.
 
+### Public final-table distribution (2026-09-07)
+
+The complete final CSV is also available in the
+[C6 certificate release](https://github.com/linche89/sudoku-enumeration/releases/tag/c6-verified-2026-09-07).
+The ZIP contains the unchanged CSV, standalone semantic/Python/.NET checkers,
+instructions and a small manifest; no F4/F5 checkpoint or production executable
+is published. Existing local and external production paths above are unchanged.
+
+```text
+asset: sudoku-c6-certificate-2026-09-07.zip
+bytes: 1074359
+SHA256: 0B4769DEAE561308CD17960AF926087CDEA158BAB4DE38B32E9A78FC9ED35A12
+release source: abe06a0f3a04e481747a9720369df71d678c46ea
+```
+
+The public download was independently read back and matched the tested
+payload. Distribution evidence and the fresh-clone gate are recorded in
+`docs/reports/repository-publication-20260907.md`. The frozen production
+master receipt and its hashes were not modified for publication.
+
 ## c6_shared_f4_20260905 (closed-value chunks; new route)
 
 This namespace is NOT a closed native L4 image and is NOT a result for N(6).
