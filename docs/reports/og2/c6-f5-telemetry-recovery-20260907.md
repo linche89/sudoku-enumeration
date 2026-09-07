@@ -85,3 +85,13 @@ had its own 360-second / 6-GiB aggregate process-tree bound. The three
 protected production executables retained their pinned hashes.
 Machine-readable evidence is the session's `gates/receipt.json`.
 The canary controller was entered after these gates, not before them.
+
+At 13:42 the actual canary successfully resumed all 9,312 saved chunks and
+closed one new 10,000-ID chunk: prefix 93,130,000, 93,129,793 live values,
+5.374647 computation seconds / 46.221965 engine seconds. Engine exit was 0,
+stderr empty, and progress/RSS output advanced normally. Its after-backup
+was still pending at that observation. The launcher automatically validates
+that backup before starting its 75/90-minute regular window; no second
+manual invocation is needed. Canary logs:
+`data/logs/reverse-f5-window-20260907-133940-19271a6bc5754061bed9aac3e4b80de3/`.
+This is a started and advancing suffix, not a complete F5 certificate.
