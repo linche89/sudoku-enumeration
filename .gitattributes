@@ -8,6 +8,8 @@
 /data/golden/og2-higher-c-structure-20260907.json -text
 
 # The retained auxiliary source hashes were calculated with LF newlines.
+# verify_layer_dp.ps1 pins this fixture's exact LF bytes, including on Windows.
+/docs/expert/2026-07-21/native_c5_response_quotient_triples.csv text eol=lf
 /experiments/proto/higher_c_first_moment.cpp text eol=lf
 /experiments/proto/higher_c_structure_certificates.py text eol=lf
 /experiments/proto/latin6_certificate.py text eol=lf
