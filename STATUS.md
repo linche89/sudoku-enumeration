@@ -1,6 +1,15 @@
 # Current Project Status
 
-Last updated: 2026-09-06
+Last updated: 2026-09-07
+
+2026-09-07 continuation note: the morning F5 worker reached 93,120,000 IDs
+(96.5445%). Its RSS watcher failed on a telemetry append; computation ended
+at the native soft limit and the outer after-backup completed, but this was
+not a normal zero-exit controller session. A separate read-only check matched
+all 9,313 local/external file sizes and SHA-256 values. The owner authorized
+the remaining suffix after a telemetry-only repair; the new launcher refreshes
+gates before computing. No complete F5 or N(6) is established by this note.
+See `docs/reports/og2/c6-f5-telemetry-recovery-20260907.md`.
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.

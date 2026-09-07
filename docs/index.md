@@ -56,6 +56,9 @@
 
 ## Dated evidence
 
+- `reports/og2/c6-f5-telemetry-recovery-20260907.md` — reviewed 93,120,000-ID
+  prefix/backup, nonfatal telemetry append and exit-code repair, bounded
+  owner-authorized final F5 suffix; not a complete N(6) claim.
 - `reports/og2/c6-f5-live-progress-20260906.md` — read-only viewer for the
   running session and inline progress for future launches; parser, phase and
   native exit/logging tests; no checkpoint modification or N(6) claim.

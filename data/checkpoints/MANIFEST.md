@@ -117,6 +117,20 @@ The original generation-37 partial image remains untouched.
 
 ## c6_reverse_f5_20260905 (partial closed-value F5 chunks)
 
+2026-09-07 reviewed extension: prefix [0,93120000), 93,119,793 live values,
+207 holes, 9,312 chunks plus manifest, 747,344,128 bytes per physical copy.
+Producer checksum modulo 2^64: 3717224009369902080. All 9,313 local and
+external files matched their receipt sizes/SHA-256 in a separate read-only
+4.445432-second audit. External directory:
+`D:/sudoku_FJ_checkpoint_backups/c6_reverse_f5_20260905/20260907-074304-4048483a50df45b6874f83f26800761b-after/`.
+Receipt SHA-256: `34D1BB91AC042E7BB949942883F1851D6B3D2FBDF5A18F1A0E2AAF288000D7BD`.
+The native summary is INCOMPLETE_RESUMABLE; a telemetry exception means the
+controller did not end normally despite completing its after-backup. This
+is storage evidence, not independent numerical reevaluation. The owner has
+authorized a same-namespace suffix continuation; later chunks must not be
+trimmed to this reviewed prefix. See
+`docs/reports/og2/c6-f5-telemetry-recovery-20260907.md`.
+
 Last reviewed completed manual session, 2026-09-06 at 17:50. This is a
 resumable numerical F5 prefix, NOT a complete F5 layer or N(6).
 
