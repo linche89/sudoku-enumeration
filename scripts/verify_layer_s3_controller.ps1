@@ -26,7 +26,12 @@ $script:heldInputNames=New-Object 'Collections.Generic.HashSet[string]' ([String
 function Refused([scriptblock]$Probe,[string]$Reason) {
     $failed=$false
     try { & $Probe } catch {
-        if ($_.Exception.Message -notmatch [regex]::Escape($Reason)) {throw}
+        # Sharing-violation messages follow the OS locale. Validate the
+        # stable Win32 error code, not an English .NET exception string.
+        if ($Reason -eq 'being used by another process') {
+            $cause=$_.Exception.GetBaseException()
+            if (($cause.HResult -band 0xffff) -ne 32) {throw}
+        } elseif ($_.Exception.Message -notmatch [regex]::Escape($Reason)) {throw}
         $failed=$true
     }
     if (!$failed) {throw "Guard failed to reject: $Reason"}
