@@ -1,0 +1,35 @@
+{
+  "base": "e:\\code\\sudoku_fj\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_replay",
+  "c": 6,
+  "caps": [
+    2000,
+    14000000,
+    1350000000,
+    250000000,
+    100000
+  ],
+  "chunk_parents": 100000,
+  "dump": "e:\\code\\sudoku_fj\\data\\logs\\layer_dp_c6_s3_prod_20260907\\final-replay.csv",
+  "expected_n": "38296278920738107863746324732012492486187417600000",
+  "implementation": {
+    "compiler_sha256": "A30B01810E44EDAA465CC51F1DFFAE6267CB0092CC653D71B881970866039CCA",
+    "compiler_target": "x86_64-w64-mingw32",
+    "compiler_version": "13.2.0",
+    "source_sha256": {
+      "experiments/proto/layer_dp_gate.cpp": "4EA11C82948370D5102B0805C4C9AF61B3A67547CDBACB2DDD12D6A40DA9E8C2",
+      "scripts/build_layer_dp.ps1": "52CB7C9085218429541E0E04D2604A8DFDDDF28563FE8590F342C509BD998B6A",
+      "scripts/layer_dp_progress.py": "B995C498CBD9B567FF146BA9BFD37671D2F7F2B84E24E8C25A96A408608E6A5F",
+      "scripts/layer_s3_lineage.py": "7E5D81BD3C5DF4311ECF69DBB1390BD2245DD52DEE815B374BA776FB67CDFEF0"
+    }
+  },
+  "native_semantics": "LDPCAN01-production-unseeded-unforced-wide",
+  "parent_layer": 5,
+  "peer": "e:\\code\\sudoku_fj\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_primary",
+  "role": "replay",
+  "schema": "S3NSB001",
+  "source_bytes": 3472307264,
+  "source_config_hash": 8397770560680791923,
+  "source_header_hash": 4206164363621945703,
+  "source_path": "e:\\code\\sudoku_fj\\data\\checkpoints\\c6_reverse_f5_closed_20260907.l5.snap",
+  "source_sha256": "4CF50FAD4F7C5DB020D30DEF258CE06AEF63125352E351D331A07BE8E173A6CF"
+}

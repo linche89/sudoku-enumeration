@@ -1,5 +1,64 @@
 # Checkpoint Manifest
 
+## Complete C6 final certificate (2026-09-07)
+
+The full count is closed and independently certificate-verified:
+
+```text
+N(6): 38296278920738107863746324732012492486187417600000
+live final classes: 63199
+labelled mass: 622345892187672576
+CSV bytes: 4766612
+CSV SHA256: 84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7
+semantic SHA256: 292F8121743016528C0E523C4C7A14F4B4471DCA8BD93A279006DACDFF8FDB91
+primary CSV: data/logs/layer_dp_c6_s3_prod_20260907/final-primary.csv
+replay CSV: data/logs/layer_dp_c6_s3_prod_20260907/final-replay.csv
+external CSV: D:/sudoku_FJ_checkpoint_backups/layer_dp_c6_s3_prod_20260907/layer_dp_c6_final.csv
+source L5 SHA256: 4CF50FAD4F7C5DB020D30DEF258CE06AEF63125352E351D331A07BE8E173A6CF
+production source commit: 4dd86b590a2531993af0d00dbb93cf9a13b4de6c
+```
+
+Both fresh final contractions produced byte-identical CSVs. Independent
+semantic verification, Python/.NET exact sums, first-moment and Latin6
+checks passed. All native workers and the production controller exited;
+no further F5 or S3 computation is required. This is a certificate-verified
+exact computation, not an independent reevaluation of every F5 value.
+
+The separate external artifact directory is
+`D:/sudoku_FJ_checkpoint_backups/layer_dp_c6_s3_prod_20260907/`.
+
+| Local artifact | External name | Bytes | SHA-256 |
+|---|---|---:|---|
+| `layer_dp_c6_s3_prod_20260907_primary.L6.snap` | `primary.L6.snap` | 3286528 | `9A480B9723D36D10CBE719D7C9F8B33CA4D450AE7F095298B443D6525CEB182C` |
+| `layer_dp_c6_s3_prod_20260907_replay.L6.snap` | `replay.L6.snap` | 3286632 | `66C537A68BFE41797B544580B7358274C7B75BFD7BAB5B4037DDD05656726E6C` |
+
+The primary has 63,200 stable slots/one insertion hole; the replay has
+63,202 slots/three holes. This explains their different snapshot hashes;
+the complete deterministic per-class data is identical. Each namespace's
+`.a` and `.L6.snap` are hard links to its closed wide generation. The two
+namespace `.L5.snap` files are hard links to the immutable
+`c6_reverse_f5_closed_20260907.L5.snap`, not additional physical backups.
+These identities were checked with `fsutil hardlink list` on 2026-09-07.
+
+Both namespaces also have immutable `.s3-binding.json` and `.s3-result.json`
+receipts, with byte-identical external copies. Preserve them with the binary
+state: they bind the actual closed L5, command, final CSV and snapshot.
+The actual production executable is retained externally as
+`layer_dp_gate.production.exe`, 337,628 bytes, SHA-256
+`45C85C6A818893F435F0130755CA7C8FA7CDBA46BC3223F89A26F5EC4CC503B6`.
+
+Small tracked master receipt:
+`data/golden/og2-c6-final-certificate-receipt.json`, also physically copied
+under the external directory with the same name. Both copies have SHA-256
+`5BB7CD7F505662DFC87C19E901EE362BC3327D747FF2F0090A9921817656C10F`.
+It records all individual input/output/lineage/evidence hashes, exact sums,
+actual controller exit/time/memory and the final complete repository gate.
+The narrowly scoped `.gitattributes` rules preserve these hash-bound bytes.
+
+Detailed commands, checks, limitations and timings:
+`docs/reports/og2/c6-finalization-20260907.md`. All earlier checkpoints and
+backups below remain protected; nothing was deleted to complete this result.
+
 ## c6_shared_f4_20260905 (closed-value chunks; new route)
 
 This namespace is NOT a closed native L4 image and is NOT a result for N(6).

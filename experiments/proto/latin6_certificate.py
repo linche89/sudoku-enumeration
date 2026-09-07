@@ -63,4 +63,3 @@ for t in range(n // 2 + 1):
     ell = factorial(2 * n) // (factorial(n - t) ** 2 * factorial(t) ** 2)
     print('C6_FAMILY t=%d m=%d ell=%d F=%d words=%s slot_masks=%s' % (t, m, ell, value, words, masks))
 print('PASS visits=%d leaves=%d seconds=%.6f no_production_input=1' % (visits, leaves, time.monotonic() - started))
-

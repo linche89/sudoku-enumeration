@@ -1,0 +1,430 @@
+{
+  "schema": "OG2_HIGHER_C_SCOPED_CERTIFICATES_001",
+  "date": "2026-09-07",
+  "proof": "docs/math/higher-c-structure.md",
+  "scope": "Exact support formulas, scoped structure proofs, first-moment and Latin/transpose checks. No fast complete N(7), N(8), or N(9) method. C6 CSV checks do not independently recompute every F.",
+  "source_hash_scope": "Retained source bytes after removing one extra EOF blank line in three copies; no mathematical or arithmetic change. The affected certificates and GMP first-moment build/C6 run were rerun successfully under their original bounds.",
+  "normalization_validation_logs": ["data/logs/c6-finalization-20260907/higher-c-final-source/", "data/logs/c6-finalization-20260907/latin6-final-source/", "data/logs/c6-finalization-20260907/linear-final-source-build/", "data/logs/c6-finalization-20260907/linear-final-source-c6/"],
+  "sources": [
+    {
+      "path": "experiments/proto/higher_c_structure_certificates.py",
+      "sha256": "CF770767E4574BB65215906617836891D2506842A366F7306DED2C5F671A9184"
+    },
+    {
+      "path": "experiments/proto/latin6_certificate.py",
+      "sha256": "6F267FC81E1CDDE4B247AEB33F1A4C2DF29FA4598F0079C0FA0493F825AC33F4"
+    },
+    {
+      "path": "experiments/proto/higher_c_first_moment.cpp",
+      "sha256": "2EBEE43CCF925E5DDB360D56562523ECA1C552137DDDE1FAF64C206C2E74ACAE"
+    },
+    {
+      "path": "experiments/proto/linear_integer_compat/boost/multiprecision/cpp_int.hpp",
+      "sha256": "537E7FD1CF0317ED17E1B6541374F119E0068B3944E2FADFD638282B5F46F59E"
+    },
+    {
+      "path": "experiments/proto/layer_final_moment_audit.py",
+      "sha256": "9F3D8E14B9A2813D239E392764D8FF5602EC49DA47B2959020F21686C7837F8C"
+    },
+    {
+      "path": "experiments/proto/layer_terminal_transpose_audit.py",
+      "sha256": "FBD91288BD73A4CC837F4BAF94571A5276B8AEF3CF925433F4BF3C0CD64601DB"
+    }
+  ],
+  "runs": [
+    {
+      "label": "higher-c-retained",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "python",
+          "experiments/proto/higher_c_structure_certificates.py"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 1.45332019997295,
+        "sampled_peak_rss_bytes": 48128000,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "python",
+              "experiments/proto/higher_c_structure_certificates.py"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 1.453139999997802
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "RAW_DIFFERENTIAL 2 3 1 PASS\nRAW_DIFFERENTIAL 3 28 40 PASS\nRAW_DIFFERENTIAL 4 1450 12944 PASS\nC,complete_raw,outer_orbit_lower,penultimate_raw,penultimate_orbit_lower,penultimate_8byte_lower,partition_terms\n2,3,1,1,1,8,5\n3,28,1,40,1,8,11\n4,1450,4,12944,34,272,22\n5,589392,154,62185328,16195,129560,42\n6,2284361552,49574,4439972139072,96353563,770828504,77\n7,95810590463936,148515921,4778447429705719808,7407067568369,59256540546952,135\n8,46981500620124470512,4551624176522,77916645799614219084169216,7548658175960888971,60389265407687111768,231\n9,281653362065380754593475328,1515939767371987397,19307504101453704460645263566072576,103918565223081367186667164,831348521784650937493337312,385\nFAMILY_GRAPH_CHECK 2 0 4 2 PASS\nFAMILY_GRAPH_CHECK 2 1 2 1 PASS\nLATIN_REDUCED_AND_TOTAL 2 1 2\nFAMILY_GRAPH_CHECK 3 0 144 4 PASS\nFAMILY_GRAPH_CHECK 3 1 48 12 PASS\nLATIN_REDUCED_AND_TOTAL 3 1 12\nFAMILY_GRAPH_CHECK 4 0 331776 8 PASS\nFAMILY_GRAPH_CHECK 4 1 82944 32 PASS\nFAMILY_GRAPH_CHECK 4 2 55296 16 PASS\nLATIN_REDUCED_AND_TOTAL 4 4 576\nLATIN_REDUCED_AND_TOTAL 5 56 161280\nC5_REFERENCE_FAMILY [(0, (26011238400, 16, 252)), (1, (5202247680, 80, 6300)), (2, (2601123840, 80, 25200))] sha256=89AB2D962CBC5E63BDF7177FD2F7F0CEEF547A5561919A96BD62B8BB966E6B46\nTERMINAL_PAIRING_TRANSPORTERS states=355 admissible_pairings=699 antipodal_states=39 PASS\nTIGHT_CUT_CHECK 2 2 PASS\nTIGHT_CUT_CHECK 3 24 PASS\nTIGHT_CUT_CHECK 4 13824 PASS\nCIRCULANT_CORE_CHECK cases=6 right_subsets=3584 PASS\nFACTOR_MEMO CacheInfo(hits=595, misses=150, maxsize=200000, currsize=150)\nPASS elapsed_seconds=1.332551 visits=817238 no_production_input=1"
+    },
+    {
+      "label": "latin6-retained",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "python",
+          "experiments/proto/latin6_certificate.py"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.26279529999010265,
+        "sampled_peak_rss_bytes": 46333952,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "python",
+              "experiments/proto/latin6_certificate.py"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.2626653999905102
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "REDUCED_LATIN_ORDER6 9408\nLABELLED_MULTIPLIER 86400 = 6! * 5!\nLABELLED_LATIN_ORDER6 812851200\nREDUCED_ENUMERATION_ORDERED_SHA256 5F03649C3835253F2C28908E435B7993783F7C51ED6C35FF2B8B0FD0E61E8E21\nC6_FAMILY t=0 m=32 ell=924 F=660727073341440000 words=[0, 0, 0, 0, 0, 0, 63, 63, 63, 63, 63, 63] slot_masks=[1365, 1365, 1365, 1365, 1365, 1365, 2730, 2730, 2730, 2730, 2730, 2730]\nC6_FAMILY t=1 m=192 ell=33264 F=110121178890240000 words=[0, 0, 0, 0, 0, 1, 62, 63, 63, 63, 63, 63] slot_masks=[1365, 1365, 1365, 1365, 1365, 1366, 2729, 2730, 2730, 2730, 2730, 2730]\nC6_FAMILY t=2 m=192 ell=207900 F=44048471556096000 words=[0, 0, 0, 0, 1, 1, 62, 62, 63, 63, 63, 63] slot_masks=[1365, 1365, 1365, 1365, 1366, 1366, 2729, 2729, 2730, 2730, 2730, 2730]\nC6_FAMILY t=3 m=96 ell=369600 F=33036353667072000 words=[0, 0, 0, 1, 1, 1, 62, 62, 62, 63, 63, 63] slot_masks=[1365, 1365, 1365, 1366, 1366, 1366, 2729, 2729, 2729, 2730, 2730, 2730]\nPASS visits=199400 leaves=9408 seconds=0.154815 no_production_input=1"
+    },
+    {
+      "label": "linear-retained-c2",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "build/higher_c_first_moment.exe",
+          "2"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.10262300001340918,
+        "sampled_peak_rss_bytes": 29069312,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "build/higher_c_first_moment.exe",
+              "2"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.10247700000763871
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "C=2\norbit_counts_rows_0_to_C=1,1,1\nlayer_totals_rows_0_to_C=1,6,6\nfrom_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions\n0,1,1,1,1,1,1\n1,1,1,1,1,1,1\nA_C=6\nN_linear_C=2^(C^2)*A_C=96"
+    },
+    {
+      "label": "linear-retained-c3",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "build/higher_c_first_moment.exe",
+          "3"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.06756850000238046,
+        "sampled_peak_rss_bytes": 29843456,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "build/higher_c_first_moment.exe",
+              "3"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.06736529999761842
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "C=3\norbit_counts_rows_0_to_C=1,1,1,1\nlayer_totals_rows_0_to_C=1,90,900,900\nfrom_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions\n0,1,1,1,1,1,1\n1,1,1,3,1,1,1\n2,1,1,1,1,1,1\nA_C=900\nN_linear_C=2^(C^2)*A_C=460800"
+    },
+    {
+      "label": "linear-retained-c4",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "build/higher_c_first_moment.exe",
+          "4"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.0705722999991849,
+        "sampled_peak_rss_bytes": 30281728,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "build/higher_c_first_moment.exe",
+              "4"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.0704150999954436
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "C=4\norbit_counts_rows_0_to_C=1,1,4,1,1\nlayer_totals_rows_0_to_C=1,2520,748440,12640320,12640320\nfrom_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions\n0,1,1,1,1,1,1\n1,1,4,42,15,15,4\n2,4,1,12,4,1,4\n3,1,1,1,1,1,1\nA_C=12640320\nN_linear_C=2^(C^2)*A_C=828396011520"
+    },
+    {
+      "label": "linear-retained-c5",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "build/higher_c_first_moment.exe",
+          "5"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.07316339999670163,
+        "sampled_peak_rss_bytes": 32305152,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "build/higher_c_first_moment.exe",
+              "5"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.07301079999888316
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "C=5\norbit_counts_rows_0_to_C=1,1,7,7,1,1\nlayer_totals_rows_0_to_C=1,113400,1559930400,1500992337600,41376005798400,41376005798400\nfrom_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions\n0,1,1,1,1,1,1\n1,1,7,870,158,158,7\n2,7,7,1751,599,154,42\n3,7,1,54,7,1,7\n4,1,1,1,1,1,1\nA_C=41376005798400\nN_linear_C=2^(C^2)*A_C=1388348372994018508800"
+    },
+    {
+      "label": "linear-retained-c6",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "build/higher_c_first_moment.exe",
+          "6"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.7815902000002097,
+        "sampled_peak_rss_bytes": 43085824,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "build/higher_c_first_moment.exe",
+              "6"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.7814358999894466
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "C=6\norbit_counts_rows_0_to_C=1,1,24,132,24,1,1\nlayer_totals_rows_0_to_C=1,7484400,6928346502000,513470940732288000,1583587180574163072000,70957164389662881792000,70957164389662881792000\nfrom_row,source_orbits,target_orbits,contingency_leaves,raw_target_occurrences,globally_distinct_raw_targets,nonzero_orbit_transitions\n0,1,1,1,1,1,1\n1,1,24,27990,3355,3355,24\n2,24,132,281066,165678,36374,2352\n3,132,24,90557,57853,2758,2352\n4,24,1,218,24,1,24\n5,1,1,1,1,1,1\nA_C=70957164389662881792000\nN_linear_C=2^(C^2)*A_C=4876139207527966044188061990912000"
+    },
+    {
+      "label": "moment-self-test",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "python",
+          "experiments/proto/layer_final_moment_audit.py",
+          "--self-test"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.13337890000548214,
+        "sampled_peak_rss_bytes": 47677440,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "python",
+              "experiments/proto/layer_final_moment_audit.py",
+              "--self-test"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.13316260001738556
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "MOMENT AUDIT SELF-TEST PASS accepted=1 rejected=12"
+    },
+    {
+      "label": "moment-c5",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "python",
+          "experiments/proto/layer_final_moment_audit.py",
+          "--c",
+          "5",
+          "--classes",
+          "355",
+          "--linear-log",
+          "data/logs/c6-finalization-20260907/linear-c5/step.stdout.log",
+          "--latin-log",
+          "data/logs/c7-structure-research-20260907/finite-run-01/step.stdout.log",
+          "data/logs/layer-reverse-release-gate-7fb95b87165140fc91f36441d1877862/fixtures/native-final-stage.csv"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.13439210000797175,
+        "sampled_peak_rss_bytes": 47480832,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "python",
+              "experiments/proto/layer_final_moment_audit.py",
+              "--c",
+              "5",
+              "--classes",
+              "355",
+              "--linear-log",
+              "data/logs/c6-finalization-20260907/linear-c5/step.stdout.log",
+              "--latin-log",
+              "data/logs/c7-structure-research-20260907/finite-run-01/step.stdout.log",
+              "data/logs/layer-reverse-release-gate-7fb95b87165140fc91f36441d1877862/fixtures/native-final-stage.csv"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.134219600004144
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "{\"C\": 5, \"classes\": 355, \"csv\": \"E:\\\\Code\\\\sudoku_FJ\\\\data\\\\logs\\\\layer-reverse-release-gate-7fb95b87165140fc91f36441d1877862\\\\fixtures\\\\native-final-stage.csv\", \"csv_sha256\": \"C1E461F1624C96122F4485647EA208CFD4B654FF6081E3F4A78DA88B8F7A7B3E\", \"latin_family\": [{\"F\": 26011238400, \"ell\": 252, \"m\": 16, \"qid\": 0, \"t\": 0, \"words\": [0, 0, 0, 0, 0, 31, 31, 31, 31, 31]}, {\"F\": 5202247680, \"ell\": 6300, \"m\": 80, \"qid\": 2, \"t\": 1, \"words\": [0, 0, 0, 0, 15, 16, 31, 31, 31, 31]}, {\"F\": 2601123840, \"ell\": 25200, \"m\": 80, \"qid\": 39, \"t\": 2, \"words\": [0, 0, 0, 15, 15, 16, 16, 31, 31, 31]}], \"moments_0_1_2\": [1016255020032, 1388348372994018508800, 1903816047972624930994913280000], \"oracles\": {\"independent_linear\": 1388348372994018508800, \"labelled_latin\": 161280, \"latin_log\": \"E:\\\\Code\\\\sudoku_FJ\\\\data\\\\logs\\\\c7-structure-research-20260907\\\\finite-run-01\\\\step.stdout.log\", \"latin_log_sha256\": \"A0F351991581833C7AF7AF2022E409B2C54C13B9F3DAD3269F4C0BF046A6D610\", \"linear_log\": \"E:\\\\Code\\\\sudoku_FJ\\\\data\\\\logs\\\\c6-finalization-20260907\\\\linear-c5\\\\step.stdout.log\", \"linear_log_sha256\": \"146BABC77888A7E3A3B8F9D28954A4AE136CF1A7EEF7208C0C039CD4F6CBC8F9\", \"permutation_arrays\": 41376005798400, \"reduced_latin\": 56}, \"positive_F_divisible_by_factorial_C\": 355, \"scope\": \"additional moments and Latin anchors; not full numerical F recomputation\", \"status\": \"PASS\"}"
+    },
+    {
+      "label": "moment-c6-primary",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "python",
+          "experiments/proto/layer_final_moment_audit.py",
+          "--c",
+          "6",
+          "--classes",
+          "63199",
+          "--linear-log",
+          "data/logs/c6-finalization-20260907/linear-c6/step.stdout.log",
+          "--latin-log",
+          "data/logs/c7-structure-research-20260907/latin6-run-01/step.stdout.log",
+          "data/logs/layer_dp_c6_s3_prod_20260907/final-primary.csv"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.8462207999837119,
+        "sampled_peak_rss_bytes": 49299456,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "python",
+              "experiments/proto/layer_final_moment_audit.py",
+              "--c",
+              "6",
+              "--classes",
+              "63199",
+              "--linear-log",
+              "data/logs/c6-finalization-20260907/linear-c6/step.stdout.log",
+              "--latin-log",
+              "data/logs/c7-structure-research-20260907/latin6-run-01/step.stdout.log",
+              "data/logs/layer_dp_c6_s3_prod_20260907/final-primary.csv"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.8460786000068765
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "{\"C\": 6, \"classes\": 63199, \"csv\": \"E:\\\\Code\\\\sudoku_FJ\\\\data\\\\logs\\\\layer_dp_c6_s3_prod_20260907\\\\final-primary.csv\", \"csv_sha256\": \"84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7\", \"latin_family\": [{\"F\": 660727073341440000, \"ell\": 924, \"m\": 32, \"qid\": 0, \"t\": 0, \"words\": [0, 0, 0, 0, 0, 0, 63, 63, 63, 63, 63, 63]}, {\"F\": 110121178890240000, \"ell\": 33264, \"m\": 192, \"qid\": 4, \"t\": 1, \"words\": [0, 0, 0, 0, 0, 31, 32, 63, 63, 63, 63, 63]}, {\"F\": 44048471556096000, \"ell\": 207900, \"m\": 192, \"qid\": 134, \"t\": 2, \"words\": [0, 0, 0, 0, 31, 31, 32, 32, 63, 63, 63, 63]}, {\"F\": 33036353667072000, \"ell\": 369600, \"m\": 96, \"qid\": 3520, \"t\": 3, \"words\": [0, 0, 0, 31, 31, 31, 32, 32, 32, 63, 63, 63]}], \"moments_0_1_2\": [622345892187672576, 4876139207527966044188061990912000, 38296278920738107863746324732012492486187417600000], \"oracles\": {\"independent_linear\": 4876139207527966044188061990912000, \"labelled_latin\": 812851200, \"latin_log\": \"E:\\\\Code\\\\sudoku_FJ\\\\data\\\\logs\\\\c7-structure-research-20260907\\\\latin6-run-01\\\\step.stdout.log\", \"latin_log_sha256\": \"3F59B9BFAA0B115A7500BBFE86AF45DA3659B796C5402C980E73292865D271FA\", \"linear_log\": \"E:\\\\Code\\\\sudoku_FJ\\\\data\\\\logs\\\\c6-finalization-20260907\\\\linear-c6\\\\step.stdout.log\", \"linear_log_sha256\": \"F7DCE165B9BB9D26E23B9DF68936EE235482BE40A1508A6474468C2B0B54F7EF\", \"permutation_arrays\": 70957164389662881792000, \"reduced_latin\": 9408}, \"positive_F_divisible_by_factorial_C\": 63199, \"scope\": \"additional moments and Latin anchors; not full numerical F recomputation\", \"status\": \"PASS\"}"
+    },
+    {
+      "label": "transpose-c5",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "python",
+          "experiments/proto/layer_terminal_transpose_audit.py",
+          "--c",
+          "5",
+          "--classes",
+          "355",
+          "data/logs/layer-reverse-release-gate-7fb95b87165140fc91f36441d1877862/fixtures/native-final-stage.csv"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 0.19647570000961423,
+        "sampled_peak_rss_bytes": 47747072,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "python",
+              "experiments/proto/layer_terminal_transpose_audit.py",
+              "--c",
+              "5",
+              "--classes",
+              "355",
+              "data/logs/layer-reverse-release-gate-7fb95b87165140fc91f36441d1877862/fixtures/native-final-stage.csv"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 0.19643259997246787
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "{\"C\": 5, \"antipodal_classes\": 39, \"antipodal_raw_mass\": 15504, \"classes\": 355, \"csv\": \"E:\\\\Code\\\\sudoku_FJ\\\\data\\\\logs\\\\layer-reverse-release-gate-7fb95b87165140fc91f36441d1877862\\\\fixtures\\\\native-final-stage.csv\", \"csv_sha256\": \"C1E461F1624C96122F4485647EA208CFD4B654FF6081E3F4A78DA88B8F7A7B3E\", \"exchanged_pairs\": [[1, 39], [7, 131], [17, 139], [34, 203], [62, 176], [68, 123], [143, 349], [167, 275], [212, 298]], \"scope\": \"terminal-only graph isomorphism and F symmetry; not F reevaluation\", \"self_transpose_classes\": 21, \"status\": \"PASS\", \"unpaired_graph_classes\": 346}"
+    },
+    {
+      "label": "transpose-c6-primary",
+      "receipt": {
+        "status": "PASS",
+        "command": [
+          "python",
+          "experiments/proto/layer_terminal_transpose_audit.py",
+          "--c",
+          "6",
+          "--classes",
+          "63199",
+          "data/logs/layer_dp_c6_s3_prod_20260907/final-primary.csv"
+        ],
+        "guard_seconds": 30,
+        "aggregate_rss_limit_bytes": 1073741824,
+        "expected_exit": 0,
+        "seconds": 1.0416126000054646,
+        "sampled_peak_rss_bytes": 95547392,
+        "runs": [
+          {
+            "label": "step",
+            "command": [
+              "python",
+              "experiments/proto/layer_terminal_transpose_audit.py",
+              "--c",
+              "6",
+              "--classes",
+              "63199",
+              "data/logs/layer_dp_c6_s3_prod_20260907/final-primary.csv"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 1.0414661999966484
+          }
+        ],
+        "surviving_tracked_processes": []
+      },
+      "stdout": "{\"C\": 6, \"antipodal_classes\": 388, \"antipodal_raw_mass\": 2324784, \"classes\": 63199, \"csv\": \"E:\\\\Code\\\\sudoku_FJ\\\\data\\\\logs\\\\layer_dp_c6_s3_prod_20260907\\\\final-primary.csv\", \"csv_sha256\": \"84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7\", \"exchanged_pairs\": [[1, 3520], [2, 134], [18, 3322], [20, 36086], [22, 3337], [24, 3421], [53, 190], [74, 3604], [87, 31870], [93, 2495], [181, 3801], [206, 12780], [227, 37076], [241, 36847], [259, 18154], [392, 20182], [574, 2867], [603, 12306], [605, 13525], [617, 982], [712, 3213], [741, 18039], [744, 46258], [763, 12150], [770, 17482], [860, 35424], [871, 37191], [929, 18248], [1467, 20659], [1720, 31731], [1824, 11024], [2072, 19573], [2124, 53633], [2137, 20701], [2142, 3844], [2500, 48170], [2530, 36911], [2542, 11086], [2581, 3710], [2753, 13305], [2822, 34620], [3167, 13774], [3605, 52936], [3612, 36437], [3745, 19801], [3774, 33063], [4028, 41351], [4059, 26442], [4091, 58572], [4163, 18077], [4219, 39205], [4352, 15701], [4385, 12443], [4407, 41317], [4444, 17494], [4780, 35154], [4810, 12556], [4871, 36403], [5004, 15613], [5191, 36983], [5296, 49489], [5324, 36122], [5331, 36187], [5807, 25649], [5953, 14460], [6014, 15582], [6104, 17660], [6417, 34511], [6966, 19896], [6990, 20625], [7761, 27882], [8023, 38976], [8203, 39649], [8320, 48885], [11005, 26507], [11444, 45960], [12154, 41366], [12193, 13363], [12667, 38550], [13686, 20545], [13943, 49147], [14436, 38704], [14559, 40061], [14610, 38294], [15209, 35224], [15292, 18105], [15362, 38499], [15392, 39144], [15596, 38341], [16047, 33143], [16377, 50130], [16426, 35529], [17504, 39230], [17546, 45883], [17677, 23702], [20042, 37834], [20189, 41001], [20786, 28539], [21334, 41828], [21382, 53010], [21505, 48205], [21537, 58278], [22232, 26214], [22745, 55573], [23726, 31600], [24964, 47833], [25077, 39426], [25903, 38211], [26243, 55671], [26967, 53694], [28015, 62661], [28036, 53423], [28420, 28488], [28476, 58874], [28863, 47550], [29994, 52626], [30223, 39356], [31956, 52466], [32145, 46791], [32159, 39486], [32720, 37022], [32917, 37500], [32991, 56526], [34795, 49738], [35062, 38595], [36149, 40043], [37521, 46827], [37643, 54485], [37850, 48673], [37954, 42670], [38848, 49871], [39495, 55876], [39579, 46733], [39842, 50978], [40963, 42316], [41813, 52472], [42848, 48978], [43113, 45798], [43141, 56946], [44715, 59208], [48186, 54240], [52641, 59368], [53332, 59214], [54067, 62770], [58282, 62439], [60009, 62451]], \"scope\": \"terminal-only graph isomorphism and F symmetry; not F reevaluation\", \"self_transpose_classes\": 96, \"status\": \"PASS\", \"unpaired_graph_classes\": 63053}"
+    }
+  ]
+}

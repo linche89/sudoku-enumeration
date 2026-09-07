@@ -106,4 +106,3 @@ private:
 };
 
 } // namespace boost::multiprecision
-

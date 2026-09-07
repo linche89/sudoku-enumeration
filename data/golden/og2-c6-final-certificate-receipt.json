@@ -1,0 +1,302 @@
+{
+  "schema": "OG2_COMPLETE_C6_CERTIFICATE_001",
+  "date": "2026-09-07",
+  "status": "CLOSED_AND_VERIFIED",
+  "C": 6,
+  "classes": 63199,
+  "exact_N": "38296278920738107863746324732012492486187417600000",
+  "labelled_mass": "622345892187672576",
+  "independent_first_moment": "4876139207527966044188061990912000",
+  "csv_sha256": "84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7",
+  "semantic_sha256": "292F8121743016528C0E523C4C7A14F4B4471DCA8BD93A279006DACDFF8FDB91",
+  "production_source_commit": "4dd86b590a2531993af0d00dbb93cf9a13b4de6c",
+  "method": "Shared closed F4 graph values; complete reverse F5; two final native contractions; independent semantic and arbitrary-precision sum checks",
+  "scope": "The two contractions share the same exact engine and closed F5 input. Independent storage/coverage/normalization/sum and moment/anchor checks are not a second numerical recomputation of every F4/F5/F6 value.",
+  "closed_L5_receipt": "data/golden/og2-c6-closed-l5-export-receipt.json",
+  "auxiliary_certificates": "data/golden/og2-higher-c-structure-20260907.json",
+  "artifacts": [
+    {
+      "local": {
+        "path": "E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\final-primary.csv",
+        "bytes": 4766612,
+        "sha256": "84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7"
+      },
+      "backup": {
+        "path": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\layer_dp_c6_final.csv",
+        "bytes": 4766612,
+        "sha256": "84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7"
+      }
+    },
+    {
+      "local": {
+        "path": "E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\final-replay.csv",
+        "bytes": 4766612,
+        "sha256": "84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7"
+      },
+      "backup": {
+        "path": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\layer_dp_c6_final.csv",
+        "bytes": 4766612,
+        "sha256": "84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7"
+      }
+    },
+    {
+      "local": {
+        "path": "E:\\Code\\sudoku_FJ\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_primary.L6.snap",
+        "bytes": 3286528,
+        "sha256": "9A480B9723D36D10CBE719D7C9F8B33CA4D450AE7F095298B443D6525CEB182C"
+      },
+      "backup": {
+        "path": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\primary.L6.snap",
+        "bytes": 3286528,
+        "sha256": "9A480B9723D36D10CBE719D7C9F8B33CA4D450AE7F095298B443D6525CEB182C"
+      }
+    },
+    {
+      "local": {
+        "path": "E:\\Code\\sudoku_FJ\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_replay.L6.snap",
+        "bytes": 3286632,
+        "sha256": "66C537A68BFE41797B544580B7358274C7B75BFD7BAB5B4037DDD05656726E6C"
+      },
+      "backup": {
+        "path": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\replay.L6.snap",
+        "bytes": 3286632,
+        "sha256": "66C537A68BFE41797B544580B7358274C7B75BFD7BAB5B4037DDD05656726E6C"
+      }
+    }
+  ],
+  "lineage": [
+    {
+      "local": {
+        "path": "E:\\Code\\sudoku_FJ\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_primary.s3-binding.json",
+        "bytes": 1558,
+        "sha256": "E2A064CEE0DBFD37CC77C5CA15C57F54A672C74C55512D92AF10CE5A86775F5B"
+      },
+      "backup": {
+        "path": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\primary.s3-binding.json",
+        "bytes": 1558,
+        "sha256": "E2A064CEE0DBFD37CC77C5CA15C57F54A672C74C55512D92AF10CE5A86775F5B"
+      }
+    },
+    {
+      "local": {
+        "path": "E:\\Code\\sudoku_FJ\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_primary.s3-result.json",
+        "bytes": 927,
+        "sha256": "E069B53C5F2680FF759FB96F647EC51844ED066C76AC6F30563F1A6EEF7532F4"
+      },
+      "backup": {
+        "path": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\primary.s3-result.json",
+        "bytes": 927,
+        "sha256": "E069B53C5F2680FF759FB96F647EC51844ED066C76AC6F30563F1A6EEF7532F4"
+      }
+    },
+    {
+      "local": {
+        "path": "E:\\Code\\sudoku_FJ\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_replay.s3-binding.json",
+        "bytes": 1556,
+        "sha256": "686779555E2CE91A211BB63828C7922B5A4335E3EB34D08897F09C7C982857DF"
+      },
+      "backup": {
+        "path": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\replay.s3-binding.json",
+        "bytes": 1556,
+        "sha256": "686779555E2CE91A211BB63828C7922B5A4335E3EB34D08897F09C7C982857DF"
+      }
+    },
+    {
+      "local": {
+        "path": "E:\\Code\\sudoku_FJ\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_replay.s3-result.json",
+        "bytes": 922,
+        "sha256": "8366DA72146ECA53C0C8EF2520E9A0F5983310BF6C2DB143C0549C6DA2C9692F"
+      },
+      "backup": {
+        "path": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\replay.s3-result.json",
+        "bytes": 922,
+        "sha256": "8366DA72146ECA53C0C8EF2520E9A0F5983310BF6C2DB143C0549C6DA2C9692F"
+      }
+    }
+  ],
+  "production_executable_backup": {
+    "path": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\layer_dp_gate.production.exe",
+    "bytes": 337628,
+    "sha256": "45C85C6A818893F435F0130755CA7C8FA7CDBA46BC3223F89A26F5EC4CC503B6"
+  },
+  "evidence": [
+    {
+      "path": "E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\summary.txt",
+      "bytes": 2411,
+      "sha256": "226BC79EF838A58F1AA43548E3FB2AF5D2689149C05E1615836A905136D424B6"
+    },
+    {
+      "path": "E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\certificate.log",
+      "bytes": 492,
+      "sha256": "6BCF7C9A8A803FD558508B1D6BC3D3FE0C1B18940AB23B5E9A306B1FFA0D531F"
+    },
+    {
+      "path": "E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\sum-python.log",
+      "bytes": 427,
+      "sha256": "ADE99F651B46164C835D202884F0D3B40B467FB4F8E7221D6ED131154235700F"
+    },
+    {
+      "path": "E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\sum-powershell.log",
+      "bytes": 312,
+      "sha256": "C860D5E230E0624F9FBE4610B1D0254883856F0B431CA291B39FBF2B710634C9"
+    },
+    {
+      "path": "E:\\Code\\sudoku_FJ\\data\\logs\\c6-finalization-20260907\\s3-production\\receipt.json",
+      "bytes": 2489,
+      "sha256": "C60DEEB0578793D1278721E2220872EAE58D80C4A581580DB38B8FA5F497F8DC"
+    },
+    {
+      "path": "E:\\Code\\sudoku_FJ\\data\\logs\\c6-finalization-20260907\\final-verify-all\\receipt.json",
+      "bytes": 671,
+      "sha256": "7E57114CB7297E03893F0A7D33D0F06118C103813746C1516C648C05A7622439"
+    },
+    {
+      "path": "E:\\Code\\sudoku_FJ\\data\\logs\\c6-finalization-20260907\\moment-c6-complete\\step.stdout.log",
+      "bytes": 3103,
+      "sha256": "31A36C61DD02D515C3A5674DCCAC0F04F8537FBB3F7C352D56FAE944A2831A35"
+    }
+  ],
+  "controller_summary": {
+    "mode": "C6_PRODUCTION_S3_FINALIZED",
+    "git_head": "4dd86b590a2531993af0d00dbb93cf9a13b4de6c",
+    "layer5_sha256": "4CF50FAD4F7C5DB020D30DEF258CE06AEF63125352E351D331A07BE8E173A6CF",
+    "primary_csv": "E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\final-primary.csv",
+    "primary_binding_sha256": "E2A064CEE0DBFD37CC77C5CA15C57F54A672C74C55512D92AF10CE5A86775F5B",
+    "replay_binding_sha256": "686779555E2CE91A211BB63828C7922B5A4335E3EB34D08897F09C7C982857DF",
+    "primary_result_sha256": "E069B53C5F2680FF759FB96F647EC51844ED066C76AC6F30563F1A6EEF7532F4",
+    "replay_result_sha256": "8366DA72146ECA53C0C8EF2520E9A0F5983310BF6C2DB143C0549C6DA2C9692F",
+    "session_max_hours": "2.5",
+    "backup_reserve_minutes": "15",
+    "replay_csv": "E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\final-replay.csv",
+    "csv_sha256": "84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7",
+    "semantic_sha256": "292F8121743016528C0E523C4C7A14F4B4471DCA8BD93A279006DACDFF8FDB91",
+    "classes": "63199",
+    "G1_F": "6986348258918400",
+    "G2_F": "7053808087203840",
+    "python_sum": "38296278920738107863746324732012492486187417600000",
+    "powershell_sum": "38296278920738107863746324732012492486187417600000",
+    "expected_n": "38296278920738107863746324732012492486187417600000",
+    "external_csv": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\layer_dp_c6_final.csv",
+    "external_csv_receipt": "D:\\sudoku_FJ_checkpoint_backups\\layer_dp_c6_s3_prod_20260907\\layer_dp_c6_final.csv.sha256.txt",
+    "command_records": "E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\primary\\command.txt;E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\replay\\command.txt",
+    "primary_command": "E:\\Code\\sudoku_FJ\\build\\layer_dp_gate.exe 6 --threads 24 --caps 2000,14000000,1350000000,250000000,100000 --ckpt-chunk 100000 --checkpoint E:\\Code\\sudoku_FJ\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_primary 40 --dump E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\primary\\final.csv --ack-full-c6 --load-layer 5 E:\\Code\\sudoku_FJ\\data\\checkpoints\\c6_reverse_f5_closed_20260907.L5.snap",
+    "replay_command": "E:\\Code\\sudoku_FJ\\build\\layer_dp_gate.exe 6 --threads 24 --caps 2000,14000000,1350000000,250000000,100000 --ckpt-chunk 100000 --checkpoint E:\\Code\\sudoku_FJ\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_replay 40 --dump E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\replay\\final.csv --ack-full-c6 --load-layer 5 E:\\Code\\sudoku_FJ\\data\\checkpoints\\c6_reverse_f5_closed_20260907.L5.snap"
+  },
+  "controller_guard": {
+    "status": "PASS",
+    "command": [
+      "powershell",
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "scripts/run_layer_dp_c6_s3_finalize.ps1",
+      "-AuthorizeFullC6",
+      "-Layer5",
+      "data/checkpoints/c6_reverse_f5_closed_20260907.L5.snap",
+      "-Layer5Backup",
+      "D:/sudoku_FJ_checkpoint_backups/c6_reverse_f5_20260905/20260907-142458-60c5a69f99fc4f98af862fa474975b7c-closed.L5.snap",
+      "-Layer5Sha256",
+      "4CF50FAD4F7C5DB020D30DEF258CE06AEF63125352E351D331A07BE8E173A6CF",
+      "-PrimaryBase",
+      "data/checkpoints/layer_dp_c6_s3_prod_20260907_primary",
+      "-ReplayBase",
+      "data/checkpoints/layer_dp_c6_s3_prod_20260907_replay",
+      "-ExternalBackupDir",
+      "D:/sudoku_FJ_checkpoint_backups/layer_dp_c6_s3_prod_20260907",
+      "-LogRoot",
+      "data/logs/layer_dp_c6_s3_prod_20260907",
+      "-SessionMaxHours",
+      "2.5",
+      "-MaxHoursPerAttempt",
+      "1",
+      "-ReserveMinutes",
+      "15",
+      "-RssLimitGB",
+      "32",
+      "-Threads",
+      "24"
+    ],
+    "guard_seconds": 9600,
+    "aggregate_rss_limit_bytes": 51539607552,
+    "expected_exit": 0,
+    "seconds": 3319.0009196000174,
+    "sampled_peak_rss_bytes": 4806529024,
+    "runs": [
+      {
+        "label": "step",
+        "command": [
+          "powershell",
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "scripts/run_layer_dp_c6_s3_finalize.ps1",
+          "-AuthorizeFullC6",
+          "-Layer5",
+          "data/checkpoints/c6_reverse_f5_closed_20260907.L5.snap",
+          "-Layer5Backup",
+          "D:/sudoku_FJ_checkpoint_backups/c6_reverse_f5_20260905/20260907-142458-60c5a69f99fc4f98af862fa474975b7c-closed.L5.snap",
+          "-Layer5Sha256",
+          "4CF50FAD4F7C5DB020D30DEF258CE06AEF63125352E351D331A07BE8E173A6CF",
+          "-PrimaryBase",
+          "data/checkpoints/layer_dp_c6_s3_prod_20260907_primary",
+          "-ReplayBase",
+          "data/checkpoints/layer_dp_c6_s3_prod_20260907_replay",
+          "-ExternalBackupDir",
+          "D:/sudoku_FJ_checkpoint_backups/layer_dp_c6_s3_prod_20260907",
+          "-LogRoot",
+          "data/logs/layer_dp_c6_s3_prod_20260907",
+          "-SessionMaxHours",
+          "2.5",
+          "-MaxHoursPerAttempt",
+          "1",
+          "-ReserveMinutes",
+          "15",
+          "-RssLimitGB",
+          "32",
+          "-Threads",
+          "24"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 3319.0007960000075
+      }
+    ],
+    "surviving_tracked_processes": []
+  },
+  "final_repository_gate": {
+    "status": "PASS",
+    "command": [
+      "powershell",
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "scripts/verify_all.ps1"
+    ],
+    "guard_seconds": 360,
+    "aggregate_rss_limit_bytes": 8589934592,
+    "expected_exit": 0,
+    "seconds": 171.56921079999302,
+    "sampled_peak_rss_bytes": 1132478464,
+    "runs": [
+      {
+        "label": "step",
+        "command": [
+          "powershell",
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "scripts/verify_all.ps1"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 171.56902090000222
+      }
+    ],
+    "surviving_tracked_processes": []
+  },
+  "semantic_certificate_output": "certificate = E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\final-primary.csv\nC = 6\nclasses = 63199  OK\nsum(m*ell) = 622345892187672576  OK\nG1 = qid 43200, F=6986348258918400  BOUND\nG2 = qid 43206, F=7053808087203840  BOUND\nweighted_square = 38296278920738107863746324732012492486187417600000\ncsv_sha256 = 84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7\nsemantic_sha256 = 292F8121743016528C0E523C4C7A14F4B4471DCA8BD93A279006DACDFF8FDB91\nCERTIFICATE PASS",
+  "python_exact_sum_output": "dump = E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\final-primary.csv\nC = 6  (2C = 12 words per representative)\nclasses = 63199  OK (expected 63199)\nsum(m*ell) = 622345892187672576  OK (== binomial(12,6)^6)\nexpected F values present: 6986348258918400, 7053808087203840  OK\nN(6) = 38296278920738107863746324732012492486187417600000\nN check vs expected 38296278920738107863746324732012492486187417600000: PASS",
+  "dotnet_exact_sum_output": "dump = E:\\Code\\sudoku_FJ\\data\\logs\\layer_dp_c6_s3_prod_20260907\\final-primary.csv\nC = 6\nclasses = 63199  OK\nsum(m*ell) = 622345892187672576  OK\nN(6) = 38296278920738107863746324732012492486187417600000\nN check vs expected 38296278920738107863746324732012492486187417600000: PASS\nPOWERSHELL EXACT SUM PASS"
+}

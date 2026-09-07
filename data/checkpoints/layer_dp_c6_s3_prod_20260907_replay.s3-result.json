@@ -1,0 +1,13 @@
+{
+  "binding_sha256": "686779555E2CE91A211BB63828C7922B5A4335E3EB34D08897F09C7C982857DF",
+  "command_record": "e:\\code\\sudoku_fj\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\replay\\command.txt",
+  "command_sha256": "536153F624867FDBD7A8EBF89C3094145822BF63A5EAE289421E0C9B927AC2AF",
+  "csv_sha256": "84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7",
+  "final_csv": "e:\\code\\sudoku_fj\\data\\logs\\layer_dp_c6_s3_prod_20260907\\final-replay.csv",
+  "final_snapshot": "e:\\code\\sudoku_fj\\data\\checkpoints\\layer_dp_c6_s3_prod_20260907_replay.l6.snap",
+  "prepared_csv": "e:\\code\\sudoku_fj\\data\\logs\\layer_dp_c6_s3_prod_20260907\\session-001\\replay\\final.csv",
+  "role": "replay",
+  "schema": "S3RSP001",
+  "snapshot_sha256": "66C537A68BFE41797B544580B7358274C7B75BFD7BAB5B4037DDD05656726E6C",
+  "source_sha256": "4CF50FAD4F7C5DB020D30DEF258CE06AEF63125352E351D331A07BE8E173A6CF"
+}
