@@ -11,9 +11,15 @@ physical backup.
 
 ## Current boundary
 
-S1 is partial at generation 37 / cursor 38 of 124.  There is no closed L4
-snapshot, so S2 and S3 cannot currently pass their mandatory input checks.
-The active and external generation-37 SHA-256 is:
+The full C6 result was independently certificate-verified on 2026-09-07.
+The successful route used shared F4, reverse F5 and this S3 controller, not
+completion of the original forward S1. Its protected closed L5 export and
+both final S3 snapshots/receipts are listed in the checkpoint manifest;
+commands and exact evidence are in `../reports/og2/c6-finalization-20260907.md`.
+There is no remaining F5 or S3 production work for that result.
+
+The historical forward S1 remains partial at generation 37 / cursor 38 of
+124 and must be preserved. Its active and external generation-37 SHA-256 is:
 
 ```text
 ECF0837315B0FDF8AE21C394FDA6676490E43B1828A0825529A344EC17E4E844

@@ -2,12 +2,16 @@
 
 ## Status
 
-`experiments/proto/layer_dp_gate.cpp` is a qualified C=6 implementation
-candidate, not a completed C=6 result.  It is exact and independently gated
-through C=5.  Its checkpoint/restart path has passed repeated process-kill,
-wide-accumulator, corrupt-generation fallback, and snapshot round-trip tests.
-Production S1 is partial at generation 37 / cursor 38 of 124; no full C=6
-layer-4 construction or 63,199-class contraction has been run.
+On 2026-09-07, `experiments/proto/layer_dp_gate.cpp` completed two full C6
+final contractions from the independently integrity-checked closed reverse-F5
+export. Both 63,199-class CSVs were byte-identical and passed independent
+semantic verification and arbitrary-precision summation, reproducing N(6).
+See `../reports/og2/c6-finalization-20260907.md` for commands, hashes and scope.
+The original forward S1 remains partial at generation 37 / cursor 38 of 124;
+the successful hybrid route instead closed F4 by graph-value sharing and F5
+by reverse recurrence. This does not claim the old S1 stream was completed.
+The complete C2--C5, process-kill, wide-accumulator, corruption fallback and
+snapshot round-trip gates remain mandatory.
 
 The raw design notes under `docs/expert/2026-07-26/` and
 `docs/expert/2026-07-27/` explain the route's provenance.  This file records

@@ -5,9 +5,11 @@
 `experiments/proto/s4_certificate_verify.py` is an independent semantic
 verifier for the final layer-DP CSV.  It has passed a complete C=5 gate on all
 355 classes, rejects a deliberately falsified orbit size, and independently
-constructs the C=6 G1/G2 canonical witnesses and stabilizers.  No complete
-C=6 CSV exists yet, so the 63,199-row application of this verifier remains a
-future production gate.
+constructs the C=6 G1/G2 canonical witnesses and stabilizers. On 2026-09-07
+its complete 63,199-row C6 application passed, including canonicality,
+stabilizers, labelled mass and bound G1/G2 values. Both full final runs had
+the same CSV SHA-256, and separate Python/.NET exact sums reproduced N(6).
+See `../reports/og2/c6-finalization-20260907.md` for the completed certificate.
 
 The verifier does not read a checkpoint and does not call or link the C++
 engine.  Its witness is the `representative_words` field in each CSV row.
@@ -105,7 +107,7 @@ python experiments\proto\s4_certificate_verify.py `
 ```
 
 The complete C=5 regression is exercised by `scripts/verify_layer_dp.ps1`.
-The future final C=6 invocation is frozen as:
+The final C=6 invocation, now exercised on the complete CSV, is:
 
 ```powershell
 python experiments\proto\s4_certificate_verify.py FINAL.csv `

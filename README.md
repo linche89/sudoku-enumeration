@@ -6,8 +6,10 @@ The repository contains three related tracks:
 
 - a completed, independently verified reproduction of the Felgenhauer-Jarvis
   9x9 terminal-grid count;
-- exact 2xC engines with complete C=2..5 gates and active C=6 research;
-- mathematical work on aggregating the 63,199 C=6 outer skeleton classes.
+- exact 2xC engines with complete C=2..5 gates and a fully computed,
+  independently certificate-verified C=6 result;
+- mathematical work on higher-C structure, using the complete 63,199-class
+  C6 certificate as data (no fast complete C7--C9 route is yet established).
 
 Read [STATUS.md](STATUS.md) first. It is the only authoritative statement of
 current results and open problems. The full documentation map is
@@ -21,8 +23,8 @@ current results and open problems. The full documentation map is
 - `data/golden/` — small tracked verification data.
 - `data/checkpoints/` — ignored binary checkpoints plus a tracked manifest.
 - `data/logs/` — ignored transient output.
-- `experiments/` — decision prototypes, the preflight-stage layer-DP
-  candidate, and legacy kernels.
+- `experiments/` — decision prototypes, the verified hybrid C6 layer-DP
+  implementation and structural checkers, plus legacy kernels.
 - `reference/` — immutable external material and verification fixtures.
 - `build/` — generated binaries; ignored and safe to recreate.
 

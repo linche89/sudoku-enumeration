@@ -1,5 +1,13 @@
 # C=6 Current Mathematical Bottleneck
 
+2026-09-07 closure: the complete N(6) has now been computed by the shared-F4,
+reverse-F5 and final global-contraction route, with two identical 63,199-class
+CSVs, independent semantic checks and exact sums. See
+`../reports/og2/c6-finalization-20260907.md`. The bottleneck discussion below
+preserves the earlier method-development record; it is not remaining C6 work.
+Current higher-C structural results and still-open fast scalar contraction
+questions are in `higher-c-structure.md`.
+
 ## What is solved
 
 - The outer family has exactly 63,199 skeleton orbits.

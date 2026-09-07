@@ -29,5 +29,7 @@
 Superseded code lives in `experiments/legacy/`; bounded decision engines and
 pre-promotion candidates live in `experiments/proto/`.  The layer-DP candidate
 there has its own build/gate scripts and is called by the full repository
-verification, but it remains outside `src/` until its C=6 preflight is
-complete.
+verification. Its shared-F4/reverse-F5/final-contraction route has now closed
+and independently certificate-verified the complete C6 count. Its location
+under `experiments/proto/` is retained; no source reorganization accompanied
+the numerical finalization. See `docs/reports/og2/c6-finalization-20260907.md`.

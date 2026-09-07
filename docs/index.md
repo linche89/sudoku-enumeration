@@ -36,6 +36,10 @@
 
 ## Current mathematics
 
+- `math/higher-c-structure.md` — proved all-C Latin and separator-response
+  formulas, explicit higher-C table-size bounds, terminal graph-cache barrier,
+  independent Latin6 anchors and complete C6 transpose/moment checks; no
+  demonstrated fast complete N(7)--N(9) algorithm.
 - `math/c6-current-bottleneck.md` — audited C=6 mathematical frontier.
 - `math/penultimate-layer-burnside.md` — exact native penultimate-layer
   Burnside count, including `M_5(6) = 96,452,755` and small-C differentials.
@@ -57,7 +61,8 @@
 ## Dated evidence
 
 - `reports/og2/c6-finalization-20260907.md` — complete independent F5 integrity
-  audit, protected L5 export/readback and owner-authorized final N(6) gates.
+  audit, protected L5 export/readback, two identical 63,199-class final CSVs
+  and independently verified exact N(6), with backups and numerical scope.
 - `reports/og2/c6-f5-telemetry-recovery-20260907.md` — reviewed 93,120,000-ID
   prefix/backup, nonfatal telemetry append and exit-code repair, bounded
   owner-authorized final F5 suffix; not a complete N(6) claim.

@@ -2,15 +2,26 @@
 
 Last updated: 2026-09-07
 
-2026-09-07 finalization update: F5 is completely closed and backed up:
-96,452,976 IDs, 96,452,755 live values and 221 holes. Independent full-domain
-byte/lineage/value-shape audit passed on all 9,647 files and both physical
-copies. The native L5 export has also been produced with zero new F5 work;
-its independent all-record weighted readback and separate-volume backup
-also pass. The owner's explicitly authorized final N(6) computation is the
-next gate. No complete N(6) is yet claimed.
-See `docs/reports/og2/c6-finalization-20260907.md`; the earlier telemetry
-incident is retained in `docs/reports/og2/c6-f5-telemetry-recovery-20260907.md`.
+2026-09-07 finalization: the complete exact C=6 count is CLOSED AND VERIFIED.
+
+```text
+N(6) = 38296278920738107863746324732012492486187417600000
+```
+
+All 96,452,755 live F5 values were closed, independently storage/lineage
+audited, exported with an independent all-record weighted readback, and
+physically backed up. Two fresh final contractions each produced all 63,199
+classes and byte-identical CSVs. Independent Python representative/orbit/
+multiplicity/coverage verification and Python/.NET arbitrary-precision sums
+passed. Independent first-moment, four Latin6 anchors, positivity and 6!
+divisibility checks also passed. The CSV and both final snapshots are backed
+up on D:. This independently reproduces the previously reported N(6), not a
+new discovery of its decimal value. The computational objective is 100% done.
+
+The two contractions use the same engine and closed F5 input; their agreement
+is a replay check, not a second independent numerical evaluation of every F5.
+See `docs/reports/og2/c6-finalization-20260907.md` for the precise evidence and
+scope. The earlier telemetry incident remains documented separately.
 
 This is the single authoritative status page. Dated reports preserve evidence;
 historical handoffs and raw expert responses are not current project state.
@@ -27,8 +38,21 @@ byte/backup/alias audit passed: every live alias resolves to a closed value,
 with zero unresolved aliases. The owner has since completed the protected
 native F4 export and the complete numerical F5 catalogue: 96,452,976 saved
 IDs (100%), with 96,452,755 live closed F5 values. Its independent integrity
-audit passes; final N(6) closure remains pending. Earlier dated window
-evidence below is historical, not the current F5 percentage.
+audit, protected L5 export and full final N(6) closure all pass. Each final
+contraction emitted 5,563,295,272 records; transition times were 1321.670 and
+1331.336 seconds. The complete two-run controller, including its fresh full
+gate, independent certificate/sums and backups, took 3319.0009196 seconds
+with a sampled aggregate peak of 4,806,529,024 bytes and no surviving child.
+Earlier dated window evidence below is historical, not the current percentage.
+
+Higher-C research is now separate from the completed C6 objective. There are
+proved all-C Latin-family and separator-response formulas, but no demonstrated
+fast complete N(7), N(8) or N(9) route. An explicit penultimate table at C7 has
+at least 7,407,067,568,369 native orbits: one eight-byte payload per orbit
+alone requires 59,256,540,546,952 bytes. This is not a lower bound on every
+scalar algorithm. Terminal unpaired graph caching saves at most a factor two;
+on the complete C6 CSV it saves only 146 of 63,199 classes. Proofs and bounded
+finite certificates: `docs/math/higher-c-structure.md`.
 
 Window8 was interrupted by overnight workstation sleep and ended under the
 hard time bound after wake, at prefix 797,325,000 (controller exit 98).
@@ -162,7 +186,13 @@ literature audit.  This project's C=6 objective is therefore an independent,
 open verification of that historical claim, not discovery of a new integer.
 See `docs/reports/og2/literature-audit-20260712.md`.
 
-## C=6 frontier
+## Historical C=6 frontier and dated development record
+
+The following frontier/development notes preserve the evidence accumulated
+before the 2026-09-07 closure above. Statements below about an unrun full sum,
+missing closed inputs or earlier prefixes are historical, not the current
+completion state. The original forward S1 checkpoint remains partial; the
+successful route used shared F4, reverse F5 and the final global contraction.
 
 There are exactly 63,199 outer skeleton orbits. The first one is closed:
 
@@ -907,25 +937,30 @@ See `docs/reports/og2/c6-s3-lineage-handoff-20260905.md`.
 ## Current checkpoints
 
 All retained checkpoints are documented in `data/checkpoints/MANIFEST.md`.
-The original layer-DP production image remains the partial generation 37
-described above. The new shared-F4 namespace contains the independently
-closed representative values/aliases just described and now has a verified
-native F4 export. The new F5 namespace has a reviewed 30,200,000-ID prefix;
-the owner's later session is in progress. The separate factorization/orbit
-graph memo contains 5,315,962 closed
-exact values.  Neither binary is stored in Git.  Factorization verification
+The original forward layer-DP production image remains the partial generation
+37 described above and is preserved. The shared-F4 namespace and its native
+export are completely closed. The reverse-F5 namespace has all 96,452,976
+stable IDs closed, including 221 holes; its protected native L5 export is
+`c6_reverse_f5_closed_20260907.L5.snap`. Both final S3 namespaces have closed
+wide L6 snapshots, immutable lineage/result receipts and separately hashed
+physical backups. The full 63,199-class CSV has SHA-256
+`84F2720E7BA8296D78604153B934B7291AF93C329C07F5D46538F9D7101127C7`.
+The separate factorization/orbit graph memo still contains 5,315,962 closed
+exact values. Large binary state and CSVs are not stored in Git; small
+receipts and the manifest are. Factorization verification
 must use `checkpointreadonly`; layer-DP production images are inspected only
 through their read-only header/hash helper or a protected staged resume.
 
 ## Active implementation tracks
 
-- `layer_dp_gate` (experiments/proto): row-incremental layer DP, the
-  qualified C=6 candidate; audited runbook in `docs/methods/layer-dp.md`.
+- `layer_dp_gate` (experiments/proto): exact row-incremental layer DP; its
+  final contraction has completed and verified all C6 classes from the closed
+  reverse-F5 input. Audited method in `docs/methods/layer-dp.md`.
 - `layer_shared_f4` / `layer_reverse_f5` (experiments/proto): new exact
   support-reuse route, complete C5 and recovery gates passed; bounded real
-  C6 F4 namespace now completely closed, independently audited and exported.
-  Numerical F5 has a reviewed 30,200,000-ID prefix and an owner-run continuation;
-  no complete F5 catalogue or final sum yet.
+  C6 F4/F5 namespaces completely closed, independently integrity audited and
+  exported; the full hybrid N(6) route is complete. No further production
+  F5 window is needed.
 - `factorization_orbit`: primary C=2..5 exact factorization/orbit engine and
   the C=5 oracle for the layer DP.
 - `multiset_q`: independent transfer-kernel research and cross-check route.

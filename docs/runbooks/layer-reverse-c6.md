@@ -3,16 +3,19 @@
 This is the new **S2 computation of closed five-row values**, not a final
 Sudoku count. It consumes a newly verified closed native L4 snapshot and
 reuses the old rehearsal L5 file **only as a support catalogue**. The owner's
-first manual C6 session has now closed 30,200,000 IDs (31.3106%) and physically
-backed up its 3,020 immutable chunks. The complete F4 export exists, but F5
-is not yet complete and N(6) is not computed. See the checkpoint manifest and
-`../reports/og2/c6-f5-window1-and-long-window-20260906.md` for this production
-evidence; the earlier qualification evidence follows below.
+completed F5 catalogue now contains all 96,452,976 stable IDs, including 221
+holes, with 9,646 immutable chunks and a verified external copy. The protected
+native L5 export has passed independent all-record weighted readback, and the
+separate S3 stage has completed and independently certificate-verified N(6).
+See `../reports/og2/c6-finalization-20260907.md` and the checkpoint manifest.
+No further F5 production window is needed. The earlier window1 evidence in
+`../reports/og2/c6-f5-window1-and-long-window-20260906.md` and qualification
+instructions below are historical/recovery guidance, not remaining work.
 
 Read `../../STATUS.md`, `../../data/checkpoints/MANIFEST.md` and `og2.md`
 before a computing window. The user has authorized completing the exact C6
 goal; this runbook does not extend the agreed computing availability or
-bypass the safety gates. The first real F5 run is a 10,000-ID pilot with an
+bypass the safety gates. The first real F5 run was a 10,000-ID pilot with an
 eight-minute soft and ten-minute hard child limit. Review its exact results,
 memory and backup evidence before scaling within the agreed daily window.
 
