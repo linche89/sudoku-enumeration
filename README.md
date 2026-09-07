@@ -149,9 +149,18 @@ blob. The intermediate F4/F5 data are **not included in a clone or the ZIP**.
 Historical E: and D: paths in runbooks refer to the original workstation;
 do not use its root-level production launchers as a fresh-clone quick start.
 
-## Provenance and licensing
+## AI-assisted development
 
-Raw expert responses are research inputs, not established mathematical facts.
+This project was developed with assistance from **5.6Sol**, **6-Astra**,
+**Opus5**, and other AI tools. AI assistance supported mathematical
+exploration, implementation, debugging, verification tooling, and documentation.
+
+The project maintainer remains responsible for the published claims and
+artifacts. Results are supported by explicit derivations, exact computations,
+and reproducible checks; AI-generated suggestions alone are not mathematical
+proofs or verification certificates.
+
+## Provenance and licensing
 
 Historical attribution and third-party notices remain applicable. No blanket
 license has been selected for this repository; public access alone does not
